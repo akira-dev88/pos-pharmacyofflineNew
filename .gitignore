@@ -24,8 +24,12 @@ dist-ssr
 *.sw?
 .env
 
-database/
-database/*.db
-database/*.db-wal
-database/*.db-shmrelease/
+# Database files (not source code)
+*.db
+*.db-wal
+*.db-shm
+server/database/
+
+# Build output
+release/
 server/dist/
