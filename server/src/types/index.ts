@@ -21,6 +21,7 @@ export interface Product {
 }
 
 export interface ProductCreateInput {
+  hsn_code?: string;
   name: string;
   price: number;
   barcode?: string;
@@ -36,6 +37,7 @@ export interface ProductUpdateInput {
   sku?: string;
   gst_percent?: number;
   stock?: number;
+  hsn_code?: string; 
 }
 
 export interface ProductSearchParams {

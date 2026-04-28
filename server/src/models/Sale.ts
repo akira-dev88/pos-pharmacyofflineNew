@@ -10,7 +10,7 @@ export class SaleModel {
     payments: Array<{ method: string; amount: number; reference?: string }>
   ): { sale: Sale; paid: number; balance: number } {
     const saleUuid = uuidv4();
-    
+
     const transaction = db.transaction(() => {
       let total = 0;
       let taxTotal = 0;
@@ -19,7 +19,7 @@ export class SaleModel {
       for (const item of cartData.items) {
         const itemTotal = item.price * item.quantity;
         const taxAmount = (itemTotal * item.tax_percent) / 100;
-        
+
         total += itemTotal;
         taxTotal += taxAmount;
 
@@ -39,7 +39,7 @@ export class SaleModel {
       }
 
       const grandTotal = total + taxTotal;
-      
+
       // Generate invoice number
       const invoiceNumber = this.generateInvoiceNumber();
 
@@ -68,7 +68,7 @@ export class SaleModel {
 
       for (const item of cartData.items) {
         const itemTaxAmount = (item.price * item.quantity * item.tax_percent) / 100;
-        
+
         insertItem.run(
           saleUuid,
           item.product_uuid,
@@ -147,7 +147,7 @@ export class SaleModel {
       `).run(cartData.cart_uuid);
 
       const sale = db.prepare('SELECT * FROM sales WHERE sale_uuid = ?').get(saleUuid) as Sale;
-      
+
       return { sale, paid: paidAmount, balance };
     });
 
@@ -257,7 +257,7 @@ export class SaleModel {
       }
 
       const sale = db.prepare('SELECT * FROM sales WHERE sale_uuid = ?').get(saleUuid) as Sale;
-      
+
       return { sale, items: itemsData };
     });
 
@@ -276,11 +276,11 @@ export class SaleModel {
     if (!sale) return null;
 
     const items = db.prepare(`
-      SELECT si.*, p.name as product_name
-      FROM sale_items si
-      LEFT JOIN products p ON si.product_uuid = p.product_uuid
-      WHERE si.sale_uuid = ?
-    `).all(saleUuid) as any[];
+  SELECT si.*, p.name as product_name, p.hsn_code
+  FROM sale_items si
+  LEFT JOIN products p ON si.product_uuid = p.product_uuid
+  WHERE si.sale_uuid = ?
+`).all(saleUuid) as any[];
 
     const payments = db.prepare(
       'SELECT method, amount FROM payments WHERE sale_uuid = ?'
@@ -296,17 +296,20 @@ export class SaleModel {
       const price = Number(item.price);
       const qty = Number(item.quantity);
       const taxPercent = Number(item.tax_percent);
-      
+
       const base = price * qty;
       const tax = (base * taxPercent) / 100;
 
       invoiceItems.push({
         name: item.product_name,
+        hsn_code: item.hsn_code || null,
         qty: qty,
         price: price,
         total: Math.round(base * 100) / 100,
         tax_percent: taxPercent,
-        tax_amount: Math.round(tax * 100) / 100
+        tax_amount: Math.round(tax * 100) / 100,
+        cgst: Math.round((tax / 2) * 100) / 100,
+        sgst: Math.round((tax / 2) * 100) / 100
       });
 
       total += base;
@@ -354,7 +357,7 @@ export class SaleModel {
   private static generateInvoiceNumber(): string {
     const setting = db.prepare('SELECT * FROM settings LIMIT 1').get() as any;
     const prefix = setting?.invoice_prefix || 'INV';
-    
+
     // Get last invoice number
     const lastSale = db.prepare(`
       SELECT invoice_number FROM sales 
@@ -384,7 +387,7 @@ export class SaleModel {
   // Get sales list with pagination - Pattern matching PHP index
   static findAll(page: number = 1, limit: number = 50, filters: any): { sales: Sale[], total: number } {
     const offset = (page - 1) * limit;
-    
+
     const sales = db.prepare(
       'SELECT * FROM sales ORDER BY created_at DESC LIMIT ? OFFSET ?'
     ).all(limit, offset) as Sale[];
@@ -408,8 +411,8 @@ export class SaleModel {
 
     const payments = db.prepare('SELECT * FROM payments WHERE sale_uuid = ?').all(uuid);
 
-    const customer = sale.customer_uuid ? 
-      db.prepare('SELECT * FROM customers WHERE customer_uuid = ?').get(sale.customer_uuid) : 
+    const customer = sale.customer_uuid ?
+      db.prepare('SELECT * FROM customers WHERE customer_uuid = ?').get(sale.customer_uuid) :
       null;
 
     return {

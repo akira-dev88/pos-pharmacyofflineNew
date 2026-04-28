@@ -13,6 +13,13 @@ export async function addItem(cart_uuid: string, product_uuid: string) {
   });
 }
 
+export async function checkout(cart_uuid: string, customer_uuid: string | null, payments: any[]) {
+  return await apiPost(`/carts/${cart_uuid}/checkout`, {
+    customer_uuid,
+    payments
+  });
+}
+
 // 📥 Get Cart
 export async function getCart(cart_uuid: string) {
   return await apiGet(`/carts/${cart_uuid}`);

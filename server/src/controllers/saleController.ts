@@ -13,36 +13,36 @@ export class SaleController {
       // Get cart with items
       const cart = CartModel.findWithItems(cartUuid);
       if (!cart) {
-        res.status(404).json({ 
-          success: false, 
-          error: 'Cart not found' 
+        res.status(404).json({
+          success: false,
+          error: 'Cart not found'
         });
         return;
       }
 
       // Check if cart is active
       if (cart.status !== 'active') {
-        res.status(400).json({ 
-          success: false, 
-          error: 'Cart is not active. Current status: ' + cart.status 
+        res.status(400).json({
+          success: false,
+          error: 'Cart is not active. Current status: ' + cart.status
         });
         return;
       }
 
       // Check if cart has items
       if (!cart.items || cart.items.length === 0) {
-        res.status(400).json({ 
-          success: false, 
-          error: 'Cart is empty' 
+        res.status(400).json({
+          success: false,
+          error: 'Cart is empty'
         });
         return;
       }
 
       // Validate payments
       if (!payments || !Array.isArray(payments) || payments.length === 0) {
-        res.status(400).json({ 
-          success: false, 
-          error: 'At least one payment method is required' 
+        res.status(400).json({
+          success: false,
+          error: 'At least one payment method is required'
         });
         return;
       }
@@ -53,9 +53,9 @@ export class SaleController {
 
       // Validate payment amounts
       if (Math.abs(totalPaid - grandTotal) > 0.01) { // Allow small rounding differences
-        res.status(400).json({ 
-          success: false, 
-          error: `Payment amount mismatch. Total: ${grandTotal}, Paid: ${totalPaid}` 
+        res.status(400).json({
+          success: false,
+          error: `Payment amount mismatch. Total: ${grandTotal}, Paid: ${totalPaid}`
         });
         return;
       }
@@ -67,16 +67,20 @@ export class SaleController {
         payments
       );
 
+      // Get full invoice data including shop info, items, GST breakdown
+      const invoice = SaleModel.getInvoice(sale.sale.sale_uuid);
+
       res.status(201).json({
         success: true,
         message: 'Checkout successful',
-        data: sale
+        data: sale,
+        invoice: invoice
       });
     } catch (error: any) {
       console.error('Checkout error:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: error.message || 'Internal server error' 
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Internal server error'
       });
     }
   };
@@ -107,9 +111,9 @@ export class SaleController {
       });
     } catch (error) {
       console.error('List sales error:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: 'Internal server error' 
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error'
       });
     }
   };
@@ -121,9 +125,9 @@ export class SaleController {
       const sale = SaleModel.findById(saleUuid);
 
       if (!sale) {
-        res.status(404).json({ 
-          success: false, 
-          error: 'Sale not found' 
+        res.status(404).json({
+          success: false,
+          error: 'Sale not found'
         });
         return;
       }
@@ -134,9 +138,9 @@ export class SaleController {
       });
     } catch (error) {
       console.error('Show sale error:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: 'Internal server error' 
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error'
       });
     }
   };

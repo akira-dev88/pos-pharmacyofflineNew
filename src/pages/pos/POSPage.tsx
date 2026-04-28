@@ -16,6 +16,7 @@ import { useCustomers } from "./hooks/useCustomers";
 import { IonIcon } from '@ionic/react';
 import { storefrontOutline } from 'ionicons/icons';
 import InvoiceReceipt from "./components/InvoiceReceipt";
+import { getSettings } from "../../renderer/services/settingsApi";
 
 function POSpage() {
   const navigate = useNavigate();
@@ -61,6 +62,15 @@ function POSpage() {
     loadSales,
     sales,
   } = useCustomers();
+
+  const [shopSettings, setShopSettings] = useState<any>(null);
+
+  useEffect(() => {
+    getSettings().then(res => {
+      if (res?.data) setShopSettings(res.data);
+      else if (res?.shop_name) setShopSettings(res);
+    });
+  }, []);
 
   // Save scroll positions function
   const saveScrollPositions = () => {
@@ -143,11 +153,11 @@ function POSpage() {
     const restoreTimer = setTimeout(() => {
       const savedPositions = sessionStorage.getItem('pos_scroll_positions');
       console.log('Restoring scroll positions:', savedPositions);
-      
+
       if (savedPositions) {
         try {
           const { productGrid, cartItems, paymentSummary } = JSON.parse(savedPositions);
-          
+
           if (productGridRef.current && productGrid > 0) {
             productGridRef.current.scrollTop = productGrid;
           }
@@ -275,22 +285,26 @@ function POSpage() {
           </div>
 
           {/* Store Info - Not scrollable */}
-          <div className="m-3 p-3 bg-[#212121] rounded-xl flex-shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="rounded-xl bg-black p-2">
-                <IonIcon icon={storefrontOutline} className="text-2xl text-gray-300" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <div className="text-base font-bold text-white">My Store</div>
-                  <div className="text-xs text-gray-400">GSTIN: 33ABCDE1234F1Z5</div>
-                </div>
-                <div className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
-                  <span>Chennai, Tamil Nadu</span>
-                </div>
-              </div>
-            </div>
-          </div>
+<div className="m-3 p-3 bg-[#212121] rounded-xl flex-shrink-0">
+  <div className="flex items-center gap-3">
+    <div className="rounded-xl bg-black p-2">
+      <IonIcon icon={storefrontOutline} className="text-2xl text-gray-300" />
+    </div>
+    <div className="flex-1">
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="text-base font-bold text-white">
+          {shopSettings?.shop_name || 'My Store'}
+        </div>
+        {shopSettings?.gstin && (
+          <div className="text-xs text-gray-400">GSTIN: {shopSettings.gstin}</div>
+        )}
+      </div>
+      <div className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
+        <span>{shopSettings?.address || 'Set address in Settings'}</span>
+      </div>
+    </div>
+  </div>
+</div>
 
           {/* Cart Items List - Scrollable */}
           <div

@@ -6,12 +6,12 @@ export class ProductModel {
   // Create new product
   static create(input: ProductCreateInput): Product {
     const uuid = uuidv4();
-    
+
     const stmt = db.prepare(`
-      INSERT INTO products (
-        product_uuid, name, barcode, sku, price, gst_percent, stock
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
+    INSERT INTO products (
+      product_uuid, name, barcode, sku, price, gst_percent, stock, hsn_code
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
 
     stmt.run(
       uuid,
@@ -20,7 +20,8 @@ export class ProductModel {
       input.sku || null,
       input.price,
       input.gst_percent || 0,
-      input.stock || 0
+      input.stock || 0,
+      input.hsn_code || null
     );
 
     return this.findById(uuid)!;
@@ -47,7 +48,7 @@ export class ProductModel {
   // List all products (paginated)
   static findAll(page: number = 1, limit: number = 20): { products: Product[], total: number } {
     const offset = (page - 1) * limit;
-    
+
     const products = db.prepare(
       'SELECT * FROM products ORDER BY created_at DESC LIMIT ? OFFSET ?'
     ).all(limit, offset) as Product[];
@@ -121,7 +122,7 @@ export class ProductModel {
     const product = this.findById(uuid);
     if (!product) return undefined;
 
-    const allowedFields = ['name', 'barcode', 'sku', 'price', 'gst_percent', 'stock'];
+    const allowedFields = ['name', 'barcode', 'sku', 'price', 'gst_percent', 'stock', 'hsn_code'];
     const updateFields: string[] = [];
     const values: any[] = [];
 
@@ -150,8 +151,8 @@ export class ProductModel {
     const product = this.findById(uuid);
     if (!product) return undefined;
 
-    const currentStock = operation === 'add' 
-      ? product.stock + quantity 
+    const currentStock = operation === 'add'
+      ? product.stock + quantity
       : product.stock - quantity;
 
     if (currentStock < 0) {

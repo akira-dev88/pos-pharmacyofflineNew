@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import { runMigrations } from './database/migrations/001_initial';
+import { addHsnCode } from './database/migrations/002_hsn';
 
 // Import routes
 import authRoutes from './routes/auth';
@@ -31,6 +32,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Run database migrations
 runMigrations();
+addHsnCode();
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -86,16 +88,16 @@ export function startServer(): Promise<void> {
 
 // Check if running in Electron
 const isElectron = process.env.ELECTRON_RUNNING === 'true';
-const isMainModule = typeof require !== 'undefined' && require.main === module;
+// const isMainModule = typeof require !== 'undefined' && require.main === module;
 
 // Only auto-start if:
 // 1. Not in Electron (Electron will call startServer manually)
 // 2. It's the main module
-if (isMainModule) {
+// if (isMainModule) {
   startServer().catch((error) => {
-    console.error('Failed to start server:', error);
-    process.exit(1);
-  });
-}
+  console.error('Failed to start server:', error);
+  process.exit(1);
+});
+// }
 
 export default app;

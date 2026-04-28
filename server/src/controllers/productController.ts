@@ -22,13 +22,13 @@ export class ProductController {
   // Create new product
   static create = (req: AuthRequest, res: Response): void => {
     try {
-      const { name, price, barcode, sku, gst_percent, stock } = req.body;
+      const { name, price, barcode, sku, gst_percent, stock, hsn_code } = req.body;
 
       // Validation
       if (!name || price === undefined) {
-        res.status(400).json({ 
-          success: false, 
-          error: 'Name and price are required' 
+        res.status(400).json({
+          success: false,
+          error: 'Name and price are required'
         });
         return;
       }
@@ -37,9 +37,9 @@ export class ProductController {
       if (barcode && typeof barcode === 'string') {
         const existingBarcode = ProductModel.findByBarcode(barcode);
         if (existingBarcode) {
-          res.status(400).json({ 
-            success: false, 
-            error: 'Product with this barcode already exists' 
+          res.status(400).json({
+            success: false,
+            error: 'Product with this barcode already exists'
           });
           return;
         }
@@ -49,9 +49,9 @@ export class ProductController {
       if (sku && typeof sku === 'string') {
         const existingSku = ProductModel.findBySku(sku);
         if (existingSku) {
-          res.status(400).json({ 
-            success: false, 
-            error: 'Product with this SKU already exists' 
+          res.status(400).json({
+            success: false,
+            error: 'Product with this SKU already exists'
           });
           return;
         }
@@ -63,7 +63,8 @@ export class ProductController {
         barcode: barcode ? String(barcode) : undefined,
         sku: sku ? String(sku) : undefined,
         gst_percent: gst_percent !== undefined ? Number(gst_percent) : undefined,
-        stock: stock !== undefined ? Number(stock) : undefined
+        stock: stock !== undefined ? Number(stock) : undefined,
+        hsn_code: hsn_code ? String(hsn_code) : undefined  // ← add this
       });
 
       res.status(201).json({
@@ -73,9 +74,9 @@ export class ProductController {
       });
     } catch (error) {
       console.error('Create product error:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: 'Internal server error' 
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error'
       });
     }
   };
@@ -100,9 +101,9 @@ export class ProductController {
       });
     } catch (error) {
       console.error('List products error:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: 'Internal server error' 
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error'
       });
     }
   };
@@ -113,9 +114,9 @@ export class ProductController {
       const query = ProductController.getQueryParam(req, 'q');
 
       if (!query) {
-        res.status(400).json({ 
-          success: false, 
-          error: 'Search query is required' 
+        res.status(400).json({
+          success: false,
+          error: 'Search query is required'
         });
         return;
       }
@@ -129,9 +130,9 @@ export class ProductController {
       });
     } catch (error) {
       console.error('Search products error:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: 'Internal server error' 
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error'
       });
     }
   };
@@ -143,9 +144,9 @@ export class ProductController {
       const product = ProductModel.findByBarcode(barcode);
 
       if (!product) {
-        res.status(404).json({ 
-          success: false, 
-          error: 'Product not found' 
+        res.status(404).json({
+          success: false,
+          error: 'Product not found'
         });
         return;
       }
@@ -156,9 +157,9 @@ export class ProductController {
       });
     } catch (error) {
       console.error('Find by barcode error:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: 'Internal server error' 
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error'
       });
     }
   };
@@ -170,9 +171,9 @@ export class ProductController {
       const product = ProductModel.findBySku(sku);
 
       if (!product) {
-        res.status(404).json({ 
-          success: false, 
-          error: 'Product not found' 
+        res.status(404).json({
+          success: false,
+          error: 'Product not found'
         });
         return;
       }
@@ -183,9 +184,9 @@ export class ProductController {
       });
     } catch (error) {
       console.error('Find by SKU error:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: 'Internal server error' 
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error'
       });
     }
   };
@@ -197,9 +198,9 @@ export class ProductController {
       const product = ProductModel.findById(uuid);
 
       if (!product) {
-        res.status(404).json({ 
-          success: false, 
-          error: 'Product not found' 
+        res.status(404).json({
+          success: false,
+          error: 'Product not found'
         });
         return;
       }
@@ -210,9 +211,9 @@ export class ProductController {
       });
     } catch (error) {
       console.error('Show product error:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: 'Internal server error' 
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error'
       });
     }
   };
@@ -221,7 +222,7 @@ export class ProductController {
   static update = (req: AuthRequest, res: Response): void => {
     try {
       const uuid = String(req.params.uuid);
-      const { name, price, barcode, sku, gst_percent, stock } = req.body;
+      const { name, price, barcode, sku, gst_percent, stock, hsn_code } = req.body;
 
       const updates: any = {};
       if (name !== undefined) updates.name = String(name);
@@ -230,13 +231,14 @@ export class ProductController {
       if (sku !== undefined) updates.sku = String(sku);
       if (gst_percent !== undefined) updates.gst_percent = Number(gst_percent);
       if (stock !== undefined) updates.stock = Number(stock);
+      if (hsn_code !== undefined) updates.hsn_code = String(hsn_code);
 
       const product = ProductModel.update(uuid, updates);
 
       if (!product) {
-        res.status(404).json({ 
-          success: false, 
-          error: 'Product not found' 
+        res.status(404).json({
+          success: false,
+          error: 'Product not found'
         });
         return;
       }
@@ -248,9 +250,9 @@ export class ProductController {
       });
     } catch (error) {
       console.error('Update product error:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: 'Internal server error' 
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error'
       });
     }
   };
@@ -262,9 +264,9 @@ export class ProductController {
       const deleted = ProductModel.delete(uuid);
 
       if (!deleted) {
-        res.status(404).json({ 
-          success: false, 
-          error: 'Product not found' 
+        res.status(404).json({
+          success: false,
+          error: 'Product not found'
         });
         return;
       }
@@ -275,9 +277,9 @@ export class ProductController {
       });
     } catch (error) {
       console.error('Delete product error:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: 'Internal server error' 
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error'
       });
     }
   };
@@ -295,9 +297,9 @@ export class ProductController {
       });
     } catch (error) {
       console.error('Low stock error:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: 'Internal server error' 
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error'
       });
     }
   };
@@ -308,9 +310,9 @@ export class ProductController {
       const { products } = req.body;
 
       if (!Array.isArray(products) || products.length === 0) {
-        res.status(400).json({ 
-          success: false, 
-          error: 'Products array is required' 
+        res.status(400).json({
+          success: false,
+          error: 'Products array is required'
         });
         return;
       }
@@ -322,7 +324,8 @@ export class ProductController {
         barcode: product.barcode ? String(product.barcode) : undefined,
         sku: product.sku ? String(product.sku) : undefined,
         gst_percent: product.gst_percent !== undefined ? Number(product.gst_percent) : undefined,
-        stock: product.stock !== undefined ? Number(product.stock) : undefined
+        stock: product.stock !== undefined ? Number(product.stock) : undefined,
+        hsn_code: product.hsn_code ? String(product.hsn_code) : undefined  // ← add this
       }));
 
       const count = ProductModel.bulkCreate(sanitizedProducts);
@@ -334,9 +337,9 @@ export class ProductController {
       });
     } catch (error) {
       console.error('Bulk create error:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: 'Internal server error' 
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error'
       });
     }
   };

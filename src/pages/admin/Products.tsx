@@ -8,10 +8,8 @@ import {
   searchOutline,
   closeOutline,
   cubeOutline,
-  cashOutline,
   checkmarkCircleOutline,
   warningOutline,
-  refreshOutline,
 } from "ionicons/icons";
 
 export default function Products() {
@@ -27,6 +25,8 @@ export default function Products() {
     price: "",
     stock: "",
     sku: "",
+    gst_percent: "0",
+    hsn_code: "",
     description: "",
   });
 
@@ -66,6 +66,8 @@ export default function Products() {
           price: Number(form.price),
           stock: Number(form.stock),
           sku: form.sku,
+          gst_percent: Number(form.gst_percent),  // ← add this
+          hsn_code: form.hsn_code,                // ← add this
           description: form.description,
         });
       } else {
@@ -74,11 +76,13 @@ export default function Products() {
           price: Number(form.price),
           stock: Number(form.stock),
           sku: form.sku,
+          gst_percent: Number(form.gst_percent),
+          hsn_code: form.hsn_code,
           description: form.description,
         });
       }
 
-      setForm({ name: "", price: "", stock: "", sku: "", description: "" });
+      setForm({ name: "", price: "", stock: "", sku: "", description: "", gst_percent: "", hsn_code: "" });
       setEditing(null);
       setShowForm(false);
       await loadProducts();
@@ -98,6 +102,8 @@ export default function Products() {
       price: p.price,
       stock: p.stock || 0,
       sku: p.sku || "",
+      gst_percent: p.gst_percent || "0",
+      hsn_code: p.hsn_code || "",
       description: p.description || "",
     });
     setShowForm(true);
@@ -139,7 +145,7 @@ export default function Products() {
         <button
           onClick={() => {
             setEditing(null);
-            setForm({ name: "", price: "", stock: "", sku: "", description: "" });
+            setForm({ name: "", price: "", stock: "", sku: "", description: "", gst_percent: "", hsn_code: "" });
             setError(null);
             setShowForm(!showForm);
           }}
@@ -286,6 +292,36 @@ export default function Products() {
                 />
               </div>
 
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    GST %
+                  </label>
+                  <select
+                    className="w-full border border-gray-300 rounded-lg p-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={form.gst_percent}
+                    onChange={(e) => setForm({ ...form, gst_percent: e.target.value })}
+                  >
+                    <option value="0">0% (Exempt)</option>
+                    <option value="5">5%</option>
+                    <option value="12">12%</option>
+                    <option value="18">18%</option>
+                    <option value="28">28%</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    HSN Code
+                  </label>
+                  <input
+                    className="w-full border border-gray-300 rounded-lg p-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g. 8517"
+                    value={form.hsn_code}
+                    onChange={(e) => setForm({ ...form, hsn_code: e.target.value })}
+                  />
+                </div>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Description (Optional)</label>
                 <textarea
@@ -324,6 +360,7 @@ export default function Products() {
               <tr>
                 <th className="text-center p-4 text-sm font-semibold text-gray-600">Product</th>
                 <th className="text-center p-4 text-sm font-semibold text-gray-600">SKU</th>
+                <th className="text-center p-4 text-sm font-semibold text-gray-600">GST %</th>
                 <th className="text-end p-4 text-sm font-semibold text-gray-600">Price</th>
                 <th className="text-end p-4 text-sm font-semibold text-gray-600">Stock</th>
                 <th className="text-center p-4 text-sm font-semibold text-gray-600">Status</th>
@@ -357,15 +394,17 @@ export default function Products() {
                     <td className="p-4">
                       <span className="text-xs font-mono text-gray-500">{p.sku || "—"}</span>
                     </td>
+                    <td className="p-4 text-center">
+                      <span className="text-xs font-mono text-gray-500">{p.gst_percent || 0}%</span>
+                    </td>
                     <td className="p-4 text-right">
                       <span className="font-semibold text-green-600">₹{p.price?.toLocaleString()}</span>
                     </td>
                     <td className="p-4 text-right">
-                      <span className={`font-medium ${
-                        p.stock === 0 ? "text-red-600" :
+                      <span className={`font-medium ${p.stock === 0 ? "text-red-600" :
                         p.stock <= 10 ? "text-orange-600" :
-                        "text-gray-700"
-                      }`}>
+                          "text-gray-700"
+                        }`}>
                         {p.stock ?? "-"}
                       </span>
                     </td>

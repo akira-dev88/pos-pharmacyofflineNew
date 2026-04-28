@@ -214,151 +214,113 @@ export function useCart() {
 
   // In useCart.ts, update the checkout function
 
-const checkout = async (
-  paymentMethods: any[],
-  customerUUID: string | null,
-  selectedCustomer: any
-) => {
-  if (!cartUUID) {
-    console.error("❌ Cannot checkout: No cartUUID");
-    alert("Cart not initialized");
-    return null;
-  }
-
-  // Check if cart is already completed
-  const cartStatus = cartData?.status || cartData?.cart?.status;
-  if (cartStatus === 'completed') {
-    console.log("⚠️ Cart is already completed, creating a new cart...");
-    alert("Cart was already processed. Creating a new cart...");
-
-    const newCart = await createCart();
-    const newCartUuid = newCart.cart_uuid || newCart.data?.cart_uuid;
-    setCartUUID(newCartUuid);
-
-    const newCartData = await getCart(newCartUuid);
-    const normalizedData = normalizeCartData(newCartData);
-    setCartData(normalizedData);
-    setPayments([{ method: "cash", amount: 0 }]);
-    setDiscount(0);
-
-    alert("New cart created. Please try checkout again.");
-    return null;
-  }
-
-  const totalPaid = paymentMethods.reduce((sum, p) => sum + Number(p.amount || 0), 0);
-  const grandTotal = Number(cartData?.summary?.grand_total || cartData?.cart?.summary?.grand_total || 0);
-
-  console.log("💳 Checkout initiated:", {
-    cartUUID,
-    totalPaid,
-    grandTotal,
-    customerUUID,
-    selectedCustomer: selectedCustomer?.name,
-    cartStatus
-  });
-
-  if (totalPaid < grandTotal && !customerUUID) {
-    alert("Select customer for credit sale");
-    return null;
-  }
-
-  if (totalPaid < grandTotal && selectedCustomer) {
-    const remainingCredit =
-      (selectedCustomer.credit_limit || 0) - (selectedCustomer.credit_balance || 0);
-    const newCredit = grandTotal - totalPaid;
-    if (newCredit > remainingCredit) {
-      alert(`Credit limit exceeded 🚫\nRemaining credit: ₹${remainingCredit}\nNeed additional: ₹${newCredit}`);
+  const checkout = async (
+    paymentMethods: any[],
+    customerUUID: string | null,
+    selectedCustomer: any
+  ) => {
+    if (!cartUUID) {
+      console.error("❌ Cannot checkout: No cartUUID");
+      alert("Cart not initialized");
       return null;
     }
-  }
 
-  setLoading(true);
-  try {
-    const res = await checkoutCart(cartUUID, paymentMethods, customerUUID);
-    console.log("✅ Full checkout response:", JSON.stringify(res, null, 2));
+    // Check if cart is already completed
+    const cartStatus = cartData?.status || cartData?.cart?.status;
+    if (cartStatus === 'completed') {
+      console.log("⚠️ Cart is already completed, creating a new cart...");
+      alert("Cart was already processed. Creating a new cart...");
 
-    if (!res.success) {
-      throw new Error(res.error || res.message || "Checkout failed");
-    }
+      const newCart = await createCart();
+      const newCartUuid = newCart.cart_uuid || newCart.data?.cart_uuid;
+      setCartUUID(newCartUuid);
 
-    // Extract sale data from response
-    let saleData = null;
-    if (res.data?.sale) {
-      saleData = res.data.sale;
-    } else if (res.sale) {
-      saleData = res.sale;
-    }
-
-    console.log("📦 Sale data:", saleData);
-
-    // Generate invoice from available data (since invoice endpoint is missing)
-    const cartItems = cartData?.cart?.items || cartData?.items || [];
-    
-    // Format items for invoice
-    const formattedItems = cartItems.map((item: any) => ({
-      name: item.product?.name || 'Product',
-      qty: item.quantity,
-      price: item.price,
-      total: item.price * item.quantity,
-      gst_percent: item.tax_percent || 0
-    }));
-
-    // Calculate totals
-    const subtotal = formattedItems.reduce((sum: number, item: any) => sum + item.total, 0);
-    const tax = formattedItems.reduce((sum: number, item: any) => sum + (item.total * item.gst_percent / 100), 0);
-    const discountAmount = discount || 0;
-    const finalGrandTotal = subtotal + tax - discountAmount;
-
-    // Create invoice object
-    const invoice = {
-      invoice_number: saleData?.invoice_number || `INV-${Date.now()}`,
-      sale_uuid: saleData?.sale_uuid || res.data?.sale_uuid,
-      created_at: saleData?.created_at || new Date().toISOString(),
-      customer: selectedCustomer || null,
-      items: formattedItems,
-      payments: paymentMethods.filter(p => p.amount > 0),
-      summary: {
-        total: subtotal,
-        tax: tax,
-        grand_total: finalGrandTotal
-      },
-      discount: discountAmount,
-      shop: {
-        name: "My Store",
-        address: "Chennai, Tamil Nadu",
-        gstin: "33ABCDE1234F1Z5",
-        mobile: "9876543210"
-      }
-    };
-
-    console.log("📄 Generated invoice:", invoice);
-
-    // Create a new cart for next transaction
-    console.log("🆕 Creating new cart for next transaction...");
-    const newCart = await createCart();
-    console.log("✅ New cart created:", newCart);
-
-    const newCartUuid = newCart.cart_uuid || newCart.data?.cart_uuid;
-    setCartUUID(newCartUuid);
-
-    if (newCartUuid) {
       const newCartData = await getCart(newCartUuid);
       const normalizedData = normalizeCartData(newCartData);
       setCartData(normalizedData);
+      setPayments([{ method: "cash", amount: 0 }]);
+      setDiscount(0);
+
+      alert("New cart created. Please try checkout again.");
+      return null;
     }
 
-    setPayments([{ method: "cash", amount: 0 }]);
-    setDiscount(0);
+    const totalPaid = paymentMethods.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+    const grandTotal = Number(cartData?.summary?.grand_total || cartData?.cart?.summary?.grand_total || 0);
 
-    return { success: true, invoice };
-  } catch (err: any) {
-    console.error("❌ Checkout failed:", err);
-    alert(err.message || "Checkout failed");
-    return null;
-  } finally {
-    setLoading(false);
-  }
-};
+    console.log("💳 Checkout initiated:", {
+      cartUUID,
+      totalPaid,
+      grandTotal,
+      customerUUID,
+      selectedCustomer: selectedCustomer?.name,
+      cartStatus
+    });
+
+    if (totalPaid < grandTotal && !customerUUID) {
+      alert("Select customer for credit sale");
+      return null;
+    }
+
+    if (totalPaid < grandTotal && selectedCustomer) {
+      const remainingCredit =
+        (selectedCustomer.credit_limit || 0) - (selectedCustomer.credit_balance || 0);
+      const newCredit = grandTotal - totalPaid;
+      if (newCredit > remainingCredit) {
+        alert(`Credit limit exceeded 🚫\nRemaining credit: ₹${remainingCredit}\nNeed additional: ₹${newCredit}`);
+        return null;
+      }
+    }
+
+    setLoading(true);
+    try {
+      const res = await checkoutCart(cartUUID, paymentMethods, customerUUID);
+      console.log("✅ Full checkout response:", JSON.stringify(res, null, 2));
+
+      if (!res.success) {
+        throw new Error(res.error || res.message || "Checkout failed");
+      }
+
+      // Extract sale data from response
+      let saleData = null;
+      if (res.data?.sale) {
+        saleData = res.data.sale;
+      } else if (res.sale) {
+        saleData = res.sale;
+      }
+
+      console.log("📦 Sale data:", saleData);
+
+      // Use invoice directly from backend response
+      const invoice = res.invoice;
+      console.log("📄 Full invoice data:", JSON.stringify(invoice, null, 2));
+
+      // Create a new cart for next transaction
+      console.log("🆕 Creating new cart for next transaction...");
+      const newCart = await createCart();
+      console.log("✅ New cart created:", newCart);
+
+      const newCartUuid = newCart.cart_uuid || newCart.data?.cart_uuid;
+      setCartUUID(newCartUuid);
+
+      if (newCartUuid) {
+        const newCartData = await getCart(newCartUuid);
+        const normalizedData = normalizeCartData(newCartData);
+        setCartData(normalizedData);
+      }
+
+      setPayments([{ method: "cash", amount: 0 }]);
+      setDiscount(0);
+
+      return { success: true, invoice };
+    } catch (err: any) {
+      console.error("❌ Checkout failed:", err);
+      alert(err.message || "Checkout failed");
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Get cart items from normalized structure
   const getCartItems = () => {
