@@ -109,6 +109,54 @@ function POSpage() {
     checkCartStatus();
   }, [cartData, refreshCart]);
 
+  // Barcode scanner listener
+  useEffect(() => {
+    let barcodeBuffer = '';
+    let lastKeyTime = Date.now();
+
+    const handleKeyDown = async (e: KeyboardEvent) => {
+      // Ignore if user is typing in an input field
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+
+      const now = Date.now();
+      const timeDiff = now - lastKeyTime;
+      lastKeyTime = now;
+
+      if (e.key === 'Enter') {
+        if (barcodeBuffer.length >= 3) {
+          // Look up product by barcode
+          try {
+            const res = await fetch(`http://127.0.0.1:3000/api/products/barcode/${barcodeBuffer}`, {
+              headers: {
+                Authorization: `Bearer ${localStorage.getItem('token')}`
+              }
+            });
+            const data = await res.json();
+            if (data.success && data.data) {
+              await addItem(data.data);
+            } else {
+              alert(`Product not found for barcode: ${barcodeBuffer}`);
+            }
+          } catch (err) {
+            console.error('Barcode lookup failed:', err);
+          }
+        }
+        barcodeBuffer = '';
+      } else if (timeDiff < 50) {
+        // Fast typing = scanner input (scanners type < 50ms between chars)
+        barcodeBuffer += e.key;
+      } else {
+        // Slow typing = human keyboard, reset buffer
+        barcodeBuffer = e.key;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [addItem]);
+
+
   // Save scroll positions on scroll
   useEffect(() => {
     const handleProductScroll = () => saveScrollPositions();

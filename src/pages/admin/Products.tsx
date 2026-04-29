@@ -25,6 +25,7 @@ export default function Products() {
     price: "",
     stock: "",
     sku: "",
+    barcode: "",
     gst_percent: "0",
     hsn_code: "",
     description: "",
@@ -66,6 +67,7 @@ export default function Products() {
           price: Number(form.price),
           stock: Number(form.stock),
           sku: form.sku,
+          barcode: form.barcode,
           gst_percent: Number(form.gst_percent),  // ← add this
           hsn_code: form.hsn_code,                // ← add this
           description: form.description,
@@ -82,7 +84,7 @@ export default function Products() {
         });
       }
 
-      setForm({ name: "", price: "", stock: "", sku: "", description: "", gst_percent: "", hsn_code: "" });
+      setForm({ name: "", price: "", stock: "", sku: "", barcode: "", description: "", gst_percent: "", hsn_code: "" });
       setEditing(null);
       setShowForm(false);
       await loadProducts();
@@ -102,6 +104,7 @@ export default function Products() {
       price: p.price,
       stock: p.stock || 0,
       sku: p.sku || "",
+      barcode: p.barcode || "",
       gst_percent: p.gst_percent || "0",
       hsn_code: p.hsn_code || "",
       description: p.description || "",
@@ -145,7 +148,7 @@ export default function Products() {
         <button
           onClick={() => {
             setEditing(null);
-            setForm({ name: "", price: "", stock: "", sku: "", description: "", gst_percent: "", hsn_code: "" });
+            setForm({ name: "", price: "", stock: "", sku: "", barcode: "", description: "", gst_percent: "", hsn_code: "" });
             setError(null);
             setShowForm(!showForm);
           }}
@@ -257,6 +260,19 @@ export default function Products() {
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Barcode (Optional)
+                </label>
+                <input
+                  className="w-full border border-gray-300 rounded-lg p-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g. 8901234567890"
+                  value={form.barcode}
+                  onChange={(e) => setForm({ ...form, barcode: e.target.value })}
+                />
+                <p className="text-xs text-gray-500 mt-1">13-digit EAN or 12-digit UPC barcode</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
