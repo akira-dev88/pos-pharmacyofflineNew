@@ -19,7 +19,11 @@
     "dist": "npm run build && electron-builder",
     "dist:linux": "npm run build && electron-builder --linux",
     "dist:win": "npm run build && electron-builder --win",
-    "postinstall": "electron-builder install-app-deps"
+    "postinstall": "electron-builder install-app-deps",
+    "rebuild:electron": "electron-rebuild -f -w better-sqlite3",
+    "rebuild:node": "npm rebuild better-sqlite3",
+    "predist:win": "npm run rebuild:electron",
+    "predist:linux": "npm run rebuild:electron"
   },
   "build": {
     "appId": "com.pos.app",
@@ -84,6 +88,7 @@
     "react-is": "^19.2.5",
     "react-router-dom": "^7.14.1",
     "recharts": "^3.8.1",
+    "sqlite3": "^6.0.1",
     "tailwind-scrollbar-hide": "^4.0.0",
     "uuid": "^13.0.0",
     "zustand": "^5.0.12"

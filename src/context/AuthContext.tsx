@@ -36,44 +36,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // Set token first
       setToken(storedToken);
-
       try {
-        // Try to verify token with backend
-        const res = await apiGet("/auth/me"); // Make sure this endpoint exists
-        
-        // Extract user data from response
+        const res = await apiGet("/auth/me");
         const userData = res?.data?.user || res?.user;
-        
+
         if (userData) {
           setUser(userData);
-          // Update stored user in case it changed
           localStorage.setItem("user", JSON.stringify(userData));
         } else {
-          // If verification fails but we have stored user, use it
-          setUser(JSON.parse(storedUser));
-        }
-      } catch (e) {
-        console.error("Auth verification failed", e);
-        
-        // If token verification fails but we have stored user, still use it
-        // This prevents logout on network errors
-        try {
-          const parsedUser = JSON.parse(storedUser);
-          setUser(parsedUser);
-        } catch (error) {
-          // Invalid stored user, clear everything
+          // No user data returned — clear everything
           localStorage.removeItem("token");
           localStorage.removeItem("user");
-          setUser(null);
           setToken(null);
+          setUser(null);
+        }
+      } catch (e) {
+        try {
+          const parsedUser = JSON.parse(storedUser);
+          setUser(parsedUser); // ← keeps old user!
+        } catch (error) {
+          console.error("Failed to parse stored user data", error);
         }
       } finally {
         setLoading(false);
       }
     };
-
     init();
   }, []);
 
@@ -81,7 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = (newToken: string, newUser: User) => {
     setToken(newToken);
     setUser(newUser);
-    
+
     // Store in localStorage for persistence
     localStorage.setItem("token", newToken);
     localStorage.setItem("user", JSON.stringify(newUser));
@@ -91,13 +79,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = () => {
     setToken(null);
     setUser(null);
-    
+
     // Clear localStorage
     localStorage.removeItem("token");
     localStorage.removeItem("user");
-    
+
     // Navigate to login
-    window.location.href = "/login";
+    window.location.reload();
   };
 
   return (
