@@ -1,4 +1,8 @@
 import * as net from 'net';
+import { exec } from 'child_process';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 
 interface InvoiceItem {
     name: string;
@@ -40,11 +44,13 @@ interface Invoice {
 export class ThermalPrinterService {
     private printerHost: string;
     private printerPort: number;
+    private printerName: string | null;
     private readonly PAPER_WIDTH = 32; // 32 characters for 80mm paper
 
-    constructor(host: string = 'localhost', port: number = 9104) {
+    constructor(host: string = 'localhost', port: number = 9104, printerName: string | null = null) {
         this.printerHost = host;
         this.printerPort = port;
+        this.printerName = printerName;
     }
 
     // Helper: Center text for thermal paper
@@ -196,41 +202,66 @@ export class ThermalPrinterService {
         return Buffer.from(commands);
     }
 
-    async print(invoice: Invoice): Promise<{ success: boolean; error?: string; printed?: boolean }> {
+    private async printViaWindows(data: Buffer): Promise<{ success: boolean; error?: string; printed?: boolean }> {
         return new Promise((resolve) => {
-            const printData = this.formatToESC_POS(invoice);
-            const client = new net.Socket();
+            // Write ESC/POS data to a temp file
+            const tmpFile = path.join(os.tmpdir(), `receipt_${Date.now()}.bin`);
+            fs.writeFileSync(tmpFile, data);
 
-            // Set timeout for connection
-            const timeout = setTimeout(() => {
-                client.destroy();
-                resolve({
-                    success: false,
-                    error: 'Printer not connected - Please check if thermal printer is available',
-                    printed: false
-                });
-            }, 3000);
-
-            client.connect(this.printerPort, this.printerHost, () => {
-                clearTimeout(timeout);
-                client.write(printData, (err) => {
-                    if (err) {
-                        resolve({ success: false, error: err.message, printed: false });
-                    } else {
-                        resolve({ success: true, printed: true });
-                    }
-                    client.end();
-                });
-            });
-
-            client.on('error', (err) => {
-                clearTimeout(timeout);
-                resolve({
-                    success: false,
-                    error: `Cannot connect to printer at ${this.printerHost}:${this.printerPort}. Make sure printer mock is running: npx thermal-printer-mock`,
-                    printed: false
-                });
+            // Send raw data to Windows printer using print command
+            const cmd = `copy /b "${tmpFile}" "${this.printerName}"`;
+            exec(cmd, (error) => {
+                fs.unlinkSync(tmpFile); // clean up temp file
+                if (error) {
+                    resolve({ success: false, error: error.message, printed: false });
+                } else {
+                    resolve({ success: true, printed: true });
+                }
             });
         });
     }
+
+    async print(invoice: Invoice): Promise<{ success: boolean; error?: string; printed?: boolean }> {
+    const printData = this.formatToESC_POS(invoice);
+
+    // If printer name is set, use Windows USB printing
+    if (this.printerName) {
+      return this.printViaWindows(printData);
+    }
+
+    // Otherwise use TCP/network (WiFi or LAN) — your existing code
+    return new Promise((resolve) => {
+      const client = new net.Socket();
+
+      const timeout = setTimeout(() => {
+        client.destroy();
+        resolve({
+          success: false,
+          error: 'Printer not connected - check if printer is on and connected',
+          printed: false
+        });
+      }, 3000);
+
+      client.connect(this.printerPort, this.printerHost, () => {
+        clearTimeout(timeout);
+        client.write(printData, (err) => {
+          if (err) {
+            resolve({ success: false, error: err.message, printed: false });
+          } else {
+            resolve({ success: true, printed: true });
+          }
+          client.end();
+        });
+      });
+
+      client.on('error', () => {
+        clearTimeout(timeout);
+        resolve({
+          success: false,
+          error: `Cannot connect to printer at ${this.printerHost}:${this.printerPort}`,
+          printed: false
+        });
+      });
+    });
+  }
 }

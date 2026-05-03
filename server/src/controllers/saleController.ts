@@ -4,6 +4,9 @@ import { SaleModel } from '../models/Sale';
 import type { AuthRequest } from '../middleware/auth';
 
 export class SaleController {
+  // static getInvoice(arg0: string, getInvoice: any) {
+  //   throw new Error('Method not implemented.');
+  // }
   // Checkout - Convert cart to sale
   static checkout = (req: AuthRequest, res: Response): void => {
     try {
@@ -145,4 +148,31 @@ export class SaleController {
       });
     }
   };
+
+  static getInvoice = (req: Request, res: Response): void => {
+    try {
+      const saleUuid = String(req.params.sale_uuid);
+      const invoice = SaleModel.getInvoice(saleUuid);
+
+      if (!invoice) {
+        res.status(404).json({
+          success: false,
+          error: 'Invoice not found'
+        });
+        return;
+      }
+
+      res.json({
+        success: true,
+        data: invoice
+      });
+    } catch (error) {
+      console.error('Get invoice error:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error'
+      });
+    }
+  };
+
 }

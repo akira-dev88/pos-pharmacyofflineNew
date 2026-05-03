@@ -1,4 +1,4 @@
-import type { Request, Response } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import { SettingsModel } from '../models/Settings';
 import type { AuthRequest } from '../middleware/auth';
 import { createBackup, listBackups, restoreBackup } from '../database/backup';
@@ -25,7 +25,7 @@ export class SettingsController {
   // CREATE or UPDATE settings
   static save = (req: AuthRequest, res: Response): void => {
     try {
-      const { shop_name, mobile, address, gstin, invoice_prefix, auto_print } = req.body;
+      const { shop_name, mobile, address, gstin, invoice_prefix, auto_print, printer_type, printer_host, printer_port, printer_name } = req.body;
 
       if (!shop_name) {
         res.status(400).json({
@@ -42,6 +42,10 @@ export class SettingsController {
         gstin: gstin ? String(gstin) : undefined,
         invoice_prefix: invoice_prefix ? String(invoice_prefix) : undefined,
         auto_print: auto_print !== undefined ? Number(auto_print) : undefined,
+        printer_type: printer_type ? String(printer_type) : undefined,
+        printer_host: printer_host ? String(printer_host) : undefined,
+        printer_port: printer_port !== undefined ? Number(printer_port) : undefined,
+        printer_name: printer_name ? String(printer_name) : undefined,
       });
 
       res.json({
@@ -124,4 +128,41 @@ export class SettingsController {
       res.status(500).json({ success: false, error: error.message });
     }
   };
+
+  static testPrint = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const settings = SettingsModel.get() as any;
+    const { ThermalPrinterService } = await import('../services/printerService');
+    
+    const printer = new ThermalPrinterService(
+      settings.printer_host || 'localhost',
+      settings.printer_port || 9104,
+      settings.printer_name || null
+    );
+
+    const testInvoice = {
+      invoice_number: 'TEST-001',
+      created_at: new Date().toISOString(),
+      shop: {
+        name: settings.shop_name || 'My Store',
+        address: settings.address,
+        mobile: settings.mobile,
+        gstin: settings.gstin,
+      },
+      items: [{ name: 'Test Item', qty: 1, price: 100, total: 100, tax_percent: 18, cgst: 9, sgst: 9 }],
+      summary: { total: 100, tax: 18, cgst: 9, sgst: 9, grand_total: 118 },
+      payments: [{ method: 'cash', amount: 118 }],
+    };
+
+    const result = await printer.print(testInvoice);
+    
+    if (result.success) {
+      res.json({ success: true, message: 'Test print sent successfully!' });
+    } else {
+      res.status(400).json({ success: false, error: result.error });
+    }
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
 }

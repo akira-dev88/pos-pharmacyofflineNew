@@ -17,6 +17,7 @@ import { IonIcon } from '@ionic/react';
 import { storefrontOutline } from 'ionicons/icons';
 import InvoiceReceipt from "./components/InvoiceReceipt";
 import { getSettings } from "../../renderer/services/settingsApi";
+import { getInvoice } from "../../renderer/services/saleApi";
 
 function POSpage() {
   const navigate = useNavigate();
@@ -26,6 +27,10 @@ function POSpage() {
   const [invoiceData, setInvoiceData] = useState<any>(null);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [autoPrint, setAutoPrint] = useState(false);
+
+  const [showPastInvoiceModal, setShowPastInvoiceModal] = useState(false);
+  const [selectedPastInvoice, setSelectedPastInvoice] = useState<any>(null);
+
 
   // Refs for scrollable containers
   const productGridRef = useRef<HTMLDivElement>(null);
@@ -480,14 +485,71 @@ function POSpage() {
       )}
 
       {showSalesModal && (
-        <SalesModal
-          sales={sales}
-          onClose={() => setShowSalesModal(false)}
-          onViewInvoice={(saleUUID) => {
-            console.log("View invoice:", saleUUID);
-          }}
-        />
-      )}
+  <SalesModal
+    sales={sales}
+    onClose={() => setShowSalesModal(false)}
+    onViewInvoice={async (saleUUID) => {
+      console.log("View invoice:", saleUUID);
+      
+      // First, find the sale from the sales array
+      const sale = sales.find(s => s.sale_uuid === saleUUID);
+      console.log("Found sale:", sale);
+      
+      if (!sale) {
+        alert('Sale not found');
+        return;
+      }
+      
+      try {
+        // Try to fetch full invoice from backend
+        const fullInvoice = await getInvoice(saleUUID);
+        console.log("Full invoice from API:", fullInvoice);
+        
+        if (fullInvoice && fullInvoice.items && fullInvoice.items.length > 0) {
+          setSelectedPastInvoice(fullInvoice);
+          setShowPastInvoiceModal(true);
+          setShowSalesModal(false);
+          return;
+        }
+      } catch (err) {
+        console.error('Failed to fetch from API:', err);
+      }
+      
+      // FALLBACK: Use the sale data we already have
+      console.log("Using fallback with sale data:", sale);
+      
+      const constructedInvoice = {
+        sale_uuid: sale.sale_uuid,
+        invoice_no: sale.invoice_number || sale.invoice_no,
+        created_at: sale.created_at,
+        customer: {
+          name: 'Walk-in Customer',
+          customer_uuid: sale.customer_uuid
+        },
+        items: [{
+          product_name: 'Sale Items',
+          quantity: 1,
+          price: sale.total,  // This should be 120
+          total: sale.total   // This should be 120
+        }],
+        summary: {
+          total: sale.total || 0,
+          tax: sale.tax || 0,
+          grand_total: sale.grand_total || sale.total || 0
+        },
+        payments: [{
+          method: 'cash',
+          amount: sale.grand_total || sale.total || 0
+        }]
+      };
+      
+      console.log("Constructed invoice:", constructedInvoice);
+      setSelectedPastInvoice(constructedInvoice);
+      setShowPastInvoiceModal(true);
+      setShowSalesModal(false);
+    }}
+  />
+)}
 
       {/* Invoice Receipt Modal */}
       {showInvoiceModal && invoiceData && (
@@ -495,6 +557,17 @@ function POSpage() {
           invoice={invoiceData}
           onClose={handleCloseInvoice}
           autoPrint={autoPrint}
+        />
+      )}
+
+      {showPastInvoiceModal && selectedPastInvoice && (
+        <InvoiceReceipt
+          invoice={selectedPastInvoice}
+          onClose={() => {
+            setShowPastInvoiceModal(false);
+            setSelectedPastInvoice(null);
+          }}
+          autoPrint={false} // Don't auto-print for past invoices
         />
       )}
     </div>

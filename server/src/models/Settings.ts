@@ -27,6 +27,10 @@ export class SettingsModel {
     address?: string;
     gstin?: string;
     invoice_prefix?: string;
+    printer_type?: string;
+    printer_host?: string;
+    printer_port?: number;
+    printer_name?: string;
   }): Setting {
     const existing = db.prepare('SELECT * FROM settings LIMIT 1').get() as Setting | undefined;
 
@@ -65,6 +69,24 @@ export class SettingsModel {
         updateFields.push('updated_at = CURRENT_TIMESTAMP');
         db.prepare(`UPDATE settings SET ${updateFields.join(', ')}`).run(...values);
       }
+
+      if (data.printer_type !== undefined) {
+        updateFields.push('printer_type = ?');
+        values.push(data.printer_type);
+      }
+      if (data.printer_host !== undefined) {
+        updateFields.push('printer_host = ?');
+        values.push(data.printer_host);
+      }
+      if (data.printer_port !== undefined) {
+        updateFields.push('printer_port = ?');
+        values.push(data.printer_port);
+      }
+      if (data.printer_name !== undefined) {
+        updateFields.push('printer_name = ?');
+        values.push(data.printer_name);
+      }
+
     } else {
       // Create new
       db.prepare(`

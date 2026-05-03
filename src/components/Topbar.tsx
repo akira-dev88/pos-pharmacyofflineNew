@@ -26,7 +26,7 @@ function getPageTitle(path: string) {
 
 export default function Topbar({ onMenuClick }: TopbarProps) {
     const location = useLocation();
-    const navigate = useNavigate();
+    const navigate = useNavigate(); 
     const { user, logout } = useAuth();
     const [showUserMenu, setShowUserMenu] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);

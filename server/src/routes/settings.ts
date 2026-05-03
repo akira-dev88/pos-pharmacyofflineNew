@@ -20,5 +20,6 @@ router.put('/', authorize('owner'), SettingsController.update);
 router.post('/backup', authorize('owner'), SettingsController.backup);
 router.get('/backups', authorize('owner'), SettingsController.listBackups);
 router.post('/restore', authorize('owner'), SettingsController.restore);
+router.post('/test-print', authorize('owner'), SettingsController.testPrint);
 
 export default router;

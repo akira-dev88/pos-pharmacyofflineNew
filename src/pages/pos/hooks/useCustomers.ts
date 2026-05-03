@@ -5,7 +5,7 @@ import {
   getLedger,
   addCustomerPayment,
 } from "../../../renderer/services/customerApi";
-import { getSales } from "../../../renderer/services/saleApi";
+import { getSales, getInvoice } from "../../../renderer/services/saleApi"; // Add getInvoice
 
 export function useCustomers() {
   const [customers, setCustomers] = useState<any[]>([]);
@@ -60,5 +60,6 @@ export function useCustomers() {
     addPayment,
     loadSales,
     refreshCustomers: loadCustomers,
+    getInvoice, // Export this too
   };
 }

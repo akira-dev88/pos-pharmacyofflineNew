@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { getSettings, saveSettings } from "../../renderer/services/settingsApi";
 import { IonIcon } from "@ionic/react";
+import { apiPost } from "../../renderer/services/api";
 import {
   saveOutline,
   closeOutline,
@@ -166,6 +167,19 @@ export default function Settings() {
     );
   }
 
+  const handleTestPrint = async () => {
+  try {
+    const res = await apiPost('/settings/test-print', {});
+    if (res.success) {
+      setSuccess('Test print sent! Check your printer.');
+    } else {
+      setError(`Print failed: ${res.error}`);
+    }
+  } catch (err) {
+    setError('Test print failed');
+  }
+};
+
   return (
     <div className="space-y-3">
       {/* Header */}
@@ -201,6 +215,75 @@ export default function Settings() {
             }`} />
         </button>
       </div>
+
+      {/* Printer Settings */}
+<div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+  <div className="bg-gradient-to-r from-gray-800 to-gray-900 px-6 py-4">
+    <h2 className="text-white font-semibold text-lg">🖨️ Printer Settings</h2>
+  </div>
+  <div className="p-6 space-y-4">
+    {/* Printer Type */}
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">Connection Type</label>
+      <select
+        className="w-full border border-gray-300 rounded-lg p-2.5"
+        value={data.printer_type || 'network'}
+        onChange={(e) => setData({ ...data, printer_type: e.target.value })}
+      >
+        <option value="network">WiFi / LAN (Network)</option>
+        <option value="usb">USB (Windows Printer)</option>
+      </select>
+    </div>
+
+    {/* Network settings */}
+    {(data.printer_type === 'network' || !data.printer_type) && (
+      <>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Printer IP Address</label>
+          <input
+            className="w-full border border-gray-300 rounded-lg p-2.5"
+            placeholder="192.168.1.100 or localhost"
+            value={data.printer_host || 'localhost'}
+            onChange={(e) => setData({ ...data, printer_host: e.target.value })}
+          />
+          <p className="text-xs text-gray-500 mt-1">Print status page on printer to find IP</p>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Port</label>
+          <input
+            type="number"
+            className="w-full border border-gray-300 rounded-lg p-2.5"
+            placeholder="9100"
+            value={data.printer_port || 9100}
+            onChange={(e) => setData({ ...data, printer_port: Number(e.target.value) })}
+          />
+        </div>
+      </>
+    )}
+
+    {/* USB settings */}
+    {data.printer_type === 'usb' && (
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Windows Printer Name</label>
+        <input
+          className="w-full border border-gray-300 rounded-lg p-2.5"
+          placeholder="e.g. POS-80 or XP-80"
+          value={data.printer_name || ''}
+          onChange={(e) => setData({ ...data, printer_name: e.target.value })}
+        />
+        <p className="text-xs text-gray-500 mt-1">Find in Windows → Settings → Printers & Scanners</p>
+      </div>
+    )}
+
+    {/* Test print button */}
+    <button
+      onClick={handleTestPrint}
+      className="w-full bg-gray-800 text-white py-2 rounded-lg hover:bg-gray-700 text-sm"
+    >
+      🖨️ Test Print
+    </button>
+  </div>
+</div>
 
       {/* Success/Error Messages */}
       {success && (

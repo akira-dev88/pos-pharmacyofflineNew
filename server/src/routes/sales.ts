@@ -10,5 +10,6 @@ router.use(authenticate);
 // List sales and get single sale
 router.get('/', SaleController.index);
 router.get('/:sale_uuid', SaleController.show);
+router.get('/:sale_uuid/invoice', SaleController.getInvoice); // ADD THIS LINE
 
 export default router;

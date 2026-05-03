@@ -9,6 +9,7 @@ export interface Sale {
 }
 
 export interface Invoice {
+  invoice_no: string | undefined;
   total_amount: any;
   gst: any;
   customer_name: any;
