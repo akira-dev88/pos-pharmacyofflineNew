@@ -33,3 +33,13 @@ export function addAutoPrint(): void {
     console.log('Added printer_name column to settings');
   }
 }
+
+// Create license table if not exists
+db.exec(`
+  CREATE TABLE IF NOT EXISTS license (
+    id INTEGER PRIMARY KEY,
+    license_key TEXT NOT NULL,
+    machine_id TEXT NOT NULL,
+    activated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )
+`);

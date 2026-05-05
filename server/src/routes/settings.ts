@@ -4,6 +4,10 @@ import { authenticate, authorize } from '../middleware/auth';
 
 const router = Router();
 
+// ✅ Public routes — no auth needed
+router.get('/license/status', SettingsController.licenseStatus);
+router.post('/license/activate', SettingsController.activateLicense);
+
 // All settings routes require authentication
 router.use(authenticate);
 

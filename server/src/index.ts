@@ -19,6 +19,8 @@ import supplierRoutes from './routes/suppliers';
 import reportRoutes from './routes/reports';
 import staffRoutes from './routes/staff';
 
+import { LicenseService } from './services/licenseService';
+
 import { scheduleAutoBackup, checkDbIntegrity } from './database/backup';
 
 // Load environment variables - simplified for CommonJS
@@ -38,6 +40,15 @@ app.use(express.urlencoded({ extended: true }));
 runMigrations();
 addHsnCode();
 addAutoPrint();
+
+const licensed = LicenseService.isLicensed();
+if (!licensed) {
+  console.log('⚠️ App not licensed');
+  // Don't block server start — let frontend handle it
+  process.env.APP_LICENSED = 'false';
+} else {
+  process.env.APP_LICENSED = 'true';
+}
 
 // After startServer():
 startServer().then(() => {
