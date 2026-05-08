@@ -37,7 +37,7 @@ export default function PaymentSection({
     onPaymentChange(0, "method", method);
     
     // When selecting "credit", set amount to grandTotal automatically
-    if (method === "credit") {
+    if (method === "pay_later") {
       setAmountGiven(grandTotal);
       onPaymentChange(0, "amount", grandTotal);
     }
@@ -51,8 +51,7 @@ export default function PaymentSection({
   const methods = [
     { id: "cash", label: "Cash", activeBorder: "border-green-500", activeBg: "bg-green-500/10", activeText: "text-green-500" },
     { id: "upi", label: "UPI", activeBorder: "border-purple-500", activeBg: "bg-purple-500/10", activeText: "text-purple-500" },
-    { id: "credit", label: "Pay Later", activeBorder: "border-orange-500", activeBg: "bg-orange-500/10", activeText: "text-orange-500" },
-  ];
+    { id: "pay_later", label: "Pay Later", activeBorder: "border-orange-500", activeBg: "bg-orange-500/10", activeText: "text-orange-500" },  ];
 
   return (
     <div className="space-y-3">
@@ -87,7 +86,7 @@ export default function PaymentSection({
       </div>
 
       {/* Amount Input - Show only for cash and upi */}
-      {selectedMethod !== "credit" && (
+      {selectedMethod !== "pay_later" && (
         <div>
           <label className="text-xs text-gray-400 mb-1 block">
             {selectedMethod === "cash" ? "Cash Given by Customer" : "Amount Paid"}
@@ -113,7 +112,7 @@ export default function PaymentSection({
       )}
 
       {/* Credit Info - Show when Pay Later is selected */}
-      {selectedMethod === "credit" && (
+      {selectedMethod === "pay_later" && (
         <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl px-3 py-3">
           <div className="flex items-center gap-2">
             <svg className="w-5 h-5 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

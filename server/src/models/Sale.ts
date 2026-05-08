@@ -104,40 +104,76 @@ export class SaleModel {
       }
 
       const balance = grandTotal - paidAmount;
+      // Update customer credit for Pay Later payments
+      const payLaterAmount = payments
+        .filter(p => p.method === 'pay_later')
+        .reduce((sum, p) => sum + Number(p.amount || 0), 0);
 
-      // Update customer credit if needed
-      if (customerUuid && balance > 0) {
-        // Check credit limit before updating
-        const customer = db.prepare(
-          'SELECT * FROM customers WHERE customer_uuid = ?'
-        ).get(customerUuid) as any;
+      console.log('[BACK] CUSTOMER UUID:', customerUuid);
+      console.log('[BACK] PAY LATER AMOUNT:', payLaterAmount);
 
-        if (customer) {
-          const newBalance = customer.credit_balance + balance;
-          if (customer.credit_limit > 0 && newBalance > customer.credit_limit) {
-            throw new Error('Credit limit exceeded');
-          }
+      if (customerUuid && payLaterAmount > 0) {
+        const customer = db.prepare(`
+          SELECT * FROM customers 
+          WHERE customer_uuid = ?
+        `).get(customerUuid) as any;
 
-          db.prepare(`
-            UPDATE customers 
-            SET credit_balance = ?,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE customer_uuid = ?
-          `).run(newBalance, customerUuid);
+        console.log('[BACK] CUSTOMER BEFORE:', customer);
 
-          // Customer ledger entry
-          db.prepare(`
-            INSERT INTO customer_ledgers (
-              customer_uuid, type, amount, reference_uuid, note
-            ) VALUES (?, 'sale', ?, ?, ?)
-          `).run(
-            customerUuid,
-            grandTotal,
-            saleUuid,
-            `Sale invoice #${invoiceNumber}`
-          );
+        if (!customer) {
+          throw new Error('Customer not found');
         }
+
+        const currentBalance = Number(customer.credit_balance || 0);
+        const creditLimit = Number(customer.credit_limit || 0);
+
+        const newBalance = currentBalance + payLaterAmount;
+
+        console.log('[BACK] NEW BALANCE:', newBalance);
+
+        // Credit limit validation
+        if (creditLimit > 0 && newBalance > creditLimit) {
+          throw new Error('Credit limit exceeded');
+        }
+
+        // Update customer balance
+        const updateResult = db.prepare(`
+          UPDATE customers
+          SET credit_balance = ?,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE customer_uuid = ?
+        `).run(newBalance, customerUuid);
+
+        console.log('[BACK] UPDATE RESULT:', updateResult);
+
+        // Insert ledger entry
+        const ledgerResult = db.prepare(`
+          INSERT INTO customer_ledgers (
+            customer_uuid,
+            type,
+            amount,
+            reference_uuid,
+            note
+          ) VALUES (?, 'sale', ?, ?, ?)
+        `).run(
+          customerUuid,
+          payLaterAmount,
+          saleUuid,
+          `Pay Later invoice #${invoiceNumber}`
+        );
+
+        console.log('[BACK] LEDGER RESULT:', ledgerResult);
+
+        // Verify update immediately
+        const updatedCustomer = db.prepare(`
+          SELECT * FROM customers
+          WHERE customer_uuid = ?
+        `).get(customerUuid);
+
+        console.log('[BACK] CUSTOMER AFTER:', updatedCustomer);
       }
+
+      console.log('PAYMENTS RECEIVED:', payments);
 
       // Mark cart as completed
       db.prepare(`
