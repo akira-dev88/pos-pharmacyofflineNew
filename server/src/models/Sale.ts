@@ -106,7 +106,7 @@ export class SaleModel {
       const balance = grandTotal - paidAmount;
       // Update customer credit for Pay Later payments
       const payLaterAmount = payments
-        .filter(p => p.method === 'pay_later')
+        .filter(p => p.method === 'pay_later')   // ✅ CORRECT
         .reduce((sum, p) => sum + Number(p.amount || 0), 0);
 
       console.log('[BACK] CUSTOMER UUID:', customerUuid);
@@ -148,14 +148,14 @@ export class SaleModel {
 
         // Insert ledger entry
         const ledgerResult = db.prepare(`
-          INSERT INTO customer_ledgers (
-            customer_uuid,
-            type,
-            amount,
-            reference_uuid,
-            note
-          ) VALUES (?, 'sale', ?, ?, ?)
-        `).run(
+  INSERT INTO customer_ledgers (
+    customer_uuid,
+    type,
+    amount,
+    reference_uuid,
+    note
+  ) VALUES (?, 'debit', ?, ?, ?) 
+`).run(
           customerUuid,
           payLaterAmount,
           saleUuid,

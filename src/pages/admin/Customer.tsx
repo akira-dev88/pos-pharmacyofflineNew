@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   getCustomers,
   createCustomer,
@@ -30,6 +30,7 @@ export default function CustomerPage() {
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const [form, setForm] = useState({
     name: "",
@@ -48,17 +49,48 @@ export default function CustomerPage() {
     loadInsights();
   }, []);
 
+  const loadAllCustomerData = useCallback(async () => {
+    setLoading(true);
+    try {
+      await Promise.all([
+        loadCustomers(),
+        loadInsights(),
+      ]);
+    } catch (error) {
+      console.error("Error loading customer data:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Refresh when refreshKey changes
+  useEffect(() => {
+    loadAllCustomerData();
+  }, [refreshKey, loadAllCustomerData]);
+
+  // Expose refresh function via window
+ useEffect(() => {
+    const handleRefresh = () => {
+      console.log("📢 Received refresh customer page event");
+      setRefreshKey(prev => prev + 1);
+    };
+    
+    window.addEventListener('refresh-customers', handleRefresh);
+    
+    return () => {
+      window.removeEventListener('refresh-customers', handleRefresh);
+    };
+  }, []);
+
+  // Existing loadCustomers and loadInsights functions remain the same
   const loadCustomers = async () => {
     try {
-      setLoading(true);
       const data = await getCustomers();
       console.log("✅ Customers data loaded:", data);
       setCustomers(Array.isArray(data) ? data : []);
     } catch (e) {
       console.error("Error loading customers:", e);
       setCustomers([]);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -68,11 +100,7 @@ export default function CustomerPage() {
         apiGet("/customers/aging"),
         apiGet("/customers/reminders"),
       ]);
-      
-      console.log("📊 Aging Response:", agingResponse);
-      console.log("📊 Reminders Response:", reminderResponse);
-      
-      // Extract data from responses
+
       let agingData = [];
       if (agingResponse.success && agingResponse.data) {
         agingData = agingResponse.data;
@@ -81,7 +109,7 @@ export default function CustomerPage() {
       } else if (Array.isArray(agingResponse)) {
         agingData = agingResponse;
       }
-      
+
       let reminderData = [];
       if (reminderResponse.success && reminderResponse.data) {
         reminderData = reminderResponse.data;
@@ -90,7 +118,7 @@ export default function CustomerPage() {
       } else if (Array.isArray(reminderResponse)) {
         reminderData = reminderResponse;
       }
-      
+
       setAging(agingData);
       setReminders(reminderData);
     } catch (e) {
@@ -99,6 +127,58 @@ export default function CustomerPage() {
       setReminders([]);
     }
   };
+
+  // const loadCustomers = async () => {
+  //   try {
+  //     setLoading(true);
+  //     const data = await getCustomers();
+  //     console.log("✅ Customers data loaded:", data);
+  //     setCustomers(Array.isArray(data) ? data : []);
+  //   } catch (e) {
+  //     console.error("Error loading customers:", e);
+  //     setCustomers([]);
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
+
+  // const loadInsights = async () => {
+  //   try {
+  //     const [agingResponse, reminderResponse] = await Promise.all([
+  //       apiGet("/customers/aging"),
+  //       apiGet("/customers/reminders"),
+  //     ]);
+
+  //     console.log("📊 Aging Response:", agingResponse);
+  //     console.log("📊 Reminders Response:", reminderResponse);
+
+  //     // Extract data from responses
+  //     let agingData = [];
+  //     if (agingResponse.success && agingResponse.data) {
+  //       agingData = agingResponse.data;
+  //     } else if (agingResponse.data && Array.isArray(agingResponse.data)) {
+  //       agingData = agingResponse.data;
+  //     } else if (Array.isArray(agingResponse)) {
+  //       agingData = agingResponse;
+  //     }
+
+  //     let reminderData = [];
+  //     if (reminderResponse.success && reminderResponse.data) {
+  //       reminderData = reminderResponse.data;
+  //     } else if (reminderResponse.data && Array.isArray(reminderResponse.data)) {
+  //       reminderData = reminderResponse.data;
+  //     } else if (Array.isArray(reminderResponse)) {
+  //       reminderData = reminderResponse;
+  //     }
+
+  //     setAging(agingData);
+  //     setReminders(reminderData);
+  //   } catch (e) {
+  //     console.error("Insights error:", e);
+  //     setAging([]);
+  //     setReminders([]);
+  //   }
+  // };
 
   // 🔁 RESET FORM
   const resetForm = () => {

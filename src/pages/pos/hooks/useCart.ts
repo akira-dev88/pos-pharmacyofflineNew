@@ -82,17 +82,17 @@ export function useCart() {
   }, []);
 
   // Auto-fill payment amount whenever grand total changes
-  useEffect(() => {
-    const cartGrandTotal =
-      cartData?.summary?.grand_total ||
-      cartData?.cart?.summary?.grand_total ||
-      0;
-    if (cartGrandTotal > 0) {
-      setPayments([{ method: currentMethodRef.current, amount: cartGrandTotal }]);
-    } else {
-      setPayments([{ method: currentMethodRef.current, amount: 0 }]);
-    }
-  }, [cartData]);
+  // useEffect(() => {
+  //   const cartGrandTotal =
+  //     cartData?.summary?.grand_total ||
+  //     cartData?.cart?.summary?.grand_total ||
+  //     0;
+  //   if (cartGrandTotal > 0) {
+  //     setPayments([{ method: currentMethodRef.current, amount: cartGrandTotal }]);
+  //   } else {
+  //     setPayments([{ method: currentMethodRef.current, amount: 0 }]);
+  //   }
+  // }, [cartData]);
 
   const refreshCart = async () => {
     if (!cartUUID) return;
@@ -112,7 +112,7 @@ export function useCart() {
       const newCartData = await getCart(newCartUuid);
       setCartData(normalizeCartData(newCartData));
     }
-    setPayments([{ method: currentMethodRef.current, amount: 0 }]);
+    setPayments([{ method: currentMethodRef.current, amount: 0 }]); // ← keep this, it resets AFTER checkout which is correct
     setDiscount(0);
     return newCartUuid;
   };
@@ -206,14 +206,18 @@ export function useCart() {
     const amountGiven = Number(paymentMethods[0]?.amount || 0);
 
     // Send grand total to backend (not cash given — change is frontend only)
-    const normalizedPayments = paymentMethods.map((p, i) => ({
-      method: p.method,
-      amount: i === 0 ? grandTotal : Number(p.amount || 0)
+    const normalizedPayments = paymentMethods.map((p) => ({
+      method: String(p.method),
+      amount: Number(p.amount || 0)
     }));
 
-    const totalSending = normalizedPayments.reduce((sum, p) => sum + p.amount, 0);
+    console.log("🔍 CHECKOUT - Normalized payments:", normalizedPayments);
+    console.log("🔍 CHECKOUT - Grand total:", grandTotal);
 
-    if (amountGiven < grandTotal && !customerUUID) {
+    const totalPaidAmount = normalizedPayments.reduce((sum, p) => sum + p.amount, 0);
+    const isCreditPayment = normalizedPayments.some(p => p.method === 'pay_later');
+
+    if (totalPaidAmount < grandTotal && !isCreditPayment && !customerUUID) {
       alert(`Please enter full payment of ₹${grandTotal} or select a customer for credit.`);
       return null;
     }
@@ -228,7 +232,7 @@ export function useCart() {
       }
     }
 
-    
+
     setLoading(true);
     console.log("🔍 PAYMENTS BEING SENT TO BACKEND:", JSON.stringify(normalizedPayments, null, 2));
     console.log("🔍 ORIGINAL PAYMENT METHODS:", JSON.stringify(paymentMethods, null, 2));

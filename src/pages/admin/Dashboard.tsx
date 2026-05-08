@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { getDashboardReport } from "../../renderer/services/reportApi";
 import {
   LineChart,
@@ -9,10 +9,6 @@ import {
   ResponsiveContainer,
   Legend,
   Area,
-  AreaChart,
-  PieChart,
-  Pie,
-  Cell,
   BarChart,
   Bar,
 } from "recharts";
@@ -37,13 +33,106 @@ export default function Dashboard() {
   const [profitTrend, setProfitTrend] = useState<any[]>([]);
   const [trend, setTrend] = useState<any[]>([]);
   const [customerSummary, setCustomerSummary] = useState<any>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  // Helper function to format numbers (e.g., 3308.4 -> 3.30k)
+  // Function to load all dashboard data
+  const loadAllData = useCallback(async () => {
+    console.log("🔄 Dashboard: Loading all data...");
+    setLoading(true);
+    try {
+      // Load dashboard report
+      const report = await getDashboardReport();
+      if (report) {
+        console.log("📊 Dashboard report loaded:", report);
+        setData(report);
+      } else {
+        console.error('No data received from dashboard API');
+        setData({
+          today_sales: 0,
+          month_sales: 0,
+          total_sales: 0,
+          total_orders: 0,
+          low_stock: [],
+          recent_sales: [],
+          recent_purchases: [],
+          top_products: [],
+        });
+      }
+
+      // Load customer summary - THIS IS CRITICAL
+      const summary = await getCustomerSummary();
+      console.log("👥 Customer summary loaded:", summary);
+      console.log("💰 Total credit value:", summary?.total_credit);
+      setCustomerSummary(summary);
+
+      // Load sales trend
+      const salesTrend = await getSalesTrend();
+      if (salesTrend && Array.isArray(salesTrend)) {
+        const formatted = salesTrend.map((d: any) => ({
+          ...d,
+          date: d.date ? new Date(d.date).toLocaleDateString("en-IN", {
+            day: "numeric",
+            month: "short",
+          }) : "Invalid Date",
+        }));
+        setTrend(formatted);
+      }
+
+      // Load profit trend
+      const profitData = await getProfitTrend();
+      if (profitData && Array.isArray(profitData)) {
+        const formatted = profitData.map((d: any) => ({
+          ...d,
+          date: d.date ? new Date(d.date).toLocaleDateString("en-IN", {
+            day: "numeric",
+            month: "short",
+          }) : "Invalid Date",
+        }));
+        setProfitTrend(formatted);
+      }
+    } catch (err) {
+      console.error('Dashboard data error:', err);
+      // Set default values on error
+      setData({
+        today_sales: 0,
+        month_sales: 0,
+        total_sales: 0,
+        total_orders: 0,
+        low_stock: [],
+        recent_sales: [],
+        recent_purchases: [],
+        top_products: [],
+      });
+      setCustomerSummary({ total_credit: 0, customers_with_credit: 0, top_debtors: [] });
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Initial load and refresh when trigger changes
+  useEffect(() => {
+    loadAllData();
+  }, [refreshTrigger, loadAllData]);
+
+  // Listen for refresh events
+  useEffect(() => {
+    const handleRefresh = () => {
+      console.log("📢 Received refresh-dashboard event, refreshing...");
+      setRefreshTrigger(prev => prev + 1);
+    };
+
+    window.addEventListener('refresh-dashboard', handleRefresh);
+    console.log("✅ Dashboard event listener registered");
+
+    return () => {
+      window.removeEventListener('refresh-dashboard', handleRefresh);
+    };
+  }, []);
+
+  // Helper function to format numbers
   const formatCompactNumber = (num: number): string => {
     if (num === null || num === undefined) return "0";
-
     const absNum = Math.abs(num);
-
     if (absNum >= 10000000) {
       return (num / 10000000).toFixed(2) + "cr";
     } else if (absNum >= 100000) {
@@ -70,90 +159,7 @@ export default function Dashboard() {
     return "";
   };
 
-  useEffect(() => {
-    getCustomerSummary().then(setCustomerSummary);
-  }, []);
-
-  useEffect(() => {
-    // Load dashboard report with proper data handling
-    getDashboardReport()
-      .then((result) => {
-        console.log('Dashboard data received:', result);
-        if (result) {
-          setData(result);
-        } else {
-          console.error('No data received from dashboard API');
-          setData({
-            today_sales: 0,
-            month_sales: 0,
-            total_sales: 0,
-            total_orders: 0,
-            low_stock: [],
-            recent_sales: [],
-            recent_purchases: [],
-            top_products: [],
-          });
-        }
-      })
-      .catch((err) => {
-        console.error('Dashboard report error:', err);
-        setData({
-          today_sales: 0,
-          month_sales: 0,
-          total_sales: 0,
-          total_orders: 0,
-          low_stock: [],
-          recent_sales: [],
-          recent_purchases: [],
-          top_products: [],
-        });
-      })
-      .finally(() => setLoading(false));
-
-    // Load sales trend
-    getSalesTrend()
-      .then((res) => {
-        if (res && Array.isArray(res)) {
-          const formatted = res.map((d: any) => ({
-            ...d,
-            date: d.date ? new Date(d.date).toLocaleDateString("en-IN", {
-              day: "numeric",
-              month: "short",
-            }) : "Invalid Date",
-          }));
-          setTrend(formatted);
-        } else {
-          setTrend([]);
-        }
-      })
-      .catch((err) => {
-        console.error('Sales trend error:', err);
-        setTrend([]);
-      });
-
-    // Load profit trend
-    getProfitTrend()
-      .then((res) => {
-        if (res && Array.isArray(res)) {
-          const formatted = res.map((d: any) => ({
-            ...d,
-            date: d.date ? new Date(d.date).toLocaleDateString("en-IN", {
-              day: "numeric",
-              month: "short",
-            }) : "Invalid Date",
-          }));
-          setProfitTrend(formatted);
-        } else {
-          setProfitTrend([]);
-        }
-      })
-      .catch((err) => {
-        console.error('Profit trend error:', err);
-        setProfitTrend([]);
-      });
-  }, []);
-
-  if (loading) return (
+  if (loading && !data) return (
     <div className="flex items-center justify-center h-64">
       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
     </div>
@@ -162,9 +168,6 @@ export default function Dashboard() {
   if (!data) return (
     <div className="text-red-500 text-center p-8">Failed to load data</div>
   );
-
-  // Color palette for charts
-  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
   // KPI Card Component
   const getGradient = (color: string) => {
@@ -198,9 +201,16 @@ export default function Dashboard() {
     </div>
   );
 
+  // Get the current credit total (with fallback)
+  const currentTotalCredit = customerSummary?.total_credit ?? 0;
+  const currentCustomersWithCredit = customerSummary?.customers_with_credit ?? 0;
+  const currentTopDebtors = customerSummary?.top_debtors ?? [];
+
+  console.log("🎨 Rendering Dashboard with credit total:", currentTotalCredit);
+
   return (
     <div className="space-y-3 p-4 min-h-screen">
-      {/* Header */}
+      {/* Header with Refresh Button */}
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-3">
           <div className="p-3 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg">
@@ -215,12 +225,23 @@ export default function Dashboard() {
             <h1 className="text-4xl font-bold text-white font-inter">Dashboard</h1>
           </div>
         </div>
-        <div className="text-right">
-          <p className="text-xs text-gray-400">{new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+        <div className="flex items-center gap-3">
+          <div className="text-right">
+            <p className="text-xs text-gray-400">{new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+          </div>
+          <button
+            onClick={() => {
+              console.log("🔘 Manual refresh clicked");
+              setRefreshTrigger(prev => prev + 1);
+            }}
+            className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-lg text-xs transition-colors"
+          >
+            🔄 Refresh
+          </button>
         </div>
       </div>
 
-      {/* 🔥 KPI CARDS with Compact Format */}
+      {/* KPI CARDS */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
         <KPICard
           title="Today's Sales"
@@ -256,27 +277,26 @@ export default function Dashboard() {
           icon={cubeOutline}
           color="text-orange-600"
           subtitle={`${data.total_orders || 0} orders processed`}
-          isMonetary={false}  // This removes the ₹ symbol
+          isMonetary={false}
         />
       </div>
 
-      {/* Rest of your existing code continues unchanged */}
-      {/* Credit Summary Row - Bento Box Layout */}
+      {/* Credit Summary Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-
-        {/* Left Column - Credit Cards Stack */}
         <div className="lg:col-span-1 space-y-3">
-          {/* Credit Card - Updated with compact format */}
+          {/* Total Credit Card */}
           <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-2xl shadow-lg p-6 text-white text-start hover:shadow-xl transition-all duration-300 transform hover:scale-105">
             <div className="flex justify-between items-start">
               <div className="flex-1">
                 <p className="text-red-100 text-sm font-medium">Total Credit Given</p>
                 <div className="flex items-baseline gap-1 mt-2">
                   <span className="text-xs text-red-200">₹</span>
-                  <p className="text-4xl font-bold">{formatCompactNumber(customerSummary?.total_credit || 0)}</p>
+                  <p className="text-4xl font-bold">
+                    {currentTotalCredit}  {/* 👈 raw number, no formatting */}
+                  </p>
                 </div>
                 <p className="text-red-100 text-sm mt-2">
-                  {customerSummary?.customers_with_credit || 0} customers have outstanding dues
+                  {currentCustomersWithCredit} customers have outstanding dues
                 </p>
               </div>
               <div className="bg-white/20 p-3 rounded-xl backdrop-blur-sm">
@@ -285,7 +305,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Top Debtors - Enhanced with animations */}
+          {/* Top Debtors */}
           <div className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all duration-300">
             <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
               <div className="p-1 bg-red-100 rounded-lg">
@@ -294,8 +314,8 @@ export default function Dashboard() {
               Top Debtors
             </h3>
             <div className="space-y-3 max-h-[300px] overflow-y-auto scrollbar-hide">
-              {customerSummary?.top_debtors?.length > 0 ? (
-                customerSummary.top_debtors.map((c: any, i: number) => (
+              {currentTopDebtors.length > 0 ? (
+                currentTopDebtors.map((c: any, i: number) => (
                   <div key={i} className="flex justify-between items-center py-2 border-b border-gray-100 hover:bg-gray-50 px-2 rounded-lg transition-all duration-200 hover:translate-x-1">
                     <div className="flex items-center gap-3">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${i === 0 ? 'bg-yellow-100 text-yellow-600' :
@@ -323,7 +343,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Right Column - Profit Trend Chart (Spans 2 columns) */}
+        {/* Profit Trend Chart */}
         <div className="lg:col-span-2">
           <div className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all duration-300 h-full">
             <div className="flex justify-between items-center mb-6">
@@ -333,46 +353,22 @@ export default function Dashboard() {
               </div>
               <div className="flex gap-2">
                 <div className="px-3 py-1 bg-green-100 text-green-600 text-xs rounded-full flex items-center gap-1">
-                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                   Revenue
                 </div>
                 <div className="px-3 py-1 bg-red-100 text-red-600 text-xs rounded-full flex items-center gap-1">
-                  <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                  <div className="w-2 h-2 bg-red-500 rounded-full"></div>
                   Cost
                 </div>
                 <div className="px-3 py-1 bg-purple-100 text-purple-600 text-xs rounded-full flex items-center gap-1">
-                  <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></div>
+                  <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
                   Profit
                 </div>
               </div>
             </div>
-
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={profitTrend} margin={{ top: 20, right: 30, left: 20, bottom: 10 }}>
-                  <defs>
-                    <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="costGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="profitGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.4} />
-                      <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
-                    </linearGradient>
-                    <filter id="revenueShadow" x="-20%" y="-20%" width="140%" height="140%">
-                      <feDropShadow dx="0" dy="4" stdDeviation="4" floodColor="#10b981" floodOpacity="0.3" />
-                    </filter>
-                    <filter id="costShadow" x="-20%" y="-20%" width="140%" height="140%">
-                      <feDropShadow dx="0" dy="4" stdDeviation="4" floodColor="#ef4444" floodOpacity="0.3" />
-                    </filter>
-                    <filter id="profitShadow" x="-20%" y="-20%" width="140%" height="140%">
-                      <feDropShadow dx="0" dy="4" stdDeviation="6" floodColor="#8b5cf6" floodOpacity="0.4" />
-                    </filter>
-                  </defs>
                   <XAxis dataKey="date" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} dy={10} />
                   <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `₹${(value / 1000).toFixed(0)}k`} dx={-10} />
                   <Tooltip
@@ -390,12 +386,11 @@ export default function Dashboard() {
                       name.charAt(0).toUpperCase() + name.slice(1)
                     ]}
                     labelFormatter={(label) => ` ${label}`}
-                    cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '5 5' }}
                   />
-                  <Legend verticalAlign="top" height={36} iconType="circle" iconSize={10} formatter={(value) => <span className="text-xs font-medium text-gray-600">{value}</span>} />
-                  <Area type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={2.5} fill="url(#revenueGradient)" dot={{ fill: '#10b981', strokeWidth: 2, r: 4, stroke: '#fff' }} activeDot={{ r: 6, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} filter="url(#revenueShadow)" />
-                  <Area type="monotone" dataKey="cost" stroke="#ef4444" strokeWidth={2.5} fill="url(#costGradient)" dot={{ fill: '#ef4444', strokeWidth: 2, r: 4, stroke: '#fff' }} activeDot={{ r: 6, fill: '#ef4444', stroke: '#fff', strokeWidth: 2 }} filter="url(#costShadow)" />
-                  <Line type="monotone" dataKey="profit" stroke="#8b5cf6" strokeWidth={3.5} dot={{ fill: '#8b5cf6', strokeWidth: 3, r: 5, stroke: '#fff' }} activeDot={{ r: 7, fill: '#8b5cf6', stroke: '#fff', strokeWidth: 3 }} filter="url(#profitShadow)" />
+                  <Legend verticalAlign="top" height={36} iconType="circle" iconSize={10} />
+                  <Area type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={2.5} fill="url(#revenueGradient)" dot={{ fill: '#10b981', strokeWidth: 2, r: 4, stroke: '#fff' }} />
+                  <Area type="monotone" dataKey="cost" stroke="#ef4444" strokeWidth={2.5} fill="url(#costGradient)" dot={{ fill: '#ef4444', strokeWidth: 2, r: 4, stroke: '#fff' }} />
+                  <Line type="monotone" dataKey="profit" stroke="#8b5cf6" strokeWidth={3.5} dot={{ fill: '#8b5cf6', strokeWidth: 3, r: 5, stroke: '#fff' }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -403,7 +398,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Charts Section */}
+      {/* Rest of your charts - keep the same as before */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         {/* Sales Trend Chart */}
         <div className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all duration-300">
@@ -414,15 +409,6 @@ export default function Dashboard() {
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={trend} margin={{ top: 20, right: 30, left: 20, bottom: 10 }}>
-                <defs>
-                  <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.9} />
-                    <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.6} />
-                  </linearGradient>
-                  <filter id="barShadow" x="-20%" y="-20%" width="140%" height="140%">
-                    <feDropShadow dx="0" dy="4" stdDeviation="4" floodColor="#3b82f6" floodOpacity="0.3" />
-                  </filter>
-                </defs>
                 <XAxis dataKey="date" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
                 <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `₹${(value / 1000).toFixed(0)}k`} />
                 <Tooltip
@@ -435,15 +421,14 @@ export default function Dashboard() {
                   }}
                   formatter={(value: any) => [`₹${Number(value).toLocaleString()}`, 'Sales']}
                   labelFormatter={(label) => ` ${label}`}
-                  cursor={{ fill: '#f0f9ff' }}
                 />
-                <Bar dataKey="total" fill="url(#barGradient)" radius={[8, 8, 0, 0]} barSize={40} filter="url(#barShadow)" />
+                <Bar dataKey="total" fill="#3b82f6" radius={[8, 8, 0, 0]} barSize={40} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Low Stock Alert - Enhanced */}
+        {/* Low Stock Alert */}
         <div className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all duration-300">
           <div className="flex justify-between items-center mb-4">
             <h2 className="font-semibold text-gray-800 flex items-center gap-2">

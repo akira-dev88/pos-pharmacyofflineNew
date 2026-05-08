@@ -18,6 +18,7 @@ import { storefrontOutline } from 'ionicons/icons';
 import InvoiceReceipt from "./components/InvoiceReceipt";
 import { getSettings } from "../../renderer/services/settingsApi";
 import { getInvoice } from "../../renderer/services/saleApi";
+import { getCustomers } from "../../renderer/services/customerApi";
 
 function POSpage() {
   const navigate = useNavigate();
@@ -68,6 +69,7 @@ function POSpage() {
     addPayment,
     loadSales,
     sales,
+    refreshAllCustomerData,
   } = useCustomers();
 
   const [shopSettings, setShopSettings] = useState<any>(null);
@@ -78,6 +80,12 @@ function POSpage() {
   //     else if (res?.shop_name) setShopSettings(res);
   //   });
   // }, []);
+
+  // In POSpage.tsx, add this useEffect to monitor payment method changes:
+  useEffect(() => {
+    console.log("💰 Current payments state:", payments);
+    console.log("💰 Current method ref:", currentMethodRef.current);
+  }, [payments]);
 
   useEffect(() => {
     getSettings().then(res => {
@@ -239,50 +247,76 @@ function POSpage() {
     return () => clearTimeout(restoreTimer);
   }, []);
 
+  // In POSpage.tsx, update the handleCheckout function:
+
   const handleCheckout = async () => {
     if (!cartUUID || !cartData) {
-      console.log("PAYMENTS STATE BEFORE CHECKOUT:", JSON.stringify(payments));
       alert("Cart not ready. Please wait...");
       return;
     }
 
-    // Check if cart is active
     const cartStatus = cartData?.status || cartData?.cart?.status;
     if (cartStatus === 'completed') {
-      console.log("Cart already completed, refreshing...");
       await refreshCart();
       alert("Cart was already processed. Please try again.");
       return;
     }
 
-    // Check if cart has items
     const cartItems = cartData?.cart?.items || cartData?.items;
     if (!cartItems || cartItems.length === 0) {
       alert("No items in cart");
       return;
     }
 
-    // Check if payment amount is valid
     if (totalPaid <= 0) {
       alert("Please enter a payment amount");
       return;
     }
 
-    // Check if payment covers the total
-    if (totalPaid < grandTotal && !selectedCustomer) {
-      alert(`Total amount is ₹${grandTotal}. Please enter full payment or select a customer for credit.`);
+    // For credit payments, customer must be selected
+    const isCreditPayment = currentMethodRef.current === 'pay_later'; // ✅ Use ref instead of payments state
+    if (isCreditPayment && !selectedCustomer) {
+      alert("Please select a customer for Pay Later option");
       return;
     }
 
-    console.log("PAYMENTS STATE BEFORE CHECKOUT:", JSON.stringify(payments));
+    // For non-credit payments, check if amount is sufficient
+    if (!isCreditPayment && totalPaid < grandTotal) {
+      alert(`Total amount is ₹${grandTotal}. Please enter full payment.`);
+      return;
+    }
+
+    // ✅ USE forcedPayments instead of payments
+    const forcedPayments = [{
+      method: currentMethodRef.current,
+      amount: grandTotal
+    }];
+
+    console.log("🔍 FORCED PAYMENTS:", forcedPayments);
+    console.log("🔍 CURRENT METHOD REF:", currentMethodRef.current);
+    console.log("🔍 SELECTED CUSTOMER:", selectedCustomer);
+
     const result = await checkout(
-      payments,
+      forcedPayments,  // ✅ Use forcedPayments here!
       selectedCustomer?.customer_uuid || null,
       selectedCustomer
     );
 
     if (result?.success) {
-      console.log("📄 Full invoice data:", JSON.stringify(result.invoice, null, 2));
+      console.log("✅ Checkout successful!");
+
+      // ✅ Trigger refresh of dashboard and customer pages
+      console.log("🔄 Triggering dashboard and customer refresh...");
+
+      // Dispatch custom events to refresh other components
+      window.dispatchEvent(new Event('refresh-dashboard'));
+      window.dispatchEvent(new Event('refresh-customers'));
+
+      // Also refresh customer data in POSpage if needed
+      if (refreshAllCustomerData) {
+        await refreshAllCustomerData();
+      }
+
       setInvoiceData(result.invoice);
       setShowInvoiceModal(true);
     }
@@ -427,12 +461,22 @@ function POSpage() {
             {/* Payment Section */}
             <PaymentSection
               payments={payments}
+              // In POSpage.tsx, update the onPaymentChange handler:
+              // In POSpage.tsx, update the onPaymentChange handler:
               onPaymentChange={(index, field, value) => {
+                console.log("📝 Payment change in POSpage:", { index, field, value });
+                console.log("📝 Current payments before update:", payments);
+
                 const updated = [...payments];
                 updated[index] = { ...updated[index], [field]: value };
+
+                console.log("📝 Updated payments after change:", updated);
                 setPayments(updated);
+
+                // ✅ CRITICAL: Update the ref when method changes
                 if (field === "method") {
                   currentMethodRef.current = value;
+                  console.log("📝 Updated currentMethodRef to:", value);
                 }
               }}
               onAddRow={() =>
@@ -576,3 +620,11 @@ function POSpage() {
 }
 
 export default POSpage;
+
+function refreshAllCustomerData() {
+  throw new Error("Function not implemented.");
+}
+function refreshCustomers() {
+  throw new Error("Function not implemented.");
+}
+

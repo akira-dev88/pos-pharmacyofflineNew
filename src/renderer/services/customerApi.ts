@@ -71,7 +71,13 @@ export async function getCustomerLedger(uuid: string) {
   return response.data || response;
 }
 
-export async function getCustomerSummary() {
+export async function getCustomerSummary(): Promise<any> {
   const response = await apiGet("/customers/summary");
-  return response.data || response;
+  const data = response.data || response;
+  return {
+    ...data,
+    total_credit: Number(data.total_credit) || 0,
+    customers_with_credit: Number(data.customers_with_credit) || 0,
+    top_debtors: data.top_debtors || []
+  };
 }
