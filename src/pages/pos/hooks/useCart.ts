@@ -228,7 +228,10 @@ export function useCart() {
       }
     }
 
+    
     setLoading(true);
+    console.log("🔍 PAYMENTS BEING SENT TO BACKEND:", JSON.stringify(normalizedPayments, null, 2));
+    console.log("🔍 ORIGINAL PAYMENT METHODS:", JSON.stringify(paymentMethods, null, 2));
     try {
       const res = await checkoutCart(cartUUID, normalizedPayments, customerUUID);
       console.log("✅ Checkout response:", JSON.stringify(res, null, 2));

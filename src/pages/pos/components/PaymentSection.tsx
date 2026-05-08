@@ -27,6 +27,7 @@ export default function PaymentSection({
     if (grandTotal > 0) {
       setAmountGiven(grandTotal);
       onPaymentChange(0, "amount", grandTotal);
+      // Don't reset method — keep whatever is selected
     }
   }, [grandTotal]);
 
@@ -35,7 +36,7 @@ export default function PaymentSection({
   const handleMethodSelect = (method: string) => {
     setSelectedMethod(method);
     onPaymentChange(0, "method", method);
-    
+
     // When selecting "credit", set amount to grandTotal automatically
     if (method === "pay_later") {
       setAmountGiven(grandTotal);
@@ -51,7 +52,7 @@ export default function PaymentSection({
   const methods = [
     { id: "cash", label: "Cash", activeBorder: "border-green-500", activeBg: "bg-green-500/10", activeText: "text-green-500" },
     { id: "upi", label: "UPI", activeBorder: "border-purple-500", activeBg: "bg-purple-500/10", activeText: "text-purple-500" },
-    { id: "pay_later", label: "Pay Later", activeBorder: "border-orange-500", activeBg: "bg-orange-500/10", activeText: "text-orange-500" },  ];
+    { id: "pay_later", label: "Pay Later", activeBorder: "border-orange-500", activeBg: "bg-orange-500/10", activeText: "text-orange-500" },];
 
   return (
     <div className="space-y-3">
@@ -64,15 +65,13 @@ export default function PaymentSection({
             key={id}
             type="button"
             onClick={() => handleMethodSelect(id)}
-            className={`border-2 rounded-xl p-3 transition-all text-center ${
-              selectedMethod === id
-                ? `${activeBorder} ${activeBg}`
-                : "border-gray-700 bg-[#212121] hover:border-gray-600"
-            }`}
+            className={`border-2 rounded-xl p-3 transition-all text-center ${selectedMethod === id
+              ? `${activeBorder} ${activeBg}`
+              : "border-gray-700 bg-[#212121] hover:border-gray-600"
+              }`}
           >
-            <span className={`text-sm font-medium ${
-              selectedMethod === id ? activeText : "text-white"
-            }`}>
+            <span className={`text-sm font-medium ${selectedMethod === id ? activeText : "text-white"
+              }`}>
               {label}
             </span>
           </button>
@@ -128,11 +127,10 @@ export default function PaymentSection({
 
       {/* Change / Due - Show only for cash and upi */}
       {selectedMethod !== "credit" && amountGiven > 0 && (
-        <div className={`rounded-xl px-3 py-2 flex justify-between items-center ${
-          change >= 0
-            ? "bg-green-500/10 border border-green-500/30"
-            : "bg-red-500/10 border border-red-500/30"
-        }`}>
+        <div className={`rounded-xl px-3 py-2 flex justify-between items-center ${change >= 0
+          ? "bg-green-500/10 border border-green-500/30"
+          : "bg-red-500/10 border border-red-500/30"
+          }`}>
           <span className={`text-sm font-medium ${change >= 0 ? "text-green-400" : "text-red-400"}`}>
             {change >= 0 ? "Change to Return" : "⚠️ Amount Due"}
           </span>

@@ -60,6 +60,6 @@ export function useCustomers() {
     addPayment,
     loadSales,
     refreshCustomers: loadCustomers,
-    getInvoice, // Export this too
+    getInvoice,
   };
 }

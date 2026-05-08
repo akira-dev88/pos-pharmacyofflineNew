@@ -27,7 +27,7 @@
   },
   "build": {
     "appId": "com.pos.app",
-    "productName": "POS Billing System",
+    "productName": "Instant Bill",
     "win": {
       "icon": "electron/assets/icon.ico"
     },
@@ -42,7 +42,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "POS Billing System"
+      "shortcutName": "Instant Bill"
     },
     "directories": {
       "output": "release"

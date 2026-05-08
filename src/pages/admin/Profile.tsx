@@ -32,19 +32,19 @@ export default function Profile() {
     setError(null);
     try {
       const response = await getProfile();
-      
+
       // Access the data correctly
       const userData = response.data.user;
       const tenantData = response.data.tenant;
-      
+
       console.log("User data:", userData);
       console.log("Tenant data:", tenantData);
-      
+
       setUser(userData);
       setTenant(tenantData);
     } catch (err) {
       console.error("Profile load error:", err);
-      
+
       // Fallback to auth context user
       if (authUser) {
         setUser(authUser as UserProfile);
@@ -94,7 +94,7 @@ export default function Profile() {
 
   if (!user) return null;
 
-  const isExpiringSoon = tenant?.expiry_date && 
+  const isExpiringSoon = tenant?.expiry_date &&
     new Date(tenant.expiry_date) < new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
 
   const getDaysRemaining = () => {
@@ -168,13 +168,12 @@ export default function Profile() {
                 <IonIcon icon={keyOutline} className="text-green-500 text-lg" />
                 <div className="flex-1">
                   <p className="text-xs text-gray-500">Role</p>
-                  <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full ${
-                    user?.role === "owner" 
-                      ? "bg-purple-100 text-purple-700" 
+                  <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full ${user?.role === "owner"
+                      ? "bg-purple-100 text-purple-700"
                       : user?.role === "manager"
-                      ? "bg-blue-100 text-blue-700"
-                      : "bg-green-100 text-green-700"
-                  }`}>
+                        ? "bg-blue-100 text-blue-700"
+                        : "bg-green-100 text-green-700"
+                    }`}>
                     {user?.role?.charAt(0).toUpperCase() + user?.role?.slice(1) || "User"}
                   </span>
                 </div>
@@ -222,9 +221,8 @@ export default function Profile() {
                 <IonIcon icon={checkmarkCircleOutline} className="text-purple-500 text-lg" />
                 <div className="flex-1">
                   <p className="text-xs text-gray-500">Status</p>
-                  <span className={`inline-flex items-center gap-1 text-sm font-medium ${
-                    tenant?.is_active ? "text-green-600" : "text-red-600"
-                  }`}>
+                  <span className={`inline-flex items-center gap-1 text-sm font-medium ${tenant?.is_active ? "text-green-600" : "text-red-600"
+                    }`}>
                     <IonIcon icon={tenant?.is_active ? checkmarkCircleOutline : closeOutline} className="text-sm" />
                     {tenant?.is_active ? "Active" : "Inactive"}
                   </span>
@@ -232,17 +230,14 @@ export default function Profile() {
               </div>
 
               {tenant?.expiry_date && (
-                <div className={`flex items-center gap-3 p-3 rounded-lg ${
-                  isExpiringSoon && tenant?.is_active ? "bg-orange-50" : "bg-green-50"
-                }`}>
-                  <IonIcon icon={calendarOutline} className={`text-lg ${
-                    isExpiringSoon && tenant?.is_active ? "text-orange-500" : "text-green-500"
-                  }`} />
+                <div className={`flex items-center gap-3 p-3 rounded-lg ${isExpiringSoon && tenant?.is_active ? "bg-orange-50" : "bg-green-50"
+                  }`}>
+                  <IonIcon icon={calendarOutline} className={`text-lg ${isExpiringSoon && tenant?.is_active ? "text-orange-500" : "text-green-500"
+                    }`} />
                   <div className="flex-1">
                     <p className="text-xs text-gray-500">Subscription Expiry</p>
-                    <p className={`text-sm font-bold ${
-                      isExpiringSoon && tenant?.is_active ? "text-orange-600" : "text-green-600"
-                    }`}>
+                    <p className={`text-sm font-bold ${isExpiringSoon && tenant?.is_active ? "text-orange-600" : "text-green-600"
+                      }`}>
                       {new Date(tenant.expiry_date).toLocaleDateString('en-IN', {
                         day: 'numeric',
                         month: 'long',
