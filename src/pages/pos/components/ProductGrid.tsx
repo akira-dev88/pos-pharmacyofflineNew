@@ -81,7 +81,7 @@ export default function ProductGrid({ products, loading, onAddItem }: ProductGri
           {searchTerm && (
             <button
               onClick={() => setSearchTerm("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
             >
               ✕
             </button>
@@ -120,7 +120,7 @@ export default function ProductGrid({ products, loading, onAddItem }: ProductGri
             return (
               <div
                 key={p.product_uuid}
-                className={`border-2 ${hasImage ? 'border-gray-200 bg-white hover:bg-gray-50 text-gray-800' : colorClass} p-2 rounded-xl cursor-pointer h-40 flex flex-col justify-end items-start transition-all duration-200 font-inter hover:scale-105 hover:shadow-lg relative overflow-hidden`}
+                className={`border-2 ${hasImage ? 'border-gray-200 bg-white hover:bg-gray-50 text-gray-800' : colorClass} p-2 rounded-xl cursor-pointer h-40 2xl:h-56 flex flex-col justify-end items-start transition-all duration-200 font-inter hover:scale-105 hover:shadow-lg relative overflow-hidden`}
                 onClick={() => onAddItem(p)}
               >
                 {/* Background image */}

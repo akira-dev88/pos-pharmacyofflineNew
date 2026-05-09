@@ -10,7 +10,7 @@ function getHeaders() {
 
 export async function getStock() {
   try {
-    const res = await fetch(`${BASE_URL}/reports/stock`, {
+    const res = await fetch(`${BASE_URL}/products`, {
       headers: getHeaders(),
     });
 
@@ -19,34 +19,18 @@ export async function getStock() {
     }
 
     const data = await res.json();
-    console.log("Stock API raw response:", data);
-    
-    // Handle different response structures from backend
-    let stockData = [];
-    
-    // If response has success flag and data array
-    if (data.success && Array.isArray(data.data)) {
-      stockData = data.data;
-    }
-    // If response is directly an array
-    else if (Array.isArray(data)) {
-      stockData = data;
-    }
-    // If response has data property that's an array
-    else if (data.data && Array.isArray(data.data)) {
-      stockData = data.data;
-    }
-    // If response has products property
-    else if (data.products && Array.isArray(data.products)) {
-      stockData = data.products;
-    }
-    // If response is empty or has no data
-    else {
-      console.warn("Unexpected stock response structure:", data);
-      stockData = [];
-    }
-    
-    console.log("Parsed stock data:", stockData.length, "items");
+    // Assuming the products endpoint returns { success: true, data: [...] }
+    let products = Array.isArray(data) ? data : data?.data || [];
+
+    // Normalize to ensure stock field exists
+    const stockData = products.map((p: any) => ({
+      product_uuid: p.product_uuid,
+      name: p.name,
+      sku: p.sku,
+      stock: p.stock ?? 0,
+      price: p.price,
+    }));
+
     return stockData;
   } catch (error) {
     console.error("Stock API error:", error);

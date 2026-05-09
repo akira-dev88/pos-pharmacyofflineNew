@@ -421,14 +421,56 @@ export class SaleModel {
   }
 
   // Get sales list with pagination - Pattern matching PHP index
-  static findAll(page: number = 1, limit: number = 50, filters: any): { sales: Sale[], total: number } {
+  // Get sales list with pagination - Pattern matching PHP index
+  static findAll(page: number = 1, limit: number = 50, filters: any): { sales: any[], total: number } {
     const offset = (page - 1) * limit;
 
-    const sales = db.prepare(
-      'SELECT * FROM sales ORDER BY created_at DESC LIMIT ? OFFSET ?'
-    ).all(limit, offset) as Sale[];
+    // Build WHERE clause from filters
+    let whereClause = '';
+    const params: any[] = [];
 
-    const total = (db.prepare('SELECT COUNT(*) as count FROM sales').get() as any).count;
+    if (filters.startDate && filters.endDate) {
+      whereClause = 'WHERE s.created_at BETWEEN ? AND ?';
+      params.push(filters.startDate, filters.endDate);
+    } else if (filters.startDate) {
+      whereClause = 'WHERE s.created_at >= ?';
+      params.push(filters.startDate);
+    } else if (filters.endDate) {
+      whereClause = 'WHERE s.created_at <= ?';
+      params.push(filters.endDate);
+    }
+
+    if (filters.customerUuid) {
+      whereClause += whereClause ? ' AND s.customer_uuid = ?' : 'WHERE s.customer_uuid = ?';
+      params.push(filters.customerUuid);
+    }
+
+    if (filters.status) {
+      whereClause += whereClause ? ' AND s.status = ?' : 'WHERE s.status = ?';
+      params.push(filters.status);
+    }
+
+    // Main query with customer join
+    const sales = db.prepare(`
+    SELECT s.*, 
+           c.name as customer_name, 
+           c.mobile as customer_mobile
+    FROM sales s
+    LEFT JOIN customers c ON s.customer_uuid = c.customer_uuid
+    ${whereClause}
+    ORDER BY s.created_at DESC
+    LIMIT ? OFFSET ?
+  `).all(...params, limit, offset);
+
+    // Count total with same filters (without limit/offset)
+    const countParams = params.slice(0, -2); // remove limit and offset
+    const countResult = db.prepare(`
+    SELECT COUNT(*) as count
+    FROM sales s
+    ${whereClause}
+  `).get(...countParams) as any;
+
+    const total = countResult?.count || 0;
 
     return { sales, total };
   }

@@ -12,6 +12,7 @@ import {
   cubeOutline,
   trendingUpOutline,
   searchOutline,
+  checkmarkOutline,
 } from "ionicons/icons";
 
 export default function Stock() {
@@ -28,7 +29,7 @@ export default function Stock() {
       setLoading(true);
       setError(null);
       const data = await getStock();
-      
+
       // Ensure data is an array
       const stockData = Array.isArray(data) ? data : [];
       setItems(stockData);
@@ -73,8 +74,8 @@ export default function Stock() {
     const matchesSearch = item.name?.toLowerCase().includes(searchTerm.toLowerCase()) || false;
     const matchesStatus =
       filterStatus === "all" ? true :
-      filterStatus === "low" ? item.stock < 10 && item.stock > 0 :
-      item.stock >= 10;
+        filterStatus === "low" ? item.stock < 10 && item.stock > 0 :
+          item.stock >= 10;
     return matchesSearch && matchesStatus;
   });
 
@@ -186,31 +187,28 @@ export default function Stock() {
         <div className="flex gap-2">
           <button
             onClick={() => setFilterStatus("all")}
-            className={`px-4 py-2 rounded-xl font-medium transition-all ${
-              filterStatus === "all"
+            className={`px-4 py-2 rounded-xl font-medium transition-all ${filterStatus === "all"
                 ? "bg-blue-600 text-white shadow-md"
                 : "bg-white text-gray-600 hover:bg-gray-100 border border-gray-200"
-            }`}
+              }`}
           >
             All
           </button>
           <button
             onClick={() => setFilterStatus("low")}
-            className={`px-4 py-2 rounded-xl font-medium transition-all ${
-              filterStatus === "low"
+            className={`px-4 py-2 rounded-xl font-medium transition-all ${filterStatus === "low"
                 ? "bg-orange-600 text-white shadow-md"
                 : "bg-white text-gray-600 hover:bg-gray-100 border border-gray-200"
-            }`}
+              }`}
           >
             Low Stock
           </button>
           <button
             onClick={() => setFilterStatus("ok")}
-            className={`px-4 py-2 rounded-xl font-medium transition-all ${
-              filterStatus === "ok"
+            className={`px-4 py-2 rounded-xl font-medium transition-all ${filterStatus === "ok"
                 ? "bg-green-600 text-white shadow-md"
                 : "bg-white text-gray-600 hover:bg-gray-100 border border-gray-200"
-            }`}
+              }`}
           >
             In Stock
           </button>
@@ -235,14 +233,14 @@ export default function Stock() {
                   <td colSpan={4} className="text-center p-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
                     <p className="text-gray-500 mt-2">Loading stock data...</p>
-                   </td>
-                 </tr>
+                  </td>
+                </tr>
               ) : filteredItems.length === 0 ? (
                 <tr>
                   <td colSpan={4} className="text-center p-8 text-gray-500">
                     {searchTerm ? "No products match your search" : "No stock data available"}
-                   </td>
-                 </tr>
+                  </td>
+                </tr>
               ) : (
                 filteredItems.map((item) => {
                   const stock = item?.stock || 0;
@@ -266,22 +264,20 @@ export default function Stock() {
 
                       <td className="p-4">
                         <div className="text-right">
-                          <div className={`text-xl font-bold ${
-                            isOut ? "text-red-600" :
-                            isLow ? "text-orange-600" :
-                            "text-green-600"
-                          }`}>
+                          <div className={`text-xl font-bold ${isOut ? "text-red-600" :
+                              isLow ? "text-orange-600" :
+                                "text-green-600"
+                            }`}>
                             {stock}
                           </div>
                           {/* Progress Bar */}
                           <div className="w-32 ml-auto mt-2">
                             <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
                               <div
-                                className={`h-full rounded-full transition-all duration-500 ${
-                                  isOut ? "bg-red-500" :
-                                  isLow ? "bg-orange-500" :
-                                  "bg-green-500"
-                                }`}
+                                className={`h-full rounded-full transition-all duration-500 ${isOut ? "bg-red-500" :
+                                    isLow ? "bg-orange-500" :
+                                      "bg-green-500"
+                                  }`}
                                 style={{ width: `${stockPercentage}%` }}
                               ></div>
                             </div>
@@ -323,7 +319,7 @@ export default function Stock() {
                               className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-all"
                               title="Save"
                             >
-                              <IonIcon icon={saveOutline} className="text-lg" />
+                              <IonIcon icon={checkmarkOutline} className="text-lg" />
                             </button>
                             <button
                               onClick={() => setEditing(null)}
@@ -336,6 +332,10 @@ export default function Stock() {
                         ) : (
                           <button
                             onClick={() => {
+                              if (!item.product_uuid) {
+                                console.error("Missing product_uuid for item", item);
+                                return;
+                              }
                               setEditing(item.product_uuid);
                               setNewStock(stock);
                             }}

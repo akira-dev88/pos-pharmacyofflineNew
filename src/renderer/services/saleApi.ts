@@ -1,19 +1,21 @@
 import { apiGet, apiPost } from "./api";
 
 export interface Sale {
+  customer_mobile: import("react/jsx-runtime").JSX.Element;
+  customerName: any;
+  customer_name: any;
+  mobile: any;
+  customer: any;
   sale_uuid: string;
   invoice_number: string;
   grand_total: number | string;
   created_at: string;
-  customer?: any;
 }
 
 export interface Invoice {
   invoice_no: string | undefined;
   total_amount: any;
   gst: any;
-  customer_name: any;
-  cart: any;
   customer_name: any;
   cart: any;
   invoice_number?: string;

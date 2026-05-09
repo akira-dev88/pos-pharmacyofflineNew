@@ -17,6 +17,7 @@ import {
   checkmarkCircleOutline,
   searchOutline,
 } from "ionicons/icons";
+import InvoiceReceipt from "../pos/components/InvoiceReceipt";
 
 export default function Sales() {
   const [sales, setSales] = useState<Sale[]>([]);
@@ -32,26 +33,34 @@ export default function Sales() {
   const loadSales = async () => {
     try {
       setLoading(true);
-      const response = await getSales();
-      console.log("📊 Sales API Response:", response);
-      
-      // Handle different response structures
+      const response = (await getSales()) as any;
+
       let salesData = [];
-      if (Array.isArray(response)) {
-        salesData = response;
-      } else if (response.data && Array.isArray(response.data)) {
-        salesData = response.data;
-      } else if (response.success && response.data && Array.isArray(response.data)) {
-        salesData = response.data;
-      } else if (response.sales && Array.isArray(response.sales)) {
-        salesData = response.sales;
-      } else {
-        console.warn("Unexpected sales response structure:", response);
-        salesData = [];
-      }
-      
-      console.log("📊 Processed sales data:", salesData);
-      setSales(salesData);
+      if (Array.isArray(response)) salesData = response;
+      else if (response?.data && Array.isArray(response.data)) salesData = response.data;
+      else if (response?.success && response?.data && Array.isArray(response.data)) salesData = response.data;
+      else if (response?.sales && Array.isArray(response.sales)) salesData = response.sales;
+      else salesData = [];
+
+      // ✅ Normalise each sale to ensure customer object exists
+      const normalised = salesData.map((sale: any) => {
+        // If sale already has a customer object with a name, keep it
+        if (sale.customer?.name) return sale;
+
+        // Otherwise, build a customer object from available fields
+        const customerName = sale.customer_name || sale.customerName || sale.customer?.name || "Walk-in Customer";
+        const customerMobile = sale.mobile || sale.customer_mobile || sale.customerMobile || sale.customer?.mobile || "";
+
+        return {
+          ...sale,
+          customer: {
+            name: customerName,
+            mobile: customerMobile,
+          },
+        };
+      });
+
+      setSales(normalised);
     } catch (e) {
       console.error("Sales error:", e);
       setSales([]);
@@ -60,12 +69,74 @@ export default function Sales() {
     }
   };
 
+  // Helper to normalise invoice data to the shape expected by InvoiceReceipt
+  const normaliseInvoice = (raw: any): any => {
+    return {
+      // Basic info
+      invoice_number: raw.invoice_number,
+      sale_uuid: raw.sale_uuid,
+      created_at: raw.created_at,
+      date: raw.created_at || raw.date,
+
+      // Shop info (fallback if missing)
+      shop: raw.shop || {
+        name: "My Store",
+        address: "Chennai, Tamil Nadu",
+        gstin: "33ABCDE1234F1Z5",
+        mobile: ""
+      },
+
+      // Customer info
+      customer: raw.customer || { name: raw.customer_name || "Walk-in Customer" },
+
+      // Items – normalise from different possible sources
+      items: (raw.items || raw.cart?.items || []).map((item: any) => ({
+        name: item.name || item.product?.name,
+        hsn_code: item.hsn_code || item.product?.hsn_code,
+        price: Number(item.price || item.product?.price || 0),
+        qty: Number(item.qty || item.quantity || 1),
+        total: Number(item.total || (item.price * (item.qty || item.quantity || 1))),
+        tax_percent: item.gst_percent || item.tax_percent || 0,
+        cgst: item.cgst || 0,
+        sgst: item.sgst || 0
+      })),
+
+      // Summary – normalise totals
+      summary: {
+        total: Number(raw.summary?.total || raw.subtotal || raw.total || 0),
+        tax: Number(raw.summary?.tax || raw.tax || 0),
+        cgst: Number(raw.summary?.cgst || (raw.tax || 0) / 2),
+        sgst: Number(raw.summary?.sgst || (raw.tax || 0) / 2),
+        grand_total: Number(raw.summary?.grand_total || raw.grand_total || raw.total_amount || 0)
+      },
+
+      discount: Number(raw.discount || 0),
+
+      // Payments
+      payments: raw.payments || []
+    };
+  };
+
   const handleView = async (sale: Sale) => {
     try {
-      console.log("🔍 Viewing sale:", sale);
-      const invoice = await getInvoice(sale.sale_uuid);
-      console.log("📄 Full invoice data:", invoice);
-      setInvoiceData(invoice);
+      const rawInvoice = await getInvoice(sale.sale_uuid);
+      const normalised = normaliseInvoice(rawInvoice);
+      setInvoiceData(normalised);
+
+      // 🆕 Update this sale in the sales list with the real customer name
+      setSales(prevSales =>
+        prevSales.map(s =>
+          s.sale_uuid === sale.sale_uuid
+            ? {
+              ...s,
+              customer: {
+                name: normalised.customer.name,
+                mobile: normalised.customer.mobile,
+              },
+            }
+            : s
+        )
+      );
     } catch (e) {
       console.error("Invoice error:", e);
       alert("Failed to load invoice. Please try again.");
@@ -87,17 +158,20 @@ export default function Sales() {
 
   const todaySales = sales.filter(sale => {
     if (!sale.created_at) return false;
-    const saleDate = new Date(sale.created_at).toDateString();
-    const today = new Date().toDateString();
-    return saleDate === today;
+    // Extract just the date part (YYYY-MM-DD) from the timestamp string
+    const saleDate = sale.created_at.slice(0, 10);
+    const todayDate = new Date().toISOString().slice(0, 10);
+    return saleDate === todayDate;
   }).reduce((sum, sale) => {
-    const grandTotal = typeof sale.grand_total === 'string' ? parseFloat(sale.grand_total) : (sale.grand_total || 0);
+    const grandTotal = typeof sale.grand_total === 'string'
+      ? parseFloat(sale.grand_total)
+      : (sale.grand_total || 0);
     return sum + grandTotal;
   }, 0);
 
   // Filter sales
   const filteredSales = sales.filter((sale) => {
-    const matchesSearch = !searchTerm || 
+    const matchesSearch = !searchTerm ||
       sale.invoice_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       sale.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesDate = !filterDate || sale.created_at?.startsWith(filterDate);
@@ -108,7 +182,7 @@ export default function Sales() {
     <div className="space-y-6 font-inter">
       {/* Header */}
       <div className="flex justify-between items-center font-inter">
-        <div>
+        <div className="space-y-1 text-start">
           <h1 className="text-3xl font-bold text-white">Sales</h1>
           <p className="text-gray-300 text-sm mt-1">Manage and view all your sales transactions</p>
         </div>
@@ -234,10 +308,9 @@ export default function Sales() {
                       </div>
                     </td>
                     <td className="p-4">
-                      <div className="text-gray-700">{sale.customer?.name || "Walk-in Customer"}</div>
-                      {sale.customer?.mobile && (
-                        <div className="text-xs text-gray-400 mt-0.5">{sale.customer.mobile}</div>
-                      )}
+                      <div className="text-gray-700">
+                        {sale.customer_name || "Walk-in Customer"}
+                      </div>
                     </td>
                     <td className="p-4 text-right">
                       <span className="font-bold text-green-600 text-lg">
@@ -278,128 +351,11 @@ export default function Sales() {
 
       {/* INVOICE MODAL */}
       {invoiceData && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-            {/* Modal Header */}
-            <div className="sticky top-0 bg-white border-b border-gray-100 p-4 flex justify-between items-center">
-              <h2 className="text-lg font-bold text-gray-800">Invoice Details</h2>
-              <button
-                onClick={() => setInvoiceData(null)}
-                className="p-2 hover:bg-gray-100 rounded-full transition"
-              >
-                <IonIcon icon={closeOutline} className="text-xl text-gray-500" />
-              </button>
-            </div>
-
-            {/* Invoice Content */}
-            <div className="p-6" id="invoice-content">
-              {/* Header */}
-              <div className="text-center mb-4">
-                <div className="text-xs text-gray-400 mb-1">
-                  Invoice #{invoiceData.invoice_number || invoiceData.sale_uuid?.slice(0, 8) || "-"}
-                </div>
-                <h2 className="text-xl font-bold text-gray-800">
-                  {invoiceData.shop?.name || "My Store"}
-                </h2>
-                <div className="text-xs text-gray-500 mt-1">
-                  {invoiceData.shop?.address || "Chennai, Tamil Nadu"}
-                </div>
-                <div className="text-xs text-gray-400">
-                  GSTIN: {invoiceData.shop?.gstin || "33ABCDE1234F1Z5"}
-                </div>
-                <div className="text-xs text-gray-400 mt-2">
-                  Date: {invoiceData.created_at ? new Date(invoiceData.created_at).toLocaleString() : new Date().toLocaleString()}
-                </div>
-              </div>
-
-              <hr className="my-3 border-gray-200" />
-
-              {/* Customer Info */}
-              {(invoiceData.customer || invoiceData.customer_name) && (
-                <div className="mb-3 text-sm">
-                  <div className="font-semibold text-gray-700">Customer:</div>
-                  <div className="text-gray-600">
-                    {invoiceData.customer?.name || invoiceData.customer_name || "Walk-in Customer"}
-                  </div>
-                </div>
-              )}
-
-              {/* Items */}
-              <div className="space-y-2 mb-3">
-                <div className="font-semibold text-gray-700 text-sm">Items:</div>
-                {(invoiceData.items?.length || invoiceData.cart?.items?.length) ? (
-                  (invoiceData.items || invoiceData.cart?.items || []).map((item: any, i: number) => (
-                    <div key={i} className="flex justify-between text-sm py-1 border-b border-gray-100">
-                      <div>
-                        <div className="text-gray-700">{item.name || item.product?.name}</div>
-                        <div className="text-xs text-gray-400">
-                          Qty: {item.qty || item.quantity || 1} × ₹{format(item.price || item.product?.price)}
-                        </div>
-                      </div>
-                      <div className="font-medium text-gray-700">
-                        ₹{format(item.total || (item.price * (item.qty || item.quantity || 1)))}
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-center text-sm text-gray-400">No items found</div>
-                )}
-              </div>
-
-              <hr className="my-3 border-gray-200" />
-
-              {/* Summary */}
-              <div className="space-y-1 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Subtotal</span>
-                  <span className="text-gray-800">
-                    ₹{format(invoiceData.summary?.total || invoiceData.subtotal || invoiceData.total || 0)}
-                  </span>
-                </div>
-
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Tax (GST)</span>
-                  <span className="text-gray-800">
-                    ₹{format(invoiceData.summary?.tax || invoiceData.tax || invoiceData.gst || 0)}
-                  </span>
-                </div>
-
-                <div className="flex justify-between pt-2 border-t border-gray-200">
-                  <span className="font-bold text-gray-800">Grand Total</span>
-                  <span className="font-bold text-green-600 text-lg">
-                    ₹{format(invoiceData.summary?.grand_total || invoiceData.grand_total || invoiceData.total_amount || 0)}
-                  </span>
-                </div>
-              </div>
-
-              <hr className="my-3 border-gray-200" />
-
-              {/* Footer */}
-              <div className="text-center">
-                <div className="text-sm text-gray-600">Thank you for your purchase! 🙏</div>
-                <div className="text-xs text-gray-400 mt-1">Visit again!</div>
-              </div>
-            </div>
-
-            {/* Modal Footer Buttons */}
-            <div className="sticky bottom-0 bg-white border-t border-gray-100 p-4 flex gap-2">
-              <button
-                onClick={() => window.print()}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-xl flex items-center justify-center gap-2 transition-all"
-              >
-                <IonIcon icon={printOutline} className="text-lg" />
-                <span>Print</span>
-              </button>
-              <button
-                onClick={() => setInvoiceData(null)}
-                className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-2 rounded-xl flex items-center justify-center gap-2 transition-all"
-              >
-                <IonIcon icon={closeOutline} className="text-lg" />
-                <span>Close</span>
-              </button>
-            </div>
-          </div>
-        </div>
+        <InvoiceReceipt
+          invoice={invoiceData}
+          onClose={() => setInvoiceData(null)}
+          autoPrint={false}   // set to true if you want auto-print on open
+        />
       )}
     </div>
   );
