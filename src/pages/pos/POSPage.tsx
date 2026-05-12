@@ -346,7 +346,6 @@ function POSpage() {
   return (
     <div className="h-screen flex flex-col bg-[#141414] font-inter overflow-hidden">
       <TopBar
-        onNavigate={navigate}
         onShowSales={() => {
           loadSales();
           setShowSalesModal(true);
