@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from "./api";
+import { apiDelete, apiGet, apiPost } from "./api";
 
 export interface Sale {
   customer_mobile: import("react/jsx-runtime").JSX.Element;
@@ -58,4 +58,8 @@ export async function checkoutCart(
     payments,
     customer_uuid: customer_uuid || null,
   });
+}
+
+export async function deleteSale(saleUuid: string) {
+  return await apiDelete(`/sales/${saleUuid}`);
 }

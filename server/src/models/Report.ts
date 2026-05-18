@@ -16,17 +16,19 @@ export class ReportModel {
     // Alternative: Use SQLite's date functions with localtime
     // Today's sales - using DATE() with localtime
     const todaySales = (db.prepare(`
-        SELECT COALESCE(SUM(grand_total), 0) as total 
-        FROM sales 
-        WHERE DATE(created_at, 'localtime') = DATE('now', 'localtime')
-    `).get() as any).total;
+    SELECT COALESCE(SUM(grand_total), 0) as total 
+    FROM sales 
+    WHERE DATE(created_at, 'localtime') = DATE('now', 'localtime')
+    AND (is_deleted = 0 OR is_deleted IS NULL)
+`).get() as any).total;
 
     // This month's sales - using DATE() with localtime
     const monthSales = (db.prepare(`
-        SELECT COALESCE(SUM(grand_total), 0) as total 
-        FROM sales 
-        WHERE strftime('%Y-%m', created_at, 'localtime') = strftime('%Y-%m', 'now', 'localtime')
-    `).get() as any).total;
+    SELECT COALESCE(SUM(grand_total), 0) as total 
+    FROM sales 
+    WHERE strftime('%Y-%m', created_at, 'localtime') = strftime('%Y-%m', 'now', 'localtime')
+    AND (is_deleted = 0 OR is_deleted IS NULL)
+`).get() as any).total;
 
     // Alternative method using string comparison (more reliable)
     // Today's sales alternative method
@@ -38,24 +40,26 @@ export class ReportModel {
 
     // Total sales (all time)
     const totalSales = (db.prepare(`
-        SELECT COALESCE(SUM(grand_total), 0) as total 
-        FROM sales
-    `).get() as any).total;
+    SELECT COALESCE(SUM(grand_total), 0) as total 
+    FROM sales
+    WHERE (is_deleted = 0 OR is_deleted IS NULL)
+`).get() as any).total;
 
-    // Total orders
     const totalOrders = (db.prepare(`
-        SELECT COUNT(*) as count 
-        FROM sales
-    `).get() as any).count;
+    SELECT COUNT(*) as count 
+    FROM sales
+    WHERE (is_deleted = 0 OR is_deleted IS NULL)
+`).get() as any).count;
 
     // Recent sales (last 5)
     const recentSales = db.prepare(`
-        SELECT s.*, c.name as customer_name
-        FROM sales s
-        LEFT JOIN customers c ON s.customer_uuid = c.customer_uuid
-        ORDER BY s.created_at DESC
-        LIMIT 5
-    `).all();
+    SELECT s.*, c.name as customer_name
+    FROM sales s
+    LEFT JOIN customers c ON s.customer_uuid = c.customer_uuid
+    WHERE (s.is_deleted = 0 OR s.is_deleted IS NULL)
+    ORDER BY s.created_at DESC
+    LIMIT 5
+`).all();
 
     // Low stock products (stock < 10)
     const lowStock = db.prepare(`

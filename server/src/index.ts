@@ -23,6 +23,7 @@ import migrationRouter from './routes/migration';
 import { LicenseService } from './services/licenseService';
 
 import { scheduleAutoBackup, checkDbIntegrity } from './database/backup';
+import { SaleModel } from './models/Sale';
 
 // Load environment variables - simplified for CommonJS
 dotenv.config();
@@ -41,6 +42,7 @@ app.use(express.urlencoded({ extended: true }));
 runMigrations();
 addHsnCode();
 addAutoPrint();
+SaleModel.initSoftDelete();
 
 const licensed = LicenseService.isLicensed();
 if (!licensed) {

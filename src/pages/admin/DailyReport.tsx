@@ -6,7 +6,15 @@ import { printOutline, calendarOutline, refreshOutline } from "ionicons/icons";
 
 export default function DailyReport() {
   const { t } = useTranslation();
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const getTodayIST = () => {
+    const now = new Date();
+    // Offset for IST (UTC+5:30)
+    const istOffset = 5.5 * 60 * 60 * 1000;
+    const istDate = new Date(now.getTime() + istOffset);
+    return istDate.toISOString().split('T')[0];
+  };
+
+  const [date, setDate] = useState(getTodayIST);
   const [report, setReport] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);

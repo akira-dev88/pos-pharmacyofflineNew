@@ -41,6 +41,7 @@ const getStockColorClass = (product: Product): string | null => {
 export default function ProductGrid({ products, loading, onAddItem }: ProductGridProps) {
   const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState("");
+  const [recentUUIDs, setRecentUUIDs] = useState<string[]>([]);
 
   // Filter products based on search term
   const filteredProducts = products.filter((product) => {
@@ -51,6 +52,14 @@ export default function ProductGrid({ products, loading, onAddItem }: ProductGri
       (product.barcode && product.barcode.toLowerCase().includes(searchLower))
     );
   });
+
+  const sortedProducts = searchTerm
+    ? filteredProducts // don't reorder when searching
+    : [
+      ...filteredProducts.filter(p => recentUUIDs.includes(p.product_uuid))
+        .sort((a, b) => recentUUIDs.indexOf(a.product_uuid) - recentUUIDs.indexOf(b.product_uuid)),
+      ...filteredProducts.filter(p => !recentUUIDs.includes(p.product_uuid))
+    ];
 
   if (loading) {
     return (
@@ -98,14 +107,14 @@ export default function ProductGrid({ products, loading, onAddItem }: ProductGri
 
       {/* Product Grid */}
       <div className="overflow-y-auto p-3 grid grid-cols-3 gap-2 scrollbar-hide">
-        {filteredProducts.length === 0 ? (
+        {sortedProducts.length === 0 ? (
           <div className="col-span-3 flex flex-col items-center justify-center py-12 text-gray-500">
             <div className="text-4xl mb-2">🔍</div>
             <p className="text-sm">{t('pos.noProductsFound')}</p>
             <p className="text-xs mt-1">{t('pos.tryDifferentSearch')}</p>
           </div>
         ) : (
-          filteredProducts.map((p, index) => {
+          sortedProducts.map((p, index) => {
             const stockColor = getStockColorClass(p);
 
             let colorIndex: number;
@@ -123,7 +132,13 @@ export default function ProductGrid({ products, loading, onAddItem }: ProductGri
               <div
                 key={p.product_uuid}
                 className={`border-2 ${hasImage ? 'border-gray-200 bg-white hover:bg-gray-50 text-gray-800' : colorClass} p-2 rounded-xl cursor-pointer h-40 2xl:h-56 flex flex-col justify-end items-start transition-all duration-200 font-inter hover:scale-105 hover:shadow-lg relative overflow-hidden`}
-                onClick={() => onAddItem(p)}
+                onClick={() => {
+                  setRecentUUIDs(prev => {
+                    const filtered = prev.filter(id => id !== p.product_uuid);
+                    return [p.product_uuid, ...filtered].slice(0, 20); // keep last 20
+                  });
+                  onAddItem(p);
+                }}
               >
                 {/* Background image */}
                 {hasImage && (

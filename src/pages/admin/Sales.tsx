@@ -17,8 +17,11 @@ import {
   trendingUpOutline,
   checkmarkCircleOutline,
   searchOutline,
+  trashOutline,
 } from "ionicons/icons";
 import InvoiceReceipt from "../pos/components/InvoiceReceipt";
+import { deleteSale } from "../../renderer/services/saleApi";
+import { useAuth } from "../../context/AuthContext";
 
 export default function Sales() {
   const { t } = useTranslation();
@@ -27,10 +30,25 @@ export default function Sales() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterDate, setFilterDate] = useState("");
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const { user } = useAuth();
 
   useEffect(() => {
     loadSales();
   }, []);
+
+  const handleDelete = async (sale: Sale) => {
+    if (!confirm(`Delete invoice ${sale.invoice_number}? Stock will be restored.`)) return;
+    setDeleting(sale.sale_uuid);
+    try {
+      await deleteSale(sale.sale_uuid);
+      await loadSales();
+    } catch (err: any) {
+      alert('Failed to delete: ' + err.message);
+    } finally {
+      setDeleting(null);
+    }
+  };
 
   const loadSales = async () => {
     try {
@@ -311,14 +329,30 @@ export default function Sales() {
                       </span>
                     </td>
                     <td className="p-4 text-center">
-                      <button
-                        onClick={() => handleView(sale)}
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-all inline-flex items-center gap-1"
-                        title={t('sales.viewTitle')}
-                      >
-                        <IonIcon icon={eyeOutline} className="text-lg" />
-                        <span className="text-sm">{t('sales.viewButton')}</span>
-                      </button>
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          onClick={() => handleView(sale)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-all inline-flex items-center gap-1"
+                        >
+                          <IonIcon icon={eyeOutline} className="text-lg" />
+                          <span className="text-sm">{t('sales.viewButton')}</span>
+                        </button>
+
+                        {/* Only show delete for owner */}
+                        {user?.role === 'owner' && (
+                          <button
+                            onClick={() => handleDelete(sale)}
+                            disabled={deleting === sale.sale_uuid}
+                            className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-all disabled:opacity-50"
+                            title="Delete sale"
+                          >
+                            {deleting === sale.sale_uuid
+                              ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-500" />
+                              : <IonIcon icon={trashOutline} className="text-lg" />
+                            }
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))

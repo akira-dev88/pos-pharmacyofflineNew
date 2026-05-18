@@ -23,22 +23,24 @@ router.get('/product-sales', ReportController.productSales);
 router.get('/customer-purchases', ReportController.customerPurchases);
 
 router.get('/daily', (req, res) => {
-    try {
-        const { date } = req.query;
-        const reportDate = date ? String(date) : new Date().toISOString().split('T')[0];
-        const startOfDay = `${reportDate} 00:00:00`;
-        const endOfDay = `${reportDate} 23:59:59`;
+  try {
+    const { date } = req.query;
+    const reportDate = date ? String(date) : new Date().toISOString().split('T')[0];
+    const startOfDay = `${reportDate} 00:00:00`;
+    const endOfDay = `${reportDate} 23:59:59`;
 
-        const summary = db.prepare(`
-      SELECT COUNT(*) as total_bills,
-        COALESCE(SUM(total), 0) as subtotal,
-        COALESCE(SUM(tax), 0) as total_tax,
-        COALESCE(SUM(grand_total), 0) as grand_total
-      FROM sales
-      WHERE created_at BETWEEN ? AND ? AND status = 'completed'
-    `).get(startOfDay, endOfDay) as any;
+    const summary = db.prepare(`
+  SELECT COUNT(*) as total_bills,
+    COALESCE(SUM(total), 0) as subtotal,
+    COALESCE(SUM(tax), 0) as total_tax,
+    COALESCE(SUM(grand_total), 0) as grand_total
+  FROM sales
+  WHERE datetime(created_at, 'localtime') BETWEEN ? AND ?
+  AND (status = 'completed')
+  AND (is_deleted = 0 OR is_deleted IS NULL)
+`).get(startOfDay, endOfDay) as any;
 
-        const payments = db.prepare(`
+    const payments = db.prepare(`
       SELECT p.method, COALESCE(SUM(p.amount), 0) as total
       FROM payments p
       JOIN sales s ON p.sale_uuid = s.sale_uuid
@@ -46,7 +48,7 @@ router.get('/daily', (req, res) => {
       GROUP BY p.method
     `).all(startOfDay, endOfDay);
 
-        const topProducts = db.prepare(`
+    const topProducts = db.prepare(`
       SELECT p.name, SUM(si.quantity) as qty_sold,
         SUM(si.price * si.quantity) as revenue
       FROM sale_items si
@@ -57,7 +59,7 @@ router.get('/daily', (req, res) => {
       ORDER BY revenue DESC LIMIT 10
     `).all(startOfDay, endOfDay);
 
-        const gstSlabs = db.prepare(`
+    const gstSlabs = db.prepare(`
       SELECT si.tax_percent,
         SUM(si.price * si.quantity) as taxable_amount,
         SUM(si.tax_amount) as tax_collected
@@ -68,7 +70,7 @@ router.get('/daily', (req, res) => {
       GROUP BY si.tax_percent ORDER BY si.tax_percent
     `).all(startOfDay, endOfDay);
 
-        const bills = db.prepare(`
+    const bills = db.prepare(`
       SELECT s.invoice_number, s.grand_total, s.created_at,
         c.name as customer_name
       FROM sales s
@@ -77,40 +79,40 @@ router.get('/daily', (req, res) => {
       ORDER BY s.created_at DESC
     `).all(startOfDay, endOfDay);
 
-        const settings = db.prepare('SELECT * FROM settings LIMIT 1').get() as any;
+    const settings = db.prepare('SELECT * FROM settings LIMIT 1').get() as any;
 
-        res.json({
-            success: true,
-            data: {
-                date: reportDate,
-                shop: settings ? {
-                    name: settings.shop_name,
-                    address: settings.address,
-                    gstin: settings.gstin,
-                    mobile: settings.mobile,
-                } : null,
-                summary, payments, top_products: topProducts, gst_slabs: gstSlabs, bills
-            }
-        });
-    } catch (err) {
-        console.error('Daily report error:', err);
-        res.status(500).json({ success: false, error: 'Internal server error' });
-    }
+    res.json({
+      success: true,
+      data: {
+        date: reportDate,
+        shop: settings ? {
+          name: settings.shop_name,
+          address: settings.address,
+          gstin: settings.gstin,
+          mobile: settings.mobile,
+        } : null,
+        summary, payments, top_products: topProducts, gst_slabs: gstSlabs, bills
+      }
+    });
+  } catch (err) {
+    console.error('Daily report error:', err);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
 
-    router.get('/gst', (req, res) => {
-        try {
-            const { month } = req.query;
-            // month format: "2026-05"
-            const reportMonth = month ? String(month) : new Date().toISOString().slice(0, 7);
-            const [year, mon] = reportMonth.split('-');
+  router.get('/gst', (req, res) => {
+    try {
+      const { month } = req.query;
+      // month format: "2026-05"
+      const reportMonth = month ? String(month) : new Date().toISOString().slice(0, 7);
+      const [year, mon] = reportMonth.split('-');
 
-            const startDate = `${reportMonth}-01 00:00:00`;
-            // Last day of month
-            const lastDay = new Date(parseInt(year), parseInt(mon), 0).getDate();
-            const endDate = `${reportMonth}-${lastDay} 23:59:59`;
+      const startDate = `${reportMonth}-01 00:00:00`;
+      // Last day of month
+      const lastDay = new Date(parseInt(year), parseInt(mon), 0).getDate();
+      const endDate = `${reportMonth}-${lastDay} 23:59:59`;
 
-            // GST slab wise summary
-            const slabs = db.prepare(`
+      // GST slab wise summary
+      const slabs = db.prepare(`
       SELECT
         si.tax_percent,
         COUNT(DISTINCT s.sale_uuid) as invoice_count,
@@ -127,8 +129,8 @@ router.get('/daily', (req, res) => {
       ORDER BY si.tax_percent ASC
     `).all(startDate, endDate) as any[];
 
-            // Exempt/zero rated sales
-            const exemptSales = db.prepare(`
+      // Exempt/zero rated sales
+      const exemptSales = db.prepare(`
       SELECT
         COALESCE(SUM(si.price * si.quantity), 0) as taxable_value
       FROM sale_items si
@@ -138,8 +140,8 @@ router.get('/daily', (req, res) => {
         AND si.tax_percent = 0
     `).get(startDate, endDate) as any;
 
-            // Overall summary
-            const summary = db.prepare(`
+      // Overall summary
+      const summary = db.prepare(`
       SELECT
         COUNT(DISTINCT s.sale_uuid) as total_invoices,
         COALESCE(SUM(s.total), 0) as total_taxable,
@@ -150,8 +152,8 @@ router.get('/daily', (req, res) => {
         AND s.status = 'completed'
     `).get(startDate, endDate) as any;
 
-            // Invoice list for the month
-            const invoices = db.prepare(`
+      // Invoice list for the month
+      const invoices = db.prepare(`
       SELECT
         s.invoice_number,
         s.created_at,
@@ -167,28 +169,28 @@ router.get('/daily', (req, res) => {
       ORDER BY s.created_at ASC
     `).all(startDate, endDate) as any[];
 
-            const settings = db.prepare('SELECT * FROM settings LIMIT 1').get() as any;
+      const settings = db.prepare('SELECT * FROM settings LIMIT 1').get() as any;
 
-            res.json({
-                success: true,
-                data: {
-                    month: reportMonth,
-                    shop: settings ? {
-                        name: settings.shop_name,
-                        gstin: settings.gstin,
-                        address: settings.address,
-                    } : null,
-                    summary,
-                    slabs,
-                    exempt_value: exemptSales?.taxable_value || 0,
-                    invoices,
-                }
-            });
-        } catch (err) {
-            console.error('GST report error:', err);
-            res.status(500).json({ success: false, error: 'Internal server error' });
+      res.json({
+        success: true,
+        data: {
+          month: reportMonth,
+          shop: settings ? {
+            name: settings.shop_name,
+            gstin: settings.gstin,
+            address: settings.address,
+          } : null,
+          summary,
+          slabs,
+          exempt_value: exemptSales?.taxable_value || 0,
+          invoices,
         }
-    });
+      });
+    } catch (err) {
+      console.error('GST report error:', err);
+      res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+  });
 });
 
 export default router;
