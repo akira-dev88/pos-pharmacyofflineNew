@@ -21,6 +21,18 @@ export default function InvoiceReceipt({ invoice, onClose, autoPrint }: InvoiceR
     }
   }, [autoPrint, invoice]);
 
+  useEffect(() => {
+    const handleEnterKey = (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handlePrint();
+      }
+    };
+
+    window.addEventListener('keydown', handleEnterKey);
+    return () => window.removeEventListener('keydown', handleEnterKey);
+  }, []);
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleString('en-IN', {
@@ -105,6 +117,20 @@ export default function InvoiceReceipt({ invoice, onClose, autoPrint }: InvoiceR
     const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
   };
+
+  useEffect(() => {
+    const handleShortcuts = (e: KeyboardEvent) => {
+      if (e.key === '1') {
+        e.preventDefault();
+        handleWhatsApp();
+      } else if (e.key === 'Backspace') {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleShortcuts);
+    return () => window.removeEventListener('keydown', handleShortcuts);
+  }, [handleWhatsApp, onClose]);
 
   const dashes = '--------------------------------';
   const doubleDashes = '================================';

@@ -39,6 +39,7 @@ function POSpage() {
   const productGridRef = useRef<HTMLDivElement>(null);
   const cartItemsRef = useRef<HTMLDivElement>(null);
   const paymentSummaryRef = useRef<HTMLDivElement>(null);
+  const barcodeScannedRef = useRef(false);
 
   const { products, loading: productsLoading, refetch } = useProducts();
   const {
@@ -108,6 +109,59 @@ function POSpage() {
     console.log('Saved scroll positions:', scrollState);
   };
 
+  const handleCheckout = async () => {
+  if (!cartUUID || !cartData) {
+    alert("Cart not ready. Please wait...");
+    return;
+  }
+
+  const cartStatus = cartData?.status || cartData?.cart?.status;
+  if (cartStatus === 'completed') {
+    await refreshCart();
+    alert("Cart was already processed. Please try again.");
+    return;
+  }
+
+  const cartItems = cartData?.cart?.items || cartData?.items;
+  if (!cartItems || cartItems.length === 0) {
+    alert("No items in cart");
+    return;
+  }
+
+  // For credit payments, customer must be selected
+  const isCreditPayment = currentMethodRef.current === 'pay_later';
+  if (isCreditPayment && !selectedCustomer) {
+    alert("Please select a customer for Pay Later option");
+    return;
+  }
+
+  const forcedPayments = [{
+    method: currentMethodRef.current,
+    amount: grandTotal
+  }];
+
+  console.log("🔍 FORCED PAYMENTS:", forcedPayments);
+  console.log("🔍 CURRENT METHOD REF:", currentMethodRef.current);
+  console.log("🔍 SELECTED CUSTOMER:", selectedCustomer);
+
+  const result = await checkout(
+    forcedPayments,
+    selectedCustomer?.customer_uuid || null,
+    selectedCustomer
+  );
+
+  if (result?.success) {
+    console.log("✅ Checkout successful!");
+    window.dispatchEvent(new Event('refresh-dashboard'));
+    window.dispatchEvent(new Event('refresh-customers'));
+    if (refreshAllCustomerData) {
+      await refreshAllCustomerData();
+    }
+    setInvoiceData(result.invoice);
+    setShowInvoiceModal(true);
+  }
+};
+
   // Check cart status
   useEffect(() => {
     const checkCartStatus = async () => {
@@ -141,12 +195,9 @@ function POSpage() {
 
       if (e.key === 'Enter') {
         if (barcodeBuffer.length >= 3) {
-          // Look up product by barcode
           try {
             const res = await fetch(`http://127.0.0.1:3000/api/products/barcode/${barcodeBuffer}`, {
-              headers: {
-                Authorization: `Bearer ${localStorage.getItem('token')}`
-              }
+              headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
             });
             const data = await res.json();
             if (data.success && data.data) {
@@ -157,6 +208,11 @@ function POSpage() {
           } catch (err) {
             console.error('Barcode lookup failed:', err);
           }
+          // 👇 ADD THIS FLAG
+          barcodeScannedRef.current = true;
+          setTimeout(() => {
+            barcodeScannedRef.current = false;
+          }, 100);
         }
         barcodeBuffer = '';
       } else if (timeDiff < 50) {
@@ -172,6 +228,43 @@ function POSpage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [addItem]);
 
+  // Keyboard shortcut: Enter to checkout
+  useEffect(() => {
+    const handleCheckoutShortcut = (e: KeyboardEvent) => {
+      // Ignore if any modal is open
+      if (showCustomerModal || showSalesModal || showInvoiceModal || showPastInvoiceModal || showQuickAdd) {
+        return;
+      }
+
+      const target = e.target as HTMLElement;
+      // Ignore if typing in input/textarea
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+        return;
+      }
+
+      // Ignore if barcode was just scanned
+      if (barcodeScannedRef.current) {
+        return;
+      }
+
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleCheckout();
+      }
+    };
+
+    window.addEventListener('keydown', handleCheckoutShortcut);
+    return () => window.removeEventListener('keydown', handleCheckoutShortcut);
+  }, [
+    showCustomerModal,
+    showSalesModal,
+    showInvoiceModal,
+    showPastInvoiceModal,
+    showQuickAdd,
+    cartLoading,
+    isCartInitializing,
+    cartData
+  ]);
 
   // Save scroll positions on scroll
   useEffect(() => {
@@ -251,78 +344,78 @@ function POSpage() {
 
   // In POSpage.tsx, update the handleCheckout function:
 
-  const handleCheckout = async () => {
-    if (!cartUUID || !cartData) {
-      alert("Cart not ready. Please wait...");
-      return;
-    }
+  // const handleCheckout = async () => {
+  //   if (!cartUUID || !cartData) {
+  //     alert("Cart not ready. Please wait...");
+  //     return;
+  //   }
 
-    const cartStatus = cartData?.status || cartData?.cart?.status;
-    if (cartStatus === 'completed') {
-      await refreshCart();
-      alert("Cart was already processed. Please try again.");
-      return;
-    }
+  //   const cartStatus = cartData?.status || cartData?.cart?.status;
+  //   if (cartStatus === 'completed') {
+  //     await refreshCart();
+  //     alert("Cart was already processed. Please try again.");
+  //     return;
+  //   }
 
-    const cartItems = cartData?.cart?.items || cartData?.items;
-    if (!cartItems || cartItems.length === 0) {
-      alert("No items in cart");
-      return;
-    }
+  //   const cartItems = cartData?.cart?.items || cartData?.items;
+  //   if (!cartItems || cartItems.length === 0) {
+  //     alert("No items in cart");
+  //     return;
+  //   }
 
-    if (totalPaid <= 0) {
-      alert("Please enter a payment amount");
-      return;
-    }
+  //   if (totalPaid <= 0) {
+  //     alert("Please enter a payment amount");
+  //     return;
+  //   }
 
-    // For credit payments, customer must be selected
-    const isCreditPayment = currentMethodRef.current === 'pay_later'; // ✅ Use ref instead of payments state
-    if (isCreditPayment && !selectedCustomer) {
-      alert("Please select a customer for Pay Later option");
-      return;
-    }
+  //   // For credit payments, customer must be selected
+  //   const isCreditPayment = currentMethodRef.current === 'pay_later'; // ✅ Use ref instead of payments state
+  //   if (isCreditPayment && !selectedCustomer) {
+  //     alert("Please select a customer for Pay Later option");
+  //     return;
+  //   }
 
-    // For non-credit payments, check if amount is sufficient
-    if (!isCreditPayment && totalPaid < grandTotal) {
-      alert(`Total amount is ₹${grandTotal}. Please enter full payment.`);
-      return;
-    }
+  //   // For non-credit payments, check if amount is sufficient
+  //   if (!isCreditPayment && totalPaid < grandTotal) {
+  //     alert(`Total amount is ₹${grandTotal}. Please enter full payment.`);
+  //     return;
+  //   }
 
-    // ✅ USE forcedPayments instead of payments
-    const forcedPayments = [{
-      method: currentMethodRef.current,
-      amount: grandTotal
-    }];
+  //   // ✅ USE forcedPayments instead of payments
+  //   const forcedPayments = [{
+  //     method: currentMethodRef.current,
+  //     amount: grandTotal
+  //   }];
 
-    console.log("🔍 FORCED PAYMENTS:", forcedPayments);
-    console.log("🔍 CURRENT METHOD REF:", currentMethodRef.current);
-    console.log("🔍 SELECTED CUSTOMER:", selectedCustomer);
+  //   console.log("🔍 FORCED PAYMENTS:", forcedPayments);
+  //   console.log("🔍 CURRENT METHOD REF:", currentMethodRef.current);
+  //   console.log("🔍 SELECTED CUSTOMER:", selectedCustomer);
 
-    const result = await checkout(
-      forcedPayments,  // ✅ Use forcedPayments here!
-      selectedCustomer?.customer_uuid || null,
-      selectedCustomer
-    );
+  //   const result = await checkout(
+  //     forcedPayments,  // ✅ Use forcedPayments here!
+  //     selectedCustomer?.customer_uuid || null,
+  //     selectedCustomer
+  //   );
 
-    if (result?.success) {
-      console.log("✅ Checkout successful!");
+  //   if (result?.success) {
+  //     console.log("✅ Checkout successful!");
 
-      // ✅ Trigger refresh of dashboard and customer pages
-      console.log("🔄 Triggering dashboard and customer refresh...");
+  //     // ✅ Trigger refresh of dashboard and customer pages
+  //     console.log("🔄 Triggering dashboard and customer refresh...");
 
-      // Dispatch custom events to refresh other components
-      window.dispatchEvent(new Event('refresh-dashboard'));
-      window.dispatchEvent(new Event('refresh-customers'));
+  //     // Dispatch custom events to refresh other components
+  //     window.dispatchEvent(new Event('refresh-dashboard'));
+  //     window.dispatchEvent(new Event('refresh-customers'));
 
-      // Also refresh customer data in POSpage if needed
-      if (refreshAllCustomerData) {
-        await refreshAllCustomerData();
-      }
+  //     // Also refresh customer data in POSpage if needed
+  //     if (refreshAllCustomerData) {
+  //       await refreshAllCustomerData();
+  //     }
 
-      setInvoiceData(result.invoice);
-      setShowInvoiceModal(true);
-    }
-  };
+  //     setInvoiceData(result.invoice);
+  //     setShowInvoiceModal(true);
+  //   }
+  // };
 
   const handleCloseInvoice = () => {
     setShowInvoiceModal(false);
