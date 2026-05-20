@@ -40,11 +40,4 @@ const db = new Database(path.resolve(dbPath), options);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
-try {
-  db.exec(`ALTER TABLE products ADD COLUMN is_deleted INTEGER DEFAULT 0`);
-  console.log('✅ Added is_deleted column to products');
-} catch (e) {
-  // Column already exists, ignore
-}
-
 export default db;

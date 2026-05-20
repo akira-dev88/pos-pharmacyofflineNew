@@ -16,19 +16,17 @@ export class ReportModel {
     // Alternative: Use SQLite's date functions with localtime
     // Today's sales - using DATE() with localtime
     const todaySales = (db.prepare(`
-    SELECT COALESCE(SUM(grand_total), 0) as total 
-    FROM sales 
-    WHERE DATE(created_at, 'localtime') = DATE('now', 'localtime')
-    AND (is_deleted = 0 OR is_deleted IS NULL)
-`).get() as any).total;
+        SELECT COALESCE(SUM(grand_total), 0) as total 
+        FROM sales 
+        WHERE DATE(created_at, 'localtime') = DATE('now', 'localtime')
+    `).get() as any).total;
 
     // This month's sales - using DATE() with localtime
     const monthSales = (db.prepare(`
-    SELECT COALESCE(SUM(grand_total), 0) as total 
-    FROM sales 
-    WHERE strftime('%Y-%m', created_at, 'localtime') = strftime('%Y-%m', 'now', 'localtime')
-    AND (is_deleted = 0 OR is_deleted IS NULL)
-`).get() as any).total;
+        SELECT COALESCE(SUM(grand_total), 0) as total 
+        FROM sales 
+        WHERE strftime('%Y-%m', created_at, 'localtime') = strftime('%Y-%m', 'now', 'localtime')
+    `).get() as any).total;
 
     // Alternative method using string comparison (more reliable)
     // Today's sales alternative method
@@ -40,26 +38,24 @@ export class ReportModel {
 
     // Total sales (all time)
     const totalSales = (db.prepare(`
-    SELECT COALESCE(SUM(grand_total), 0) as total 
-    FROM sales
-    WHERE (is_deleted = 0 OR is_deleted IS NULL)
-`).get() as any).total;
+        SELECT COALESCE(SUM(grand_total), 0) as total 
+        FROM sales
+    `).get() as any).total;
 
+    // Total orders
     const totalOrders = (db.prepare(`
-    SELECT COUNT(*) as count 
-    FROM sales
-    WHERE (is_deleted = 0 OR is_deleted IS NULL)
-`).get() as any).count;
+        SELECT COUNT(*) as count 
+        FROM sales
+    `).get() as any).count;
 
     // Recent sales (last 5)
     const recentSales = db.prepare(`
-    SELECT s.*, c.name as customer_name
-    FROM sales s
-    LEFT JOIN customers c ON s.customer_uuid = c.customer_uuid
-    WHERE (s.is_deleted = 0 OR s.is_deleted IS NULL)
-    ORDER BY s.created_at DESC
-    LIMIT 5
-`).all();
+        SELECT s.*, c.name as customer_name
+        FROM sales s
+        LEFT JOIN customers c ON s.customer_uuid = c.customer_uuid
+        ORDER BY s.created_at DESC
+        LIMIT 5
+    `).all();
 
     // Low stock products (stock < 10)
     const lowStock = db.prepare(`
@@ -147,7 +143,7 @@ export class ReportModel {
   }
 
   // Stock report
-  static getStockReport() {
+  static getStockReport(month?: string) {
     return db.prepare(`
       SELECT name, stock, price 
       FROM products
@@ -368,5 +364,163 @@ export class ReportModel {
       GROUP BY c.customer_uuid
       ORDER BY total_spent DESC
     `).all();
+  }
+
+  static getDailyReportByDate(date: string) {
+    const bills = db.prepare(`
+    SELECT s.invoice_number, s.grand_total, s.created_at,
+           c.name as customer_name
+    FROM sales s
+    LEFT JOIN customers c ON s.customer_uuid = c.customer_uuid
+    WHERE DATE(s.created_at, 'localtime') = ?
+    ORDER BY s.created_at DESC
+  `).all(date) as any[];
+
+    const summary = db.prepare(`
+    SELECT
+      COUNT(*) as total_bills,
+      COALESCE(SUM(grand_total), 0) as grand_total,
+      COALESCE(SUM(total), 0) as subtotal,
+      COALESCE(SUM(tax), 0) as total_tax
+    FROM sales
+    WHERE DATE(created_at, 'localtime') = ?
+  `).get(date) as any;
+
+    const payments = db.prepare(`
+    SELECT p.method, COALESCE(SUM(p.amount), 0) as total
+    FROM payments p
+    JOIN sales s ON p.sale_uuid = s.sale_uuid
+    WHERE DATE(s.created_at, 'localtime') = ?
+    GROUP BY p.method
+    ORDER BY total DESC
+  `).all(date) as any[];
+
+    const top_products = db.prepare(`
+    SELECT
+      p.name,
+      SUM(si.quantity) as qty_sold,
+      SUM(si.price * si.quantity) as revenue
+    FROM sale_items si
+    JOIN sales s ON si.sale_uuid = s.sale_uuid
+    LEFT JOIN products p ON si.product_uuid = p.product_uuid
+    WHERE DATE(s.created_at, 'localtime') = ?
+    GROUP BY si.product_uuid
+    ORDER BY qty_sold DESC
+    LIMIT 5
+  `).all(date) as any[];
+
+    // DailyReport.tsx needs gst_slabs with taxable_amount + tax_collected
+    const gst_slabs = db.prepare(`
+    SELECT
+      si.tax_percent,
+      COALESCE(SUM(si.price * si.quantity), 0) as taxable_amount,
+      COALESCE(SUM(si.tax_amount), 0) as tax_collected
+    FROM sale_items si
+    JOIN sales s ON si.sale_uuid = s.sale_uuid
+    WHERE DATE(s.created_at, 'localtime') = ?
+      AND si.tax_percent > 0
+    GROUP BY si.tax_percent
+    ORDER BY si.tax_percent ASC
+  `).all(date) as any[];
+
+    const settings = db.prepare('SELECT * FROM settings LIMIT 1').get() as any;
+
+    // Always return a valid shape even if no sales
+    return {
+      date,
+      shop: settings ? {
+        name: settings.shop_name,
+        address: settings.address,
+        gstin: settings.gstin,
+        mobile: settings.mobile,
+      } : null,
+      summary: {
+        total_bills: summary?.total_bills || 0,
+        grand_total: summary?.grand_total || 0,
+        subtotal: summary?.subtotal || 0,
+        total_tax: summary?.total_tax || 0,
+      },
+      payments,
+      gst_slabs,
+      top_products,
+      bills,
+    };
+  }
+
+  static getGSTReport(month: string) {
+    // month format: YYYY-MM
+
+    const summary = db.prepare(`
+    SELECT
+      COUNT(*) as total_invoices,
+      COALESCE(SUM(total), 0) as total_taxable,
+      COALESCE(SUM(tax), 0) as total_tax,
+      COALESCE(SUM(grand_total), 0) as grand_total
+    FROM sales
+    WHERE strftime('%Y-%m', created_at, 'localtime') = ?
+  `).get(month) as any;
+
+    const slabs = db.prepare(`
+    SELECT
+      si.tax_percent,
+      COUNT(DISTINCT s.sale_uuid) as invoice_count,
+      COALESCE(SUM(si.price * si.quantity), 0) as taxable_value,
+      COALESCE(SUM(si.tax_amount), 0) as total_tax
+    FROM sale_items si
+    JOIN sales s ON si.sale_uuid = s.sale_uuid
+    WHERE strftime('%Y-%m', s.created_at, 'localtime') = ?
+      AND si.tax_percent > 0
+    GROUP BY si.tax_percent
+    ORDER BY si.tax_percent ASC
+  `).all(month) as any[];
+
+    const exempt = db.prepare(`
+    SELECT
+      COALESCE(SUM(si.price * si.quantity), 0) as exempt_value
+    FROM sale_items si
+    JOIN sales s ON si.sale_uuid = s.sale_uuid
+    WHERE strftime('%Y-%m', s.created_at, 'localtime') = ?
+      AND (si.tax_percent = 0 OR si.tax_percent IS NULL)
+  `).get(month) as any;
+
+    const invoices = db.prepare(`
+    SELECT
+      s.invoice_number,
+      s.created_at,
+      s.total,
+      s.tax,
+      s.grand_total,
+      c.name as customer_name
+    FROM sales s
+    LEFT JOIN customers c
+      ON s.customer_uuid = c.customer_uuid
+    WHERE strftime('%Y-%m', s.created_at, 'localtime') = ?
+    ORDER BY s.created_at DESC
+  `).all(month) as any[];
+
+    const settings = db.prepare(`
+    SELECT * FROM settings LIMIT 1
+  `).get() as any;
+
+    return {
+      shop: settings ? {
+        name: settings.shop_name,
+        gstin: settings.gstin,
+        address: settings.address,
+        mobile: settings.mobile,
+      } : null,
+
+      summary: {
+        total_invoices: summary?.total_invoices || 0,
+        total_taxable: summary?.total_taxable || 0,
+        total_tax: summary?.total_tax || 0,
+        grand_total: summary?.grand_total || 0,
+      },
+
+      slabs,
+      invoices,
+
+      exempt_value: exempt?.exempt_value || 0,
+    };
   }
 }

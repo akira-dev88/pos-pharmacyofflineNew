@@ -8,8 +8,12 @@ import {
   updateItem,
   removeItem,
   applyDiscount as applyDiscountApi,
+  checkoutCart,     
+  holdCart,
+  resumeCart,
+  getHeldCarts,
+  clearCart,
 } from "../../../renderer/services/cartApi";
-import { checkoutCart } from "../../../renderer/services/saleApi";
 
 export function useCart() {
   const [cartUUID, setCartUUID] = useState<string | null>(null);
@@ -65,7 +69,7 @@ export function useCart() {
 
       try {
         const res = await createCart();
-        const cartUuid = res.cart_uuid || res.data?.cart_uuid;
+        const cartUuid = res?.cart_uuid;
         if (!cartUuid) throw new Error("No cart_uuid in response");
 
         setCartUUID(cartUuid);

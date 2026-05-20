@@ -23,9 +23,6 @@ router.post('/:cart_uuid/items', CartController.addItem);
 router.put('/:cart_uuid/items/:product_uuid', CartController.updateItem);
 router.delete('/:cart_uuid/items/:product_uuid', CartController.removeItem);
 
-// Custom/quick add item
-router.post('/:cart_uuid/custom-item', CartController.addCustomItem);
-
 // Discount
 router.post('/:cart_uuid/discount', CartController.applyDiscount);
 

@@ -426,27 +426,27 @@ export class SaleModel {
     const offset = (page - 1) * limit;
 
     // Build WHERE clause from filters
-    let whereClause = 'WHERE (s.is_deleted = 0 OR s.is_deleted IS NULL)';
+    let whereClause = '';
     const params: any[] = [];
 
     if (filters.startDate && filters.endDate) {
-      whereClause += ' AND s.created_at BETWEEN ? AND ?';
+      whereClause = 'WHERE s.created_at BETWEEN ? AND ?';
       params.push(filters.startDate, filters.endDate);
     } else if (filters.startDate) {
-      whereClause += ' AND s.created_at >= ?';
+      whereClause = 'WHERE s.created_at >= ?';
       params.push(filters.startDate);
     } else if (filters.endDate) {
-      whereClause += ' AND s.created_at <= ?';
+      whereClause = 'WHERE s.created_at <= ?';
       params.push(filters.endDate);
     }
 
     if (filters.customerUuid) {
-      whereClause += ' AND s.customer_uuid = ?';
+      whereClause += whereClause ? ' AND s.customer_uuid = ?' : 'WHERE s.customer_uuid = ?';
       params.push(filters.customerUuid);
     }
 
     if (filters.status) {
-      whereClause += ' AND s.status = ?';
+      whereClause += whereClause ? ' AND s.status = ?' : 'WHERE s.status = ?';
       params.push(filters.status);
     }
 
@@ -499,62 +499,5 @@ export class SaleModel {
       payments,
       customer
     };
-  }
-
-  static softDelete(saleUuid: string): boolean {
-    const transaction = db.transaction(() => {
-      const sale = db.prepare('SELECT * FROM sales WHERE sale_uuid = ?').get(saleUuid) as any;
-      if (!sale) throw new Error('Sale not found');
-      if (sale.is_deleted) throw new Error('Sale already deleted');
-
-      // Restore stock for each item
-      const items = db.prepare('SELECT * FROM sale_items WHERE sale_uuid = ?').all(saleUuid) as any[];
-      for (const item of items) {
-        db.prepare(`
-        UPDATE products SET stock = stock + ?, updated_at = CURRENT_TIMESTAMP
-        WHERE product_uuid = ?
-      `).run(item.quantity, item.product_uuid);
-
-        // Stock ledger entry for reversal
-        db.prepare(`
-        INSERT INTO stock_ledgers (product_uuid, quantity, type, reference_uuid, note)
-        VALUES (?, ?, 'adjustment', ?, 'Sale deleted - stock restored')
-      `).run(item.product_uuid, item.quantity, saleUuid);
-      }
-
-      // Reverse customer credit if pay_later
-      const payLaterPayment = db.prepare(`
-      SELECT * FROM payments WHERE sale_uuid = ? AND method = 'pay_later'
-    `).get(saleUuid) as any;
-
-      if (payLaterPayment && sale.customer_uuid) {
-        db.prepare(`
-        UPDATE customers SET credit_balance = credit_balance - ?, updated_at = CURRENT_TIMESTAMP
-        WHERE customer_uuid = ?
-      `).run(payLaterPayment.amount, sale.customer_uuid);
-
-        db.prepare(`
-        INSERT INTO customer_ledgers (customer_uuid, type, amount, reference_uuid, note)
-        VALUES (?, 'credit', ?, ?, 'Sale deleted - credit reversed')
-      `).run(sale.customer_uuid, payLaterPayment.amount, saleUuid);
-      }
-
-      // Soft delete
-      db.prepare(`
-      UPDATE sales SET is_deleted = 1, updated_at = CURRENT_TIMESTAMP
-      WHERE sale_uuid = ?
-    `).run(saleUuid);
-
-      return true;
-    });
-
-    return transaction();
-  }
-  static initSoftDelete() {
-    try {
-      db.exec(`ALTER TABLE sales ADD COLUMN is_deleted INTEGER DEFAULT 0`);
-    } catch (e) {
-      // Column already exists, ignore
-    }
   }
 }

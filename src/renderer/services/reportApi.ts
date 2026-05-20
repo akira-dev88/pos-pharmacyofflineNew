@@ -1,31 +1,10 @@
 import { apiGet } from "./api";
 
-const API = "http://127.0.0.1:3000/api";
-
-function getHeaders() {
-  return {
-    "Content-Type": "application/json",
-    "Accept": "application/json",
-    "Authorization": `Bearer ${localStorage.getItem("token")}`,
-  };
-}
-
 export async function getDashboardReport() {
   try {
-    const res = await fetch(`${API}/reports/dashboard`, {
-      headers: getHeaders(),
-    });
-
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error("Dashboard API error:", res.status, errorText);
-      throw new Error(`Dashboard failed: ${res.status}`);
-    }
-
-    const data = await res.json();
-    console.log("Dashboard data received:", data);
-
-    // Ensure the data has all required fields
+    const response: any = await apiGet("/reports/dashboard");
+    // Backend returns the fields directly (no data wrapper) from ReportModel.getDashboard()
+    const data = response?.data || response;
     return {
       today_sales: data.today_sales || 0,
       month_sales: data.month_sales || 0,
@@ -35,11 +14,9 @@ export async function getDashboardReport() {
       recent_sales: data.recent_sales || [],
       recent_purchases: data.recent_purchases || [],
       top_products: data.top_products || [],
-      ...data
     };
   } catch (error) {
     console.error("Dashboard API error:", error);
-    // Return default data structure instead of throwing
     return {
       today_sales: 0,
       month_sales: 0,
@@ -55,34 +32,9 @@ export async function getDashboardReport() {
 
 export async function getTopProducts() {
   try {
-    const res = await fetch(`${API}/reports/top-products`, {
-      headers: getHeaders(),
-    });
-
-    if (!res.ok) throw new Error("Top products failed");
-    const data = await res.json();
-
-    console.log("Top products raw response:", data);
-
-    // Handle different response structures
-    // Case 1: { success: true, data: [...] }
-    if (data.success && Array.isArray(data.data)) {
-      return data.data;
-    }
-    // Case 2: Direct array
-    if (Array.isArray(data)) {
-      return data;
-    }
-    // Case 3: { data: [...] }
-    if (data.data && Array.isArray(data.data)) {
-      return data.data;
-    }
-    // Case 4: { products: [...] }
-    if (data.products && Array.isArray(data.products)) {
-      return data.products;
-    }
-    // Default: return empty array
-    console.warn("Unexpected top products response structure:", data);
+    const response: any = await apiGet("/reports/top-products");
+    if (response?.success && Array.isArray(response.data)) return response.data;
+    if (Array.isArray(response)) return response;
     return [];
   } catch (error) {
     console.error("Top products API error:", error);
@@ -92,34 +44,9 @@ export async function getTopProducts() {
 
 export async function getStockReport() {
   try {
-    const res = await fetch(`${API}/reports/stock`, {
-      headers: getHeaders(),
-    });
-
-    if (!res.ok) throw new Error("Stock failed");
-    const data = await res.json();
-
-    console.log("Stock report raw response:", data);
-
-    // Handle different response structures
-    // Case 1: { success: true, data: [...] }
-    if (data.success && Array.isArray(data.data)) {
-      return data.data;
-    }
-    // Case 2: Direct array
-    if (Array.isArray(data)) {
-      return data;
-    }
-    // Case 3: { data: [...] }
-    if (data.data && Array.isArray(data.data)) {
-      return data.data;
-    }
-    // Case 4: { products: [...] }
-    if (data.products && Array.isArray(data.products)) {
-      return data.products;
-    }
-    // Default: return empty array
-    console.warn("Unexpected stock response structure:", data);
+    const response: any = await apiGet("/reports/stock");
+    if (response?.success && Array.isArray(response.data)) return response.data;
+    if (Array.isArray(response)) return response;
     return [];
   } catch (error) {
     console.error("Stock report API error:", error);
@@ -129,53 +56,25 @@ export async function getStockReport() {
 
 export async function getProfitReport() {
   try {
-    const res = await fetch(`${API}/reports/profit`, {
-      headers: getHeaders(),
-    });
-
-    if (!res.ok) throw new Error("Profit failed");
-    const data = await res.json();
-
-    console.log("Profit report raw response:", data);
-
-    // Handle different response structures
-    // Case 1: { success: true, data: { revenue, cost, profit } }
-    if (data.success && data.data) {
-      return {
-        revenue: data.data.revenue || 0,
-        cost: data.data.cost || 0,
-        profit: data.data.profit || 0,
-      };
-    }
-    // Case 2: Direct object with revenue, cost, profit
-    if (data.revenue !== undefined || data.cost !== undefined || data.profit !== undefined) {
-      return {
-        revenue: data.revenue || 0,
-        cost: data.cost || 0,
-        profit: data.profit || 0,
-      };
-    }
-    // Default: return zeros
-    console.warn("Unexpected profit response structure:", data);
+    const response: any = await apiGet("/reports/profit");
+    const data = response?.data || response;
     return {
-      revenue: 0,
-      cost: 0,
-      profit: 0,
+      revenue: data.revenue || 0,
+      cost: data.cost || 0,
+      profit: data.profit || 0,
     };
   } catch (error) {
     console.error("Profit API error:", error);
-    return {
-      revenue: 0,
-      cost: 0,
-      profit: 0,
-    };
+    return { revenue: 0, cost: 0, profit: 0 };
   }
 }
 
 export async function getSalesTrend() {
   try {
-    const data = await apiGet("/reports/sales-trend");
-    return Array.isArray(data) ? data : [];
+    const response: any = await apiGet("/reports/sales-trend");
+    if (response?.success && Array.isArray(response.data)) return response.data;
+    if (Array.isArray(response)) return response;
+    return [];
   } catch (error) {
     console.error("Sales trend API error:", error);
     return [];
@@ -184,22 +83,100 @@ export async function getSalesTrend() {
 
 export async function getProfitTrend() {
   try {
-    const data = await apiGet("/reports/profit-trend");
-    return Array.isArray(data) ? data : [];
+    const response: any = await apiGet("/reports/profit-trend");
+    if (response?.success && Array.isArray(response.data)) return response.data;
+    if (Array.isArray(response)) return response;
+    return [];
   } catch (error) {
     console.error("Profit trend API error:", error);
     return [];
   }
 }
 
-export async function getDailyReport(date?: string) {
-  const query = date ? `?date=${date}` : '';
-  const response = await apiGet(`/reports/daily${query}`);
-  return response.data || response;
+export async function getSalesByPayment(startDate?: string, endDate?: string) {
+  const params = new URLSearchParams();
+  if (startDate) params.append("startDate", startDate);
+  if (endDate) params.append("endDate", endDate);
+  const query = params.toString() ? `?${params}` : "";
+  try {
+    const response: any = await apiGet(`/reports/sales-by-payment${query}`);
+    if (response?.success && Array.isArray(response.data)) return response.data;
+    if (Array.isArray(response)) return response;
+    return [];
+  } catch (error) {
+    console.error("Sales by payment API error:", error);
+    return [];
+  }
 }
 
-export async function getGSTReport(month?: string) {
-  const query = month ? `?month=${month}` : '';
-  const response = await apiGet(`/reports/gst${query}`);
-  return response.data || response;
+export async function getDailySales(days?: number) {
+  const query = days ? `?days=${days}` : "";
+  try {
+    const response: any = await apiGet(`/reports/daily-sales${query}`);
+    if (response?.success && Array.isArray(response.data)) return response.data;
+    if (Array.isArray(response)) return response;
+    return [];
+  } catch (error) {
+    console.error("Daily sales API error:", error);
+    return [];
+  }
+}
+
+export async function getProductSalesReport(startDate?: string, endDate?: string) {
+  const params = new URLSearchParams();
+  if (startDate) params.append("startDate", startDate);
+  if (endDate) params.append("endDate", endDate);
+  const query = params.toString() ? `?${params}` : "";
+  try {
+    const response: any = await apiGet(`/reports/product-sales${query}`);
+    if (response?.success && Array.isArray(response.data)) return response.data;
+    if (Array.isArray(response)) return response;
+    return [];
+  } catch (error) {
+    console.error("Product sales API error:", error);
+    return [];
+  }
+}
+
+export async function getCustomerPurchaseReport() {
+  try {
+    const response: any = await apiGet("/reports/customer-purchases");
+    if (response?.success && Array.isArray(response.data)) return response.data;
+    if (Array.isArray(response)) return response;
+    return [];
+  } catch (error) {
+    console.error("Customer purchases API error:", error);
+    return [];
+  }
+}
+
+export async function getDailyReport(date: string) {
+  try {
+    const response: any = await apiGet(`/reports/daily-report?date=${date}`);
+    if (response?.success && response.data) return response.data;
+    // Return empty structure so report.summary never throws
+    return {
+      date,
+      shop: null,
+      summary: { total_bills: 0, grand_total: 0, subtotal: 0, total_tax: 0 },
+      payments: [],
+      gst_slabs: [],
+      top_products: [],
+      bills: [],
+    };
+  } catch (error) {
+    console.error("Daily report API error:", error);
+    return null;
+  }
+}
+
+export async function getGSTReport(month: string) {
+  try {
+    const response: any = await apiGet(`/reports/gst-report?month=${month}`);
+    if (response?.success && response.data) return response.data;
+    return null;
+  } catch (error) {
+    console.error("GST report API error:", error);
+    return null;
+  }
 }

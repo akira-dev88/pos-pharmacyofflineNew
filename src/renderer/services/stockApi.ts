@@ -1,37 +1,24 @@
 // stockApi.ts
-const BASE_URL = "http://127.0.0.1:3000/api";
-
-function getHeaders() {
-  return {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${localStorage.getItem("token")}`,
-  };
-}
+import { apiGet, apiPut } from "./api";
 
 export async function getStock() {
   try {
-    const res = await fetch(`${BASE_URL}/products`, {
-      headers: getHeaders(),
-    });
-
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    const response: any = await apiGet("/products?limit=1000");
+    // New backend returns { success, products, total }
+    if (response?.success && Array.isArray(response.products)) {
+      return response.products.map((p: any) => ({
+        product_uuid: p.product_uuid,
+        name: p.name,
+        sku: p.sku,
+        stock: p.stock ?? 0,
+        price: p.price,
+      }));
     }
-
-    const data = await res.json();
-    // Assuming the products endpoint returns { success: true, data: [...] }
-    let products = Array.isArray(data) ? data : data?.data || [];
-
-    // Normalize to ensure stock field exists
-    const stockData = products.map((p: any) => ({
-      product_uuid: p.product_uuid,
-      name: p.name,
-      sku: p.sku,
-      stock: p.stock ?? 0,
-      price: p.price,
-    }));
-
-    return stockData;
+    // Fallback: old shape { success, data: [...] }
+    if (response?.success && Array.isArray(response.data)) {
+      return response.data;
+    }
+    return [];
   } catch (error) {
     console.error("Stock API error:", error);
     return [];
@@ -40,19 +27,8 @@ export async function getStock() {
 
 export async function updateStock(productUUID: string, stock: number) {
   try {
-    const res = await fetch(`${BASE_URL}/products/${productUUID}`, {
-      method: "PUT",
-      headers: getHeaders(),
-      body: JSON.stringify({ stock }),
-    });
-
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-    }
-
-    const data = await res.json();
-    console.log("Update stock response:", data);
-    return data;
+    const response: any = await apiPut(`/products/${productUUID}`, { stock });
+    return response?.data || response;
   } catch (error) {
     console.error("Update stock error:", error);
     throw error;

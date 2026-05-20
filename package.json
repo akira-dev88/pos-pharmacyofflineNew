@@ -1,5 +1,5 @@
 {
-  "name": "pos-app",
+  "name": "POS-Hardware",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -27,7 +27,7 @@
   },
   "build": {
     "appId": "com.pos.app",
-    "productName": "Instant Bill",
+    "productName": "POS Hardware",
     "win": {
       "icon": "assets/icon.ico"
     },
@@ -42,7 +42,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Instant Bill",
+      "shortcutName": "POS Hardware",
       "installerIcon": "assets/icon.ico",
       "uninstallerIcon": "assets/icon.ico",
       "installerHeaderIcon": "assets/icon.ico"

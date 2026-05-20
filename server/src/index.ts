@@ -18,12 +18,19 @@ import purchaseRoutes from './routes/purchases';
 import supplierRoutes from './routes/suppliers';
 import reportRoutes from './routes/reports';
 import staffRoutes from './routes/staff';
-import migrationRouter from './routes/migration';
+import categoryAttributeRoutes from './routes/categoryAttributes';
+import productUnitRoutes from './routes/productUnits';
+
 
 import { LicenseService } from './services/licenseService';
 
 import { scheduleAutoBackup, checkDbIntegrity } from './database/backup';
-import { SaleModel } from './models/Sale';
+
+import attributeRoutes
+from './routes/attributes';
+
+import categoryRoutes
+from './routes/categories';
 
 // Load environment variables - simplified for CommonJS
 dotenv.config();
@@ -42,7 +49,6 @@ app.use(express.urlencoded({ extended: true }));
 runMigrations();
 addHsnCode();
 addAutoPrint();
-SaleModel.initSoftDelete();
 
 const licensed = LicenseService.isLicensed();
 if (!licensed) {
@@ -76,7 +82,27 @@ app.use('/api/suppliers', supplierRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/staff', staffRoutes);
 app.use('/api/printing', printingRoutes);
-app.use('/api/migration', migrationRouter);
+
+app.use(
+  '/api/attributes',
+  attributeRoutes
+);
+
+app.use(
+  '/api/categories',
+  categoryRoutes
+);
+
+app.use(
+  '/api/category-attributes',
+  categoryAttributeRoutes
+);
+
+app.use(
+  '/api/product-units',
+  productUnitRoutes
+);
+
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

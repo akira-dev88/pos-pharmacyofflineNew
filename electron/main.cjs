@@ -114,7 +114,7 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true
     },
-    title: 'Instant Bill',
+    title: 'POS Hardware',
   });
 
   mainWindow.once('ready-to-show', () => {

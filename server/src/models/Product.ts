@@ -1,212 +1,472 @@
+// server/src/models/Product.ts
+
 import db from '../database/connection';
-import type { Product, ProductCreateInput, ProductUpdateInput } from '../types/index';
+import {
+  Product,
+  ProductAttribute,
+  ProductCreateInput,
+  ProductUpdateInput
+} from '../types';
+
 import { v4 as uuidv4 } from 'uuid';
 
 export class ProductModel {
-  // Create new product
+
+  // =========================
+  // CREATE PRODUCT
+  // =========================
+
   static create(input: ProductCreateInput): Product {
-    const uuid = uuidv4();
 
-    const stmt = db.prepare(`
-  INSERT INTO products (
-    product_uuid, name, barcode, sku, price, gst_percent, stock, hsn_code, image
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-`);
+    const productUuid = uuidv4();
 
-    stmt.run(
-      uuid, input.name, input.barcode || null, input.sku || null,
-      input.price, input.gst_percent || 0, input.stock || 0,
-      input.hsn_code || null, input.image || null
-    );
+    const transaction = db.transaction(() => {
 
-    return this.findById(uuid)!;
-  }
+      const productStmt = db.prepare(`
+        INSERT INTO products (
+          product_uuid,
+          name,
+          category_uuid,
+          subcategory,
+          barcode,
+          sku,
+          unit,
+          price,
+          purchase_price,
+          gst_percent,
+          stock,
+          hsn_code,
+          image,
+          is_deleted
+        ) VALUES (
+          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0
+        )
+      `);
 
-  static initSoftDelete() {
-    db.exec(`
-    ALTER TABLE products ADD COLUMN IF NOT EXISTS is_deleted INTEGER DEFAULT 0
-  `);
-  }
+      productStmt.run(
+        productUuid,
+        input.name,
+        input.category_uuid || null,
+        input.subcategory || null,
+        input.barcode || null,
+        input.sku || null,
+        input.unit || 'piece',
+        input.price,
+        input.purchase_price || 0,
+        input.gst_percent || 0,
+        input.stock || 0,
+        input.hsn_code || null,
+        input.image || null
+      );
 
-  // Find product by UUID
-  static findById(uuid: string): Product | undefined {
-    const stmt = db.prepare('SELECT * FROM products WHERE product_uuid = ? AND is_deleted = 0');
-    return stmt.get(uuid) as Product | undefined;
-  }
+      // INSERT ATTRIBUTES
 
-  // Find product by barcode
-  static findByBarcode(barcode: string): Product | undefined {
-    const stmt = db.prepare('SELECT * FROM products WHERE barcode = ? AND is_deleted = 0');
-    return stmt.get(barcode) as Product | undefined;
-  }
-  // Find product by SKU
-  static findBySku(sku: string): Product | undefined {
-    const stmt = db.prepare('SELECT * FROM products WHERE sku = ? AND is_deleted = 0');
-    return stmt.get(sku) as Product | undefined;
-  }
+      if (input.attributes?.length) {
 
-  // List all products (paginated)
-  static findAll(page: number = 1, limit: number = 20): { products: Product[], total: number } {
-    const offset = (page - 1) * limit;
-    const products = db.prepare(
-      'SELECT * FROM products WHERE is_deleted = 0 ORDER BY created_at DESC LIMIT ? OFFSET ?'
-    ).all(limit, offset) as Product[];
-    const total = (db.prepare('SELECT COUNT(*) as count FROM products WHERE is_deleted = 0').get() as any).count;
-    return { products, total };
-  }
+        const attrStmt = db.prepare(`
+          INSERT INTO product_attributes (
+            product_uuid,
+            attribute_uuid,
+            value
+          ) VALUES (?, ?, ?)
+        `);
 
-  // Search products by name
-  static search(query: string, limit: number = 20): Product[] {
-    return db.prepare(`
-    SELECT * FROM products WHERE name LIKE ? AND is_deleted = 0 ORDER BY name ASC LIMIT ?
-  `).all(`%${query}%`, limit) as Product[];
-  }
+        for (const attr of input.attributes) {
 
-
-  // Advanced search with multiple criteria
-  static advancedSearch(params: {
-    name?: string;
-    barcode?: string;
-    sku?: string;
-    minPrice?: number;
-    maxPrice?: number;
-    inStock?: boolean;
-  }): Product[] {
-    let query = 'SELECT * FROM products WHERE 1=1';
-    const values: any[] = [];
-
-    if (params.name) {
-      query += ' AND name LIKE ?';
-      values.push(`%${params.name}%`);
-    }
-
-    if (params.barcode) {
-      query += ' AND barcode = ?';
-      values.push(params.barcode);
-    }
-
-    if (params.sku) {
-      query += ' AND sku = ?';
-      values.push(params.sku);
-    }
-
-    if (params.minPrice !== undefined) {
-      query += ' AND price >= ?';
-      values.push(params.minPrice);
-    }
-
-    if (params.maxPrice !== undefined) {
-      query += ' AND price <= ?';
-      values.push(params.maxPrice);
-    }
-
-    if (params.inStock) {
-      query += ' AND stock > 0';
-    }
-
-    query += ' ORDER BY name ASC';
-
-    const stmt = db.prepare(query);
-    return stmt.all(...values) as Product[];
-  }
-
-  // Update product
-  static update(uuid: string, updates: ProductUpdateInput): Product | undefined {
-    const product = this.findById(uuid);
-    if (!product) return undefined;
-
-    const allowedFields = ['name', 'barcode', 'sku', 'price', 'gst_percent', 'stock', 'hsn_code', 'image'];
-    const updateFields: string[] = [];
-    const values: any[] = [];
-
-    for (const [key, value] of Object.entries(updates)) {
-      if (allowedFields.includes(key) && value !== undefined) {
-        updateFields.push(`${key} = ?`);
-        values.push(value);
+          attrStmt.run(
+            productUuid,
+            attr.attribute_uuid,
+            attr.value
+          );
+        }
       }
-    }
+    });
 
-    if (updateFields.length === 0) return product;
+    transaction();
 
-    updateFields.push('updated_at = CURRENT_TIMESTAMP');
-    values.push(uuid);
+    return this.findById(productUuid)!;
+  }
 
-    const stmt = db.prepare(`
-      UPDATE products SET ${updateFields.join(', ')} WHERE product_uuid = ?
+  // =========================
+  // FIND PRODUCT BY ID
+  // =========================
+
+  static findById(uuid: string): Product | undefined {
+
+    const productStmt = db.prepare(`
+      SELECT * FROM products
+      WHERE product_uuid = ?
+      AND is_deleted = 0
     `);
 
-    stmt.run(...values);
+    const product =
+      productStmt.get(uuid) as Product | undefined;
+
+    if (!product) return undefined;
+
+    product.attributes =
+      this.getAttributes(uuid);
+
+    return product;
+  }
+
+  // =========================
+  // GET PRODUCT ATTRIBUTES
+  // =========================
+
+  static getAttributes(
+    productUuid: string
+  ): ProductAttribute[] {
+
+    const stmt = db.prepare(`
+      SELECT
+        pa.attribute_uuid,
+        a.name,
+        pa.value
+      FROM product_attributes pa
+      INNER JOIN attributes a
+      ON a.attribute_uuid = pa.attribute_uuid
+      WHERE pa.product_uuid = ?
+    `);
+
+    return stmt.all(productUuid) as ProductAttribute[];
+  }
+
+  // =========================
+  // FIND BY BARCODE
+  // =========================
+
+  static findByBarcode(
+    barcode: string
+  ): Product | undefined {
+
+    const stmt = db.prepare(`
+      SELECT * FROM products
+      WHERE barcode = ?
+      AND is_deleted = 0
+    `);
+
+    const product =
+      stmt.get(barcode) as Product | undefined;
+
+    if (!product) return undefined;
+
+    product.attributes =
+      this.getAttributes(product.product_uuid);
+
+    return product;
+  }
+
+  // =========================
+  // FIND BY SKU
+  // =========================
+
+  static findBySku(
+    sku: string
+  ): Product | undefined {
+
+    const stmt = db.prepare(`
+      SELECT * FROM products
+      WHERE sku = ?
+      AND is_deleted = 0
+    `);
+
+    const product =
+      stmt.get(sku) as Product | undefined;
+
+    if (!product) return undefined;
+
+    product.attributes =
+      this.getAttributes(product.product_uuid);
+
+    return product;
+  }
+
+  // =========================
+  // LIST PRODUCTS
+  // =========================
+
+  static findAll(
+    page: number = 1,
+    limit: number = 20
+  ): {
+    products: Product[];
+    total: number;
+  } {
+
+    const offset =
+      (page - 1) * limit;
+
+    const stmt = db.prepare(`
+      SELECT * FROM products
+      WHERE is_deleted = 0
+      ORDER BY created_at DESC
+      LIMIT ? OFFSET ?
+    `);
+
+    const products =
+      stmt.all(limit, offset) as Product[];
+
+    for (const product of products) {
+
+      product.attributes =
+        this.getAttributes(product.product_uuid);
+    }
+
+    const total = (
+      db.prepare(`
+        SELECT COUNT(*) as count
+        FROM products
+        WHERE is_deleted = 0
+      `).get() as any
+    ).count;
+
+    return {
+      products,
+      total
+    };
+  }
+
+  // =========================
+  // SEARCH PRODUCTS
+  // =========================
+
+  static search(
+    query: string,
+    limit: number = 20
+  ): Product[] {
+
+    const stmt = db.prepare(`
+      SELECT DISTINCT p.*
+      FROM products p
+
+      LEFT JOIN product_attributes pa
+      ON p.product_uuid = pa.product_uuid
+
+      WHERE
+        p.is_deleted = 0
+        AND (
+          p.name LIKE ?
+          OR p.sku LIKE ?
+          OR p.barcode LIKE ?
+          OR pa.value LIKE ?
+        )
+
+      ORDER BY p.name ASC
+      LIMIT ?
+    `);
+
+    const products = stmt.all(
+      `%${query}%`,
+      `%${query}%`,
+      `%${query}%`,
+      `%${query}%`,
+      limit
+    ) as Product[];
+
+    for (const product of products) {
+
+      product.attributes =
+        this.getAttributes(product.product_uuid);
+    }
+
+    return products;
+  }
+
+  // =========================
+  // UPDATE PRODUCT
+  // =========================
+
+  static update(
+    uuid: string,
+    updates: ProductUpdateInput
+  ): Product | undefined {
+
+    const existing =
+      this.findById(uuid);
+
+    if (!existing) return undefined;
+
+    const transaction = db.transaction(() => {
+
+      const allowedFields = [
+        'name',
+        'category_uuid',
+        'subcategory',
+        'barcode',
+        'sku',
+        'unit',
+        'price',
+        'purchase_price',
+        'gst_percent',
+        'stock',
+        'hsn_code',
+        'image'
+      ];
+
+      const updateFields: string[] = [];
+      const values: any[] = [];
+
+      for (const [key, value] of Object.entries(updates)) {
+
+        if (
+          allowedFields.includes(key) &&
+          value !== undefined
+        ) {
+
+          updateFields.push(`${key} = ?`);
+          values.push(value);
+        }
+      }
+
+      if (updateFields.length) {
+
+        updateFields.push(`
+          updated_at = CURRENT_TIMESTAMP
+        `);
+
+        values.push(uuid);
+
+        const stmt = db.prepare(`
+          UPDATE products
+          SET ${updateFields.join(', ')}
+          WHERE product_uuid = ?
+        `);
+
+        stmt.run(...values);
+      }
+
+      // UPDATE ATTRIBUTES
+
+      if (updates.attributes) {
+
+        db.prepare(`
+          DELETE FROM product_attributes
+          WHERE product_uuid = ?
+        `).run(uuid);
+
+        const attrStmt = db.prepare(`
+          INSERT INTO product_attributes (
+            product_uuid,
+            attribute_uuid,
+            value
+          ) VALUES (?, ?, ?)
+        `);
+
+        for (const attr of updates.attributes) {
+
+          attrStmt.run(
+            uuid,
+            attr.attribute_uuid,
+            attr.value
+          );
+        }
+      }
+    });
+
+    transaction();
+
     return this.findById(uuid);
   }
 
-  // Update stock quantity
-  static updateStock(uuid: string, quantity: number, operation: 'add' | 'subtract' = 'add'): Product | undefined {
-    const product = this.findById(uuid);
+  // =========================
+  // UPDATE STOCK
+  // =========================
+
+  static updateStock(
+    uuid: string,
+    quantity: number,
+    operation: 'add' | 'subtract' = 'add'
+  ): Product | undefined {
+
+    const product =
+      this.findById(uuid);
+
     if (!product) return undefined;
 
-    const currentStock = operation === 'add'
-      ? product.stock + quantity
-      : product.stock - quantity;
+    const newStock =
+      operation === 'add'
+        ? product.stock + quantity
+        : product.stock - quantity;
 
-    if (currentStock < 0) {
+    if (newStock < 0) {
       throw new Error('Insufficient stock');
     }
 
-    const stmt = db.prepare(
-      'UPDATE products SET stock = ?, updated_at = CURRENT_TIMESTAMP WHERE product_uuid = ?'
-    );
-    stmt.run(currentStock, uuid);
+    const stmt = db.prepare(`
+      UPDATE products
+      SET
+        stock = ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE product_uuid = ?
+    `);
+
+    stmt.run(newStock, uuid);
 
     return this.findById(uuid);
   }
 
-  // Delete product
-  static delete(uuid: string): boolean {
+  // =========================
+  // SOFT DELETE PRODUCT
+  // =========================
+
+  static delete(
+    uuid: string
+  ): boolean {
+
     const stmt = db.prepare(`
-    UPDATE products SET is_deleted = 1, updated_at = CURRENT_TIMESTAMP 
-    WHERE product_uuid = ?
-  `);
+      UPDATE products
+      SET
+        is_deleted = 1,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE product_uuid = ?
+    `);
+
     const result = stmt.run(uuid);
+
     return result.changes > 0;
   }
 
-  // Bulk create products (for import)
-  static bulkCreate(products: ProductCreateInput[]): number {
-    const insertStmt = db.prepare(`
-      INSERT INTO products (product_uuid, name, barcode, sku, price, gst_percent, stock)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+  // =========================
+  // LOW STOCK
+  // =========================
+
+  static getLowStock(
+    threshold: number = 10
+  ): Product[] {
+
+    const stmt = db.prepare(`
+      SELECT * FROM products
+      WHERE
+        stock <= ?
+        AND is_deleted = 0
+      ORDER BY stock ASC
     `);
 
-    const transaction = db.transaction((items: ProductCreateInput[]) => {
-      let count = 0;
-      for (const item of items) {
-        insertStmt.run(
-          uuidv4(),
-          item.name,
-          item.barcode || null,
-          item.sku || null,
-          item.price,
-          item.gst_percent || 0,
-          item.stock || 0
-        );
-        count++;
-      }
-      return count;
-    });
+    const products =
+      stmt.all(threshold) as Product[];
 
-    return transaction(products);
+    for (const product of products) {
+
+      product.attributes =
+        this.getAttributes(product.product_uuid);
+    }
+
+    return products;
   }
 
-  // Get low stock products
-  static getLowStock(threshold: number = 10): Product[] {
-    return db.prepare(
-      'SELECT * FROM products WHERE stock <= ? AND is_deleted = 0 ORDER BY stock ASC'
-    ).all(threshold) as Product[];
-  }
+  // =========================
+  // COUNT
+  // =========================
 
-
-  // Get product count
   static count(): number {
-    return (db.prepare('SELECT COUNT(*) as count FROM products WHERE is_deleted = 0').get() as any).count;
+
+    const result = db.prepare(`
+      SELECT COUNT(*) as count
+      FROM products
+      WHERE is_deleted = 0
+    `).get() as any;
+
+    return result.count;
   }
 }

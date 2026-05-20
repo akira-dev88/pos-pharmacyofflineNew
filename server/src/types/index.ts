@@ -10,36 +10,132 @@ export interface User {
 
 export interface Product {
   product_uuid: string;
+
   name: string;
+
+  category_uuid?: string;
+  subcategory?: string;
+
   barcode?: string;
   sku?: string;
+
+  unit: string;
+
   price: number;
+  purchase_price?: number;
+
   gst_percent: number;
+
   stock: number;
+
+  hsn_code?: string;
+  image?: string;
+
   created_at: string;
   updated_at: string;
+
+  attributes?: ProductAttribute[];
+}
+
+export interface ProductUnit {
+
+  unit_uuid: string;
+
+  product_uuid: string;
+
+  unit_name: string;
+
+  conversion_factor: number;
+
+  barcode?: string;
+
+  price?: number;
+
+  purchase_price?: number;
+
+  is_base_unit: number;
+
+  created_at: string;
+}
+
+export interface ProductUnitCreateInput {
+
+  product_uuid: string;
+
+  unit_name: string;
+
+  conversion_factor: number;
+
+  barcode?: string;
+
+  price?: number;
+
+  purchase_price?: number;
+
+  is_base_unit?: number;
+}
+
+export interface ProductAttribute {
+  attribute_uuid: string;
+
+  name: string;
+
+  value: string;
 }
 
 export interface ProductCreateInput {
-  hsn_code?: string;
   name: string;
-  price: number;
+
+  category_uuid?: string;
+  subcategory?: string;
+
   barcode?: string;
   sku?: string;
+
+  unit?: string;
+
+  price: number;
+  purchase_price?: number;
+
   gst_percent?: number;
+
   stock?: number;
+
+  hsn_code?: string;
   image?: string;
+
+  attributes?: {
+    attribute_uuid: string;
+    value: string;
+  }[];
 }
 
 export interface ProductUpdateInput {
+
   name?: string;
-  price?: number;
+
+  category_uuid?: string;
+  subcategory?: string;
+
   barcode?: string;
   sku?: string;
+
+  unit?: string;
+
+  price?: number;
+  purchase_price?: number;
+
   gst_percent?: number;
+
   stock?: number;
+
   hsn_code?: string;
   image?: string;
+
+  attributes?: {
+    attribute_uuid: string;
+    value: string;
+  }[];
 }
 
 export interface ProductSearchParams {

@@ -10,13 +10,13 @@ router.use(authenticate);
 // CRUD operations
 router.post('/', ProductController.create);
 router.get('/', ProductController.index);
-router.post('/bulk', ProductController.bulkCreate); // Bulk create before :uuid to avoid conflict
+// router.post('/bulk', ProductController.bulkCreate); // Bulk create before :uuid to avoid conflict
 
 // Search and lookup routes (before parameterized routes)
 router.get('/search', ProductController.search);
 router.get('/low-stock', ProductController.lowStock);
-router.get('/barcode/:barcode', ProductController.findByBarcode);
-router.get('/sku/:sku', ProductController.findBySku);
+// router.get('/barcode/:barcode', ProductController.findByBarcode);
+// router.get('/sku/:sku', ProductController.findBySku);
 
 // Parameterized routes
 router.get('/:uuid', ProductController.show);

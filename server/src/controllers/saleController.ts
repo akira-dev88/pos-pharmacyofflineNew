@@ -175,15 +175,4 @@ export class SaleController {
     }
   };
 
-  static deleteSale = (req: AuthRequest, res: Response): void => {
-    try {
-      const saleUuid = String(req.params.sale_uuid);
-      SaleModel.softDelete(saleUuid);
-      res.json({ success: true, message: 'Sale deleted and stock restored' });
-    } catch (error: any) {
-      console.error('Delete sale error:', error);
-      res.status(500).json({ success: false, error: error.message });
-    }
-  };
-
 }

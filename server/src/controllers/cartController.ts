@@ -4,52 +4,6 @@ import { ProductModel } from '../models/Product';
 import type { AuthRequest } from '../middleware/auth';
 
 export class CartController {
-  static addCustomItem = (req: Request, res: Response): void => {
-  try {
-    const cartUuid = String(req.params.cart_uuid);
-    const { name, price, gst_percent, quantity } = req.body;
-
-    if (!name || !price) {
-      res.status(400).json({ success: false, error: 'Name and price are required' });
-      return;
-    }
-
-    const cart = CartModel.findById(cartUuid);
-    if (!cart) {
-      res.status(404).json({ success: false, error: 'Cart not found' });
-      return;
-    }
-
-    if (cart.status !== 'active') {
-      res.status(400).json({ success: false, error: 'Cart is not active' });
-      return;
-    }
-
-    // Create a temporary product in the DB so cart_items FK constraint is satisfied
-    const tempProduct = ProductModel.create({
-      name: String(name),
-      price: parseFloat(String(price)),
-      gst_percent: parseFloat(String(gst_percent)) || 0,
-      stock: 999,
-      // sku: null,
-      // barcode: null,
-    });
-
-    // Add it to cart normally
-    const item = CartModel.addItem(
-      cartUuid,
-      tempProduct.product_uuid,
-      parseInt(String(quantity)) || 1,
-      tempProduct.price,
-      tempProduct.gst_percent
-    );
-
-    res.status(201).json({ success: true, data: item });
-  } catch (error) {
-    console.error('Add custom item error:', error);
-    res.status(500).json({ success: false, error: 'Internal server error' });
-  }
-};
   // Create new cart
   static create = (req: AuthRequest, res: Response): void => {
     try {
@@ -62,9 +16,9 @@ export class CartController {
       });
     } catch (error) {
       console.error('Create cart error:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: 'Internal server error' 
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error'
       });
     }
   };
@@ -76,9 +30,9 @@ export class CartController {
       const cart = CartModel.findWithItems(cartUuid);
 
       if (!cart) {
-        res.status(404).json({ 
-          success: false, 
-          error: 'Cart not found' 
+        res.status(404).json({
+          success: false,
+          error: 'Cart not found'
         });
         return;
       }
@@ -89,9 +43,9 @@ export class CartController {
       });
     } catch (error) {
       console.error('Show cart error:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: 'Internal server error' 
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error'
       });
     }
   };
@@ -104,9 +58,9 @@ export class CartController {
 
       // Validation
       if (!product_uuid || !quantity) {
-        res.status(400).json({ 
-          success: false, 
-          error: 'Product UUID and quantity are required' 
+        res.status(400).json({
+          success: false,
+          error: 'Product UUID and quantity are required'
         });
         return;
       }
@@ -114,17 +68,17 @@ export class CartController {
       // Check if cart exists and is active
       const cart = CartModel.findById(cartUuid);
       if (!cart) {
-        res.status(404).json({ 
-          success: false, 
-          error: 'Cart not found' 
+        res.status(404).json({
+          success: false,
+          error: 'Cart not found'
         });
         return;
       }
 
       if (cart.status !== 'active') {
-        res.status(400).json({ 
-          success: false, 
-          error: 'Cart is not active' 
+        res.status(400).json({
+          success: false,
+          error: 'Cart is not active'
         });
         return;
       }
@@ -132,9 +86,9 @@ export class CartController {
       // Get product details
       const product = ProductModel.findById(String(product_uuid));
       if (!product) {
-        res.status(404).json({ 
-          success: false, 
-          error: 'Product not found' 
+        res.status(404).json({
+          success: false,
+          error: 'Product not found'
         });
         return;
       }
@@ -142,9 +96,9 @@ export class CartController {
       // Check stock
       const qty = parseInt(String(quantity));
       if (qty < 1) {
-        res.status(400).json({ 
-          success: false, 
-          error: 'Quantity must be at least 1' 
+        res.status(400).json({
+          success: false,
+          error: 'Quantity must be at least 1'
         });
         return;
       }
@@ -165,9 +119,9 @@ export class CartController {
       });
     } catch (error) {
       console.error('Add item error:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: 'Internal server error' 
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error'
       });
     }
   };
@@ -188,9 +142,9 @@ export class CartController {
       const item = CartModel.updateItem(cartUuid, productUuid, updates);
 
       if (!item) {
-        res.status(404).json({ 
-          success: false, 
-          error: 'Item not found in cart' 
+        res.status(404).json({
+          success: false,
+          error: 'Item not found in cart'
         });
         return;
       }
@@ -202,9 +156,9 @@ export class CartController {
       });
     } catch (error) {
       console.error('Update item error:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: 'Internal server error' 
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error'
       });
     }
   };
@@ -218,9 +172,9 @@ export class CartController {
       const removed = CartModel.removeItem(cartUuid, productUuid);
 
       if (!removed) {
-        res.status(404).json({ 
-          success: false, 
-          error: 'Item not found in cart' 
+        res.status(404).json({
+          success: false,
+          error: 'Item not found in cart'
         });
         return;
       }
@@ -231,9 +185,9 @@ export class CartController {
       });
     } catch (error) {
       console.error('Remove item error:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: 'Internal server error' 
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error'
       });
     }
   };
@@ -245,9 +199,9 @@ export class CartController {
       const { discount } = req.body;
 
       if (discount === undefined || isNaN(Number(discount)) || Number(discount) < 0) {
-        res.status(400).json({ 
-          success: false, 
-          error: 'Valid discount amount is required' 
+        res.status(400).json({
+          success: false,
+          error: 'Valid discount amount is required'
         });
         return;
       }
@@ -255,9 +209,9 @@ export class CartController {
       const cart = CartModel.applyDiscount(cartUuid, Number(discount));
 
       if (!cart) {
-        res.status(404).json({ 
-          success: false, 
-          error: 'Cart not found' 
+        res.status(404).json({
+          success: false,
+          error: 'Cart not found'
         });
         return;
       }
@@ -272,9 +226,9 @@ export class CartController {
       });
     } catch (error) {
       console.error('Apply discount error:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: 'Internal server error' 
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error'
       });
     }
   };
@@ -286,9 +240,9 @@ export class CartController {
       const cart = CartModel.hold(cartUuid);
 
       if (!cart) {
-        res.status(404).json({ 
-          success: false, 
-          error: 'Cart not found' 
+        res.status(404).json({
+          success: false,
+          error: 'Cart not found'
         });
         return;
       }
@@ -300,9 +254,9 @@ export class CartController {
       });
     } catch (error) {
       console.error('Hold cart error:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: 'Internal server error' 
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error'
       });
     }
   };
@@ -314,9 +268,9 @@ export class CartController {
       const cart = CartModel.resume(cartUuid);
 
       if (!cart) {
-        res.status(404).json({ 
-          success: false, 
-          error: 'Cart not found' 
+        res.status(404).json({
+          success: false,
+          error: 'Cart not found'
         });
         return;
       }
@@ -328,9 +282,9 @@ export class CartController {
       });
     } catch (error) {
       console.error('Resume cart error:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: 'Internal server error' 
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error'
       });
     }
   };
@@ -347,9 +301,9 @@ export class CartController {
       });
     } catch (error) {
       console.error('Get held carts error:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: 'Internal server error' 
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error'
       });
     }
   };
@@ -358,12 +312,12 @@ export class CartController {
   static clear = (req: AuthRequest, res: Response): void => {
     try {
       const cartUuid = String(req.params.cart_uuid);
-      
+
       const cart = CartModel.findById(cartUuid);
       if (!cart) {
-        res.status(404).json({ 
-          success: false, 
-          error: 'Cart not found' 
+        res.status(404).json({
+          success: false,
+          error: 'Cart not found'
         });
         return;
       }
@@ -376,9 +330,9 @@ export class CartController {
       });
     } catch (error) {
       console.error('Clear cart error:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: 'Internal server error' 
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error'
       });
     }
   };
