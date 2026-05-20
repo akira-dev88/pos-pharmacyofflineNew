@@ -7,7 +7,7 @@
   "description": "Complete POS billing system for retail stores",
   "author": "Your Name <your.email@example.com>",
   "scripts": {
-    "backend": "tsx watch server/src/index.ts",
+    "backend": "cross-env APP_TYPE=hardware APP_DB_NAME=pos_hardware.db tsx watch server/src/index.ts",
     "frontend": "vite",
     "electron": "electron electron/main.cjs",
     "dev": "concurrently -n BACK,FRONT,ELEC -c blue,green,yellow \"npm run backend\" \"npm run frontend\" \"wait-on http://localhost:5173 && wait-on http://127.0.0.1:3000/health && npm run electron\"",
@@ -26,8 +26,9 @@
     "predist:linux": "npm run rebuild:electron"
   },
   "build": {
-    "appId": "com.pos.app",
+    "appId": "com.pos.hardware",
     "productName": "POS Hardware",
+    "asar": false,
     "win": {
       "icon": "assets/icon.ico"
     },
@@ -53,6 +54,7 @@
     "files": [
       "dist/**/*",
       "electron/main.cjs",
+      "server/dist/**/*",
       "assets/icon.ico"
     ],
     "extraResources": [
@@ -82,6 +84,7 @@
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.9.0",
     "cors": "^2.8.6",
+    "cross-env": "^10.1.0",
     "dotenv": "^17.4.2",
     "esc-pos-encoder": "^3.0.0",
     "express": "^5.2.1",

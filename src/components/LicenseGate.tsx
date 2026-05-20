@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { apiGet, apiPost } from '../renderer/services/api';
+import logo from "../../assets/icon.png"
 
 export default function LicenseGate({ children }: { children: React.ReactNode }) {
     const [licensed, setLicensed] = useState<boolean | null>(null);
@@ -56,8 +57,8 @@ export default function LicenseGate({ children }: { children: React.ReactNode })
     if (!licensed) return (
         <div className="h-screen flex items-center justify-center bg-[#141414]">
             <div className="bg-[#1a1a1a] rounded-2xl p-8 w-full max-w-md text-center">
-                <img src="/logo.png" className="w-16 h-16 mx-auto rounded-2xl mb-4" alt="InstantBill" />
-                <h1 className="text-2xl font-bold text-white mb-2">InstantBill</h1>
+                <img src={logo} className="w-16 h-16 mx-auto rounded-2xl mb-4" alt="POS Hardware" />
+                <h1 className="text-2xl font-bold text-white mb-2">POS Hardware</h1>
                 <p className="text-gray-400 mb-6 text-sm">Enter your license key to activate</p>
                 <input
                     className="w-full bg-[#212121] border border-gray-700 rounded-xl px-4 py-3 text-white text-center font-mono text-lg mb-3 outline-none focus:border-green-500 transition-colors"

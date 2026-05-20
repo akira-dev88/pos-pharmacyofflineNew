@@ -31,6 +31,7 @@ from './routes/attributes';
 
 import categoryRoutes
 from './routes/categories';
+import { upgradeProductsTable } from './database/migrations/004_products_upgrade';
 
 // Load environment variables - simplified for CommonJS
 dotenv.config();
@@ -49,6 +50,7 @@ app.use(express.urlencoded({ extended: true }));
 runMigrations();
 addHsnCode();
 addAutoPrint();
+upgradeProductsTable();
 
 const licensed = LicenseService.isLicensed();
 if (!licensed) {
