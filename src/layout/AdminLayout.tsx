@@ -36,11 +36,10 @@ function NavItem({ label, path, currentPath, icon, onClick }: NavItemProps) {
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${
-        active
+      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${active
           ? "bg-green-500 text-white shadow-lg"
           : "text-gray-300 hover:bg-[#212121] hover:text-white"
-      }`}
+        }`}
     >
       <IonIcon icon={icon} className={`text-xl ${active ? "text-white" : "text-gray-400"}`} />
       <span className="text-sm font-medium">{label}</span>
@@ -144,13 +143,7 @@ function SidebarContent({ user, currentPath, navigate, t }: SidebarContentProps)
               icon={peopleCircleOutline}
               onClick={() => navigate("/admin/supplier")}
             />
-            <NavItem
-              label={t('adminLayout.nav.purchase')}
-              path="/admin/purchase"
-              currentPath={currentPath}
-              icon={cartOutline}
-              onClick={() => navigate("/admin/purchase")}
-            />
+
             <NavItem
               label={t('adminLayout.nav.purchases')}
               path="/admin/purchases"
@@ -176,6 +169,13 @@ function SidebarContent({ user, currentPath, navigate, t }: SidebarContentProps)
               currentPath={currentPath}
               icon={cubeOutline}
               onClick={() => navigate("/admin/products")}
+            />
+            <NavItem
+              label={t('adminLayout.nav.purchase')}
+              path="/admin/purchase"
+              currentPath={currentPath}
+              icon={cartOutline}
+              onClick={() => navigate("/admin/purchase")}
             />
             <NavItem
               label={t('adminLayout.nav.stock')}
@@ -294,7 +294,7 @@ export default function AdminLayout() {
         )}
 
         {/* MAIN CONTENT */}
-        <main className="flex-1 flex flex-col overflow-hidden bg-[#141414] rounded-2xl rounded-br-2xl mr-2 mb-2 scrollbar-hide">
+        <main className="flex-1 flex flex-col overflow-hidden bg-[#F8F9FC] rounded-2xl rounded-br-2xl mr-2 mb-2 scrollbar-hide">
           <div className="flex-1 overflow-y-auto p-5 scrollbar-hide">
             <Outlet />
           </div>

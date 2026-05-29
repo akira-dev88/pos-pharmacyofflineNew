@@ -1,4 +1,4 @@
-// hooks/useCart.ts
+// pages/pos/hooks/useCart.ts
 
 import { useState, useEffect, useRef } from "react";
 import {
@@ -8,12 +8,49 @@ import {
   updateItem,
   removeItem,
   applyDiscount as applyDiscountApi,
-  checkoutCart,     
-  holdCart,
-  resumeCart,
-  getHeldCarts,
-  clearCart,
+  checkoutCart,
 } from "../../../renderer/services/cartApi";
+import { getProductUnits } from "../../../renderer/services/productApi";
+
+// ─── Unit resolution ───────────────────────────────────────────────────────────
+
+async function resolveUnitUuid(
+  product: any,
+  unitCache: Map<string, string>
+): Promise<string> {
+  if (unitCache.has(product.product_uuid)) {
+    return unitCache.get(product.product_uuid)!;
+  }
+
+  if (product.unit_uuid) {
+    unitCache.set(product.product_uuid, product.unit_uuid);
+    return product.unit_uuid;
+  }
+
+  try {
+    const units: any[] = await getProductUnits(product.product_uuid);
+    if (units.length > 0) {
+      const base = units.find((u) => u.is_base_unit) || units[0];
+      unitCache.set(product.product_uuid, base.unit_uuid);
+      return base.unit_uuid;
+    }
+  } catch (err) {
+    console.warn("Could not fetch product units for", product.product_uuid, err);
+  }
+
+  const fallback = product.unit || "piece";
+  unitCache.set(product.product_uuid, fallback);
+  return fallback;
+}
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface CheckoutResult {
+  success: boolean;
+  invoice?: any;
+}
+
+// ─── Hook ──────────────────────────────────────────────────────────────────────
 
 export function useCart() {
   const [cartUUID, setCartUUID] = useState<string | null>(null);
@@ -24,7 +61,23 @@ export function useCart() {
   const [payments, setPayments] = useState([{ method: "cash", amount: 0 }]);
   const currentMethodRef = useRef("cash");
 
-  // Helper function to normalize cart data structure
+  // Prescription modal state
+  const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
+  const [prescriptionProduct, setPrescriptionProduct] = useState<any>(null);
+  const [pendingCheckout, setPendingCheckout] = useState<{
+    paymentMethods: any[];
+    customerUUID: string | null;
+    selectedCustomer: any;
+  } | null>(null);
+  
+  // Promise resolver for checkout
+  const [prescriptionResolver, setPrescriptionResolver] = useState<((result: CheckoutResult | null) => void) | null>(null);
+
+  // Memoised unit_uuid per product
+  const unitCacheRef = useRef<Map<string, string>>(new Map());
+
+  // ─── Normalise cart response shape ─────────────────────────────────────────
+
   const normalizeCartData = (data: any) => {
     if (data?.cart) return data;
     if (data?.data?.cart) return data.data;
@@ -38,28 +91,32 @@ export function useCart() {
     return data;
   };
 
-  // Wait for backend to be ready
-  const waitForBackend = async (maxRetries = 15, delayMs = 2000): Promise<boolean> => {
+  // ─── Wait for backend ──────────────────────────────────────────────────────
+
+  const waitForBackend = async (
+    maxRetries = 15,
+    delayMs = 2000
+  ): Promise<boolean> => {
     for (let i = 0; i < maxRetries; i++) {
       try {
-        const res = await fetch('http://127.0.0.1:3000/health');
+        const res = await fetch("http://127.0.0.1:3000/health");
         if (res.ok) return true;
       } catch {
-        // backend not ready yet
+        // not ready yet
       }
       console.log(`⏳ Waiting for backend... attempt ${i + 1}/${maxRetries}`);
-      await new Promise(r => setTimeout(r, delayMs));
+      await new Promise((r) => setTimeout(r, delayMs));
     }
     return false;
   };
 
-  // Init cart
+  // ─── Initialise cart ───────────────────────────────────────────────────────
+
   useEffect(() => {
     async function init() {
       console.log("🟢 Initializing cart...");
       setIsCartInitializing(true);
 
-      // Wait for backend to be ready first
       const backendReady = await waitForBackend();
       if (!backendReady) {
         alert("Backend not responding. Please restart the app.");
@@ -69,11 +126,13 @@ export function useCart() {
 
       try {
         const res = await createCart();
-        const cartUuid = res?.cart_uuid;
+        console.log("🟢 Create cart response:", res);
+        const cartUuid = res?.cart_uuid || res?.data?.cart_uuid;
         if (!cartUuid) throw new Error("No cart_uuid in response");
 
         setCartUUID(cartUuid);
         const cartResponse = await getCart(cartUuid);
+        console.log("🟢 Get cart response:", cartResponse);
         setCartData(normalizeCartData(cartResponse));
       } catch (error) {
         console.error("❌ Failed to create cart:", error);
@@ -85,18 +144,7 @@ export function useCart() {
     init();
   }, []);
 
-  // Auto-fill payment amount whenever grand total changes
-  // useEffect(() => {
-  //   const cartGrandTotal =
-  //     cartData?.summary?.grand_total ||
-  //     cartData?.cart?.summary?.grand_total ||
-  //     0;
-  //   if (cartGrandTotal > 0) {
-  //     setPayments([{ method: currentMethodRef.current, amount: cartGrandTotal }]);
-  //   } else {
-  //     setPayments([{ method: currentMethodRef.current, amount: 0 }]);
-  //   }
-  // }, [cartData]);
+  // ─── Refresh cart ─────────────────────────────────────────────────────────
 
   const refreshCart = async () => {
     if (!cartUUID) return;
@@ -108,7 +156,11 @@ export function useCart() {
     }
   };
 
+  // ─── Fresh cart ────────────────────────────────────────────────────────────
+
   const createFreshCart = async () => {
+    unitCacheRef.current.clear();
+
     const newCart = await createCart();
     const newCartUuid = newCart.cart_uuid || newCart.data?.cart_uuid;
     setCartUUID(newCartUuid);
@@ -116,12 +168,18 @@ export function useCart() {
       const newCartData = await getCart(newCartUuid);
       setCartData(normalizeCartData(newCartData));
     }
-    setPayments([{ method: currentMethodRef.current, amount: 0 }]); // ← keep this, it resets AFTER checkout which is correct
+    setPayments([{ method: currentMethodRef.current, amount: 0 }]);
     setDiscount(0);
     return newCartUuid;
   };
 
-  const addItemToCart = async (product: any) => {
+  // ─── Add item to cart ─────────────────────────────────────────────────────
+
+  const addItemToCart = async (product: any, unitUuid?: string, quantity?: number, unitName?: string) => {
+    console.log("🟢 addItemToCart called for:", product?.name);
+    console.log("🟢 Unit UUID:", unitUuid);
+    console.log("🟢 Quantity:", quantity);
+
     if (isCartInitializing) {
       alert("Cart is initializing, please wait a moment...");
       return;
@@ -130,10 +188,29 @@ export function useCart() {
       alert("Cart not initialized. Please restart the app.");
       return;
     }
+
     setLoading(true);
+
     try {
-      await addItem(cartUUID, product.product_uuid);
+      let finalUnitUuid = unitUuid;
+      if (!finalUnitUuid) {
+        finalUnitUuid = await resolveUnitUuid(product, unitCacheRef.current);
+      }
+
+      const finalQuantity = quantity || 1;
+
+      console.log("🟢 Adding to cart with:", {
+        product_uuid: product.product_uuid,
+        unit_uuid: finalUnitUuid,
+        quantity: finalQuantity
+      });
+
+      const result = await addItem(cartUUID, product.product_uuid, finalUnitUuid, finalQuantity);
+      console.log("🟢 Add item result:", result);
+
       await refreshCart();
+      console.log("🟢 Cart refreshed successfully");
+
     } catch (error: any) {
       console.error("❌ Error adding item to cart:", error);
       alert(`Failed to add item: ${error.message || "Unknown error"}`);
@@ -142,36 +219,49 @@ export function useCart() {
     }
   };
 
+  // ─── Increase quantity ─────────────────────────────────────────────────────
+
   const increaseItem = async (item: any) => {
     if (!cartUUID) return;
     setLoading(true);
     try {
-      await addItem(cartUUID, item.product_uuid);
+      const unitUuid = item.unit_uuid || (await resolveUnitUuid(item, unitCacheRef.current));
+      await addItem(cartUUID, item.product_uuid, unitUuid, 1);
       await refreshCart();
     } catch (error: any) {
       console.error("❌ Error increasing item:", error);
+      alert(error.message || "Failed to increase quantity");
     } finally {
       setLoading(false);
     }
   };
 
+  // ─── Decrease quantity ─────────────────────────────────────────────────────
+
   const decreaseItem = async (item: any) => {
     if (!cartUUID) return;
     setLoading(true);
     try {
+      const unitUuid = item.unit_uuid || (await resolveUnitUuid(item, unitCacheRef.current));
       const newQty = item.quantity - 1;
+
       if (newQty <= 0) {
-        await removeItem(cartUUID, item.product_uuid);
+        await removeItem(cartUUID, item.product_uuid, unitUuid);
       } else {
-        await updateItem(cartUUID, item.product_uuid, { quantity: newQty });
+        await updateItem(cartUUID, item.product_uuid, unitUuid, {
+          quantity: newQty,
+        });
       }
       await refreshCart();
     } catch (error: any) {
       console.error("❌ Error decreasing item:", error);
+      alert(error.message || "Failed to decrease quantity");
     } finally {
       setLoading(false);
     }
   };
+
+  // ─── Apply discount ────────────────────────────────────────────────────────
 
   const applyDiscount = async (uuid: string | null, amount: number) => {
     if (!uuid) return;
@@ -183,20 +273,37 @@ export function useCart() {
     }
   };
 
+  // ─── Find product requiring prescription ───────────────────────────────────
+
+  const findPrescriptionProduct = () => {
+    const cartItems = getCartItems();
+    return cartItems.find((item: any) => 
+      item.product?.schedule_type && item.product.schedule_type !== 'NONE'
+    );
+  };
+
+  // ─── Checkout with prescription handling ───────────────────────────────────
+
   const checkout = async (
     paymentMethods: any[],
     customerUUID: string | null,
     selectedCustomer: any
-  ) => {
+  ): Promise<CheckoutResult | null> => {
     if (!cartUUID) {
       alert("Cart not initialized");
       return null;
     }
 
     const cartStatus = cartData?.status || cartData?.cart?.status;
-    if (cartStatus === 'completed') {
+    if (cartStatus === "completed") {
       await createFreshCart();
       alert("New cart created. Please add items again.");
+      return null;
+    }
+
+    const cartItems = getCartItems();
+    if (cartItems.length === 0) {
+      alert("No items in cart");
       return null;
     }
 
@@ -206,75 +313,156 @@ export function useCart() {
       0
     );
 
-    // Parse amount safely — could be string from input
-    const amountGiven = Number(paymentMethods[0]?.amount || 0);
-
-    // Send grand total to backend (not cash given — change is frontend only)
     const normalizedPayments = paymentMethods.map((p) => ({
       method: String(p.method),
-      amount: Number(p.amount || 0)
+      amount: Number(p.amount || 0),
     }));
 
-    console.log("🔍 CHECKOUT - Normalized payments:", normalizedPayments);
-    console.log("🔍 CHECKOUT - Grand total:", grandTotal);
+    const totalPaidAmount = normalizedPayments.reduce(
+      (sum, p) => sum + p.amount,
+      0
+    );
+    const isCreditPayment = normalizedPayments.some(
+      (p) => p.method === "pay_later"
+    );
 
-    const totalPaidAmount = normalizedPayments.reduce((sum, p) => sum + p.amount, 0);
-    const isCreditPayment = normalizedPayments.some(p => p.method === 'pay_later');
-
-    if (totalPaidAmount < grandTotal && !isCreditPayment && !customerUUID) {
-      alert(`Please enter full payment of ₹${grandTotal} or select a customer for credit.`);
+    if (
+      totalPaidAmount < grandTotal &&
+      !isCreditPayment &&
+      !customerUUID
+    ) {
+      alert(
+        `Please enter full payment of ₹${grandTotal} or select a customer for credit.`
+      );
       return null;
     }
 
-    if (amountGiven < grandTotal && selectedCustomer) {
-      const remainingCredit =
-        (selectedCustomer.credit_limit || 0) - (selectedCustomer.credit_balance || 0);
-      const newCredit = grandTotal - amountGiven;
-      if (newCredit > remainingCredit) {
-        alert(`Credit limit exceeded 🚫\nRemaining credit: ₹${remainingCredit}\nNeed: ₹${newCredit}`);
-        return null;
-      }
-    }
-
-
     setLoading(true);
-    console.log("🔍 PAYMENTS BEING SENT TO BACKEND:", JSON.stringify(normalizedPayments, null, 2));
-    console.log("🔍 ORIGINAL PAYMENT METHODS:", JSON.stringify(paymentMethods, null, 2));
     try {
-      const res = await checkoutCart(cartUUID, normalizedPayments, customerUUID);
-      console.log("✅ Checkout response:", JSON.stringify(res, null, 2));
+      const res = await checkoutCart(cartUUID, normalizedPayments, customerUUID, null);
+      console.log("✅ Checkout response:", res);
 
       if (!res.success) {
-        throw new Error(res.error || res.message || "Checkout failed");
+        const errorMessage = res.error || res.message || "";
+        console.log("🔴 Error message:", errorMessage);
+        
+        if (errorMessage.includes('requires prescription')) {
+          console.log("🔴 Prescription required detected!");
+          const prescriptionItem = findPrescriptionProduct();
+          
+          if (prescriptionItem) {
+            console.log("🔴 Found prescription product:", prescriptionItem.product?.name);
+            
+            // Store checkout data for retry
+            setPendingCheckout({ paymentMethods, customerUUID, selectedCustomer });
+            setPrescriptionProduct({
+              name: prescriptionItem.product?.name,
+              schedule_type: prescriptionItem.product?.schedule_type,
+              product_uuid: prescriptionItem.product_uuid
+            });
+            setShowPrescriptionModal(true);
+            setLoading(false);
+            
+            // Return a promise that will be resolved when prescription is submitted
+            return new Promise<CheckoutResult | null>((resolve) => {
+              setPrescriptionResolver(() => resolve);
+            });
+          }
+        }
+        throw new Error(errorMessage || "Checkout failed");
       }
 
-      const invoice = res.invoice;
-      console.log("📄 Invoice data:", JSON.stringify(invoice, null, 2));
-
-      // Create new cart for next transaction
+      const invoice = res.invoice || res.data?.invoice;
       await createFreshCart();
-
       return { success: true, invoice };
     } catch (err: any) {
       console.error("❌ Checkout failed:", err);
-      if (err.message?.includes('not active') || err.message?.includes('completed')) {
-        await createFreshCart();
-        alert("Cart was reset. Please add items again.");
-      } else {
-        alert(err.message || "Checkout failed");
-      }
+      alert(err.message || "Checkout failed");
       return null;
     } finally {
       setLoading(false);
     }
   };
 
-  const getCartItems = () => cartData?.cart?.items || cartData?.items || [];
+  // ─── Handle prescription submission ────────────────────────────────────────
 
+  const handlePrescriptionSubmit = async (prescriptionInfo: any) => {
+    console.log("📝 Prescription submitted:", prescriptionInfo);
+    setShowPrescriptionModal(false);
+    
+    const prescriptionWithProduct = {
+      ...prescriptionInfo,
+      product_uuid: prescriptionProduct?.product_uuid,
+    };
+    
+    const currentPrescriptionProduct = prescriptionProduct;
+    setPrescriptionProduct(null);
+    
+    if (!cartUUID) {
+      alert("Cart not initialized");
+      if (prescriptionResolver) {
+        prescriptionResolver(null);
+        setPrescriptionResolver(null);
+      }
+      return null;
+    }
+    
+    if (pendingCheckout) {
+      const { paymentMethods, customerUUID, selectedCustomer } = pendingCheckout;
+      setPendingCheckout(null);
+      
+      setLoading(true);
+      try {
+        const res = await checkoutCart(cartUUID, paymentMethods, customerUUID, prescriptionWithProduct);
+        console.log("✅ Checkout with prescription response:", res);
+        
+        let result: CheckoutResult | null = null;
+        if (!res.success) {
+          throw new Error(res.error || res.message || "Checkout failed");
+        }
+        
+        const invoice = res.invoice || res.data?.invoice;
+        await createFreshCart();
+        
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('refresh-dashboard'));
+          window.dispatchEvent(new Event('refresh-customers'));
+        }
+        
+        result = { success: true, invoice };
+        
+        // Resolve the promise that checkout is waiting on
+        if (prescriptionResolver) {
+          prescriptionResolver(result);
+          setPrescriptionResolver(null);
+        }
+        
+        return result;
+      } catch (err: any) {
+        console.error("❌ Checkout with prescription failed:", err);
+        alert(err.message || "Checkout failed");
+        if (prescriptionResolver) {
+          prescriptionResolver(null);
+          setPrescriptionResolver(null);
+        }
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    }
+    return null;
+  };
+
+  // ─── Selectors ─────────────────────────────────────────────────────────────
+
+  const getCartItems = () => cartData?.cart?.items || cartData?.items || [];
   const getCartSummary = () =>
     cartData?.summary ||
-    cartData?.cart?.summary ||
-    { total: 0, tax: 0, grand_total: 0 };
+    cartData?.cart?.summary || {
+      total: 0,
+      tax: 0,
+      grand_total: 0,
+    };
 
   const totalPaid = payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
   const grandTotal = Number(getCartSummary().grand_total || 0);
@@ -301,5 +489,11 @@ export function useCart() {
     getCartItems,
     getCartSummary,
     currentMethodRef,
+    // Prescription modal props
+    showPrescriptionModal,
+    prescriptionProduct,
+    handlePrescriptionSubmit,
+    setShowPrescriptionModal,
+    setPrescriptionProduct,
   };
 }

@@ -5,7 +5,6 @@ import path from 'path';
 import { runMigrations } from './database/migrations/001_initial';
 import { addHsnCode } from './database/migrations/002_hsn';
 import { addAutoPrint } from './database/migrations/003_auto_print';
-import { addSoftDelete } from './database/migrations/005_soft_delete';
 import printingRoutes from './routes/printing';
 
 // Import routes
@@ -21,7 +20,7 @@ import reportRoutes from './routes/reports';
 import staffRoutes from './routes/staff';
 import categoryAttributeRoutes from './routes/categoryAttributes';
 import productUnitRoutes from './routes/productUnits';
-
+import productBatchRoutes from './routes/productBatches';
 
 import { LicenseService } from './services/licenseService';
 
@@ -32,7 +31,18 @@ from './routes/attributes';
 
 import categoryRoutes
 from './routes/categories';
-import { upgradeProductsTable } from './database/migrations/004_products_upgrade';
+
+import stockAdjustmentRoutes
+  from './routes/stockAdjustmentRoutes';
+
+import medicineReturnRoutes
+  from './routes/medicineReturnRoutes';
+
+import h1RegisterRoutes
+from './routes/h1RegisterRoutes';
+
+import auditLogRoutes
+from './routes/auditLogRoutes';
 
 // Load environment variables - simplified for CommonJS
 dotenv.config();
@@ -51,8 +61,7 @@ app.use(express.urlencoded({ extended: true }));
 runMigrations();
 addHsnCode();
 addAutoPrint();
-upgradeProductsTable();
-addSoftDelete();
+
 const licensed = LicenseService.isLicensed();
 if (!licensed) {
   console.log('⚠️ App not licensed');
@@ -104,6 +113,31 @@ app.use(
 app.use(
   '/api/product-units',
   productUnitRoutes
+);
+
+app.use(
+  '/api/product-batches',
+  productBatchRoutes
+);
+
+app.use(
+  '/api/stock-adjustments',
+  stockAdjustmentRoutes
+);
+
+app.use(
+  '/api/medicine-returns',
+  medicineReturnRoutes
+);
+
+app.use(
+  '/api/h1-register',
+  h1RegisterRoutes
+);
+
+app.use(
+  '/api/audit-logs',
+  auditLogRoutes
 );
 
 // Health check

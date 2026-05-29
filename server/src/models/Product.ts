@@ -1,4 +1,4 @@
-// server/src/models/Product.ts
+// models/Product.ts
 
 import db from '../database/connection';
 import {
@@ -7,7 +7,6 @@ import {
   ProductCreateInput,
   ProductUpdateInput
 } from '../types';
-
 import { v4 as uuidv4 } from 'uuid';
 
 export class ProductModel {
@@ -17,11 +16,11 @@ export class ProductModel {
   // =========================
 
   static create(input: ProductCreateInput): Product {
-
     const productUuid = uuidv4();
 
     const transaction = db.transaction(() => {
 
+      // INSERT PRODUCT
       const productStmt = db.prepare(`
         INSERT INTO products (
           product_uuid,
@@ -30,16 +29,24 @@ export class ProductModel {
           subcategory,
           barcode,
           sku,
+          product_type,
+          manufacturer,
+          composition,
+          schedule_type,
+          prescription_required,
+          medicine_type,
+          rack_location,
           unit,
           price,
           purchase_price,
           gst_percent,
           stock,
           hsn_code,
-          image,
-          is_deleted
+          image
         ) VALUES (
-          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0
+          ?, ?, ?, ?, ?, ?,
+          ?, ?, ?, ?, ?, ?, ?,
+          ?, ?, ?, ?, ?, ?, ?
         )
       `);
 
@@ -50,6 +57,13 @@ export class ProductModel {
         input.subcategory || null,
         input.barcode || null,
         input.sku || null,
+        input.product_type || 'medicine',
+        input.manufacturer || null,
+        input.composition || null,
+        input.schedule_type || 'NONE',
+        input.prescription_required || 0,
+        input.medicine_type || null,
+        input.rack_location || null,
         input.unit || 'piece',
         input.price,
         input.purchase_price || 0,
@@ -60,7 +74,6 @@ export class ProductModel {
       );
 
       // INSERT ATTRIBUTES
-
       if (input.attributes?.length) {
 
         const attrStmt = db.prepare(`
@@ -72,7 +85,6 @@ export class ProductModel {
         `);
 
         for (const attr of input.attributes) {
-
           attrStmt.run(
             productUuid,
             attr.attribute_uuid,
@@ -96,16 +108,13 @@ export class ProductModel {
     const productStmt = db.prepare(`
       SELECT * FROM products
       WHERE product_uuid = ?
-      AND is_deleted = 0
     `);
 
-    const product =
-      productStmt.get(uuid) as Product | undefined;
+    const product = productStmt.get(uuid) as Product | undefined;
 
     if (!product) return undefined;
 
-    product.attributes =
-      this.getAttributes(uuid);
+    product.attributes = this.getAttributes(uuid);
 
     return product;
   }
@@ -114,9 +123,7 @@ export class ProductModel {
   // GET PRODUCT ATTRIBUTES
   // =========================
 
-  static getAttributes(
-    productUuid: string
-  ): ProductAttribute[] {
+  static getAttributes(productUuid: string): ProductAttribute[] {
 
     const stmt = db.prepare(`
       SELECT
@@ -136,23 +143,18 @@ export class ProductModel {
   // FIND BY BARCODE
   // =========================
 
-  static findByBarcode(
-    barcode: string
-  ): Product | undefined {
+  static findByBarcode(barcode: string): Product | undefined {
 
     const stmt = db.prepare(`
       SELECT * FROM products
       WHERE barcode = ?
-      AND is_deleted = 0
     `);
 
-    const product =
-      stmt.get(barcode) as Product | undefined;
+    const product = stmt.get(barcode) as Product | undefined;
 
     if (!product) return undefined;
 
-    product.attributes =
-      this.getAttributes(product.product_uuid);
+    product.attributes = this.getAttributes(product.product_uuid);
 
     return product;
   }
@@ -161,23 +163,18 @@ export class ProductModel {
   // FIND BY SKU
   // =========================
 
-  static findBySku(
-    sku: string
-  ): Product | undefined {
+  static findBySku(sku: string): Product | undefined {
 
     const stmt = db.prepare(`
       SELECT * FROM products
       WHERE sku = ?
-      AND is_deleted = 0
     `);
 
-    const product =
-      stmt.get(sku) as Product | undefined;
+    const product = stmt.get(sku) as Product | undefined;
 
     if (!product) return undefined;
 
-    product.attributes =
-      this.getAttributes(product.product_uuid);
+    product.attributes = this.getAttributes(product.product_uuid);
 
     return product;
   }
@@ -194,30 +191,24 @@ export class ProductModel {
     total: number;
   } {
 
-    const offset =
-      (page - 1) * limit;
+    const offset = (page - 1) * limit;
 
     const stmt = db.prepare(`
       SELECT * FROM products
-      WHERE is_deleted = 0
       ORDER BY created_at DESC
       LIMIT ? OFFSET ?
     `);
 
-    const products =
-      stmt.all(limit, offset) as Product[];
+    const products = stmt.all(limit, offset) as Product[];
 
     for (const product of products) {
-
-      product.attributes =
-        this.getAttributes(product.product_uuid);
+      product.attributes = this.getAttributes(product.product_uuid);
     }
 
     const total = (
       db.prepare(`
         SELECT COUNT(*) as count
         FROM products
-        WHERE is_deleted = 0
       `).get() as any
     ).count;
 
@@ -231,26 +222,22 @@ export class ProductModel {
   // SEARCH PRODUCTS
   // =========================
 
-  static search(
-    query: string,
-    limit: number = 20
-  ): Product[] {
+  static search(query: string, limit: number = 20): Product[] {
 
     const stmt = db.prepare(`
       SELECT DISTINCT p.*
       FROM products p
-
       LEFT JOIN product_attributes pa
       ON p.product_uuid = pa.product_uuid
 
       WHERE
-        p.is_deleted = 0
-        AND (
-          p.name LIKE ?
-          OR p.sku LIKE ?
-          OR p.barcode LIKE ?
-          OR pa.value LIKE ?
-        )
+        p.name LIKE ?
+        OR p.sku LIKE ?
+        OR p.barcode LIKE ?
+        OR p.composition LIKE ?
+        OR p.manufacturer LIKE ?
+        OR p.rack_location LIKE ?
+        OR pa.value LIKE ?
 
       ORDER BY p.name ASC
       LIMIT ?
@@ -261,13 +248,14 @@ export class ProductModel {
       `%${query}%`,
       `%${query}%`,
       `%${query}%`,
+      `%${query}%`,
+      `%${query}%`,
+      `%${query}%`,
       limit
     ) as Product[];
 
     for (const product of products) {
-
-      product.attributes =
-        this.getAttributes(product.product_uuid);
+      product.attributes = this.getAttributes(product.product_uuid);
     }
 
     return products;
@@ -282,8 +270,7 @@ export class ProductModel {
     updates: ProductUpdateInput
   ): Product | undefined {
 
-    const existing =
-      this.findById(uuid);
+    const existing = this.findById(uuid);
 
     if (!existing) return undefined;
 
@@ -295,6 +282,13 @@ export class ProductModel {
         'subcategory',
         'barcode',
         'sku',
+        'product_type',
+        'manufacturer',
+        'composition',
+        'schedule_type',
+        'prescription_required',
+        'medicine_type',
+        'rack_location',
         'unit',
         'price',
         'purchase_price',
@@ -313,7 +307,6 @@ export class ProductModel {
           allowedFields.includes(key) &&
           value !== undefined
         ) {
-
           updateFields.push(`${key} = ?`);
           values.push(value);
         }
@@ -354,7 +347,6 @@ export class ProductModel {
         `);
 
         for (const attr of updates.attributes) {
-
           attrStmt.run(
             uuid,
             attr.attribute_uuid,
@@ -379,8 +371,7 @@ export class ProductModel {
     operation: 'add' | 'subtract' = 'add'
   ): Product | undefined {
 
-    const product =
-      this.findById(uuid);
+    const product = this.findById(uuid);
 
     if (!product) return undefined;
 
@@ -407,24 +398,48 @@ export class ProductModel {
   }
 
   // =========================
-  // SOFT DELETE PRODUCT
+  // DELETE PRODUCT
   // =========================
 
-  static delete(
-    uuid: string
-  ): boolean {
+  static delete(uuid: string): boolean {
 
-    const stmt = db.prepare(`
-      UPDATE products
-      SET
-        is_deleted = 1,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE product_uuid = ?
-    `);
+    const transaction = db.transaction(() => {
 
-    const result = stmt.run(uuid);
+      // 1. Cart items
+      db.prepare(`DELETE FROM cart_items WHERE product_uuid = ?`).run(uuid);
 
-    return result.changes > 0;
+      // 2. Stock ledger
+      db.prepare(`DELETE FROM stock_ledgers WHERE product_uuid = ?`).run(uuid);
+
+      // 3. Stock adjustments (references both product_uuid and batch_uuid,
+      //    must go before batches are deleted)
+      db.prepare(`DELETE FROM stock_adjustments WHERE product_uuid = ?`).run(uuid);
+
+      // 4. Medicine returns (references batch_uuid, must go before batches)
+      db.prepare(`DELETE FROM medicine_returns WHERE product_uuid = ?`).run(uuid);
+
+      // 5. Sale items (references both product_uuid and batch_uuid,
+      //    must go before batches — sale and payment rows stay intact)
+      db.prepare(`DELETE FROM sale_items WHERE product_uuid = ?`).run(uuid);
+
+      // 6. Purchase items
+      db.prepare(`DELETE FROM purchase_items WHERE product_uuid = ?`).run(uuid);
+
+      // 7. Product batches (now safe — nothing references them anymore)
+      db.prepare(`DELETE FROM product_batches WHERE product_uuid = ?`).run(uuid);
+
+      // 8. Product units
+      db.prepare(`DELETE FROM product_units WHERE product_uuid = ?`).run(uuid);
+
+      // 9. Product attributes
+      db.prepare(`DELETE FROM product_attributes WHERE product_uuid = ?`).run(uuid);
+
+      // 10. Finally delete the product itself
+      const result = db.prepare(`DELETE FROM products WHERE product_uuid = ?`).run(uuid);
+      return result.changes > 0;
+    });
+
+    return transaction();
   }
 
   // =========================
@@ -437,19 +452,14 @@ export class ProductModel {
 
     const stmt = db.prepare(`
       SELECT * FROM products
-      WHERE
-        stock <= ?
-        AND is_deleted = 0
+      WHERE stock <= ?
       ORDER BY stock ASC
     `);
 
-    const products =
-      stmt.all(threshold) as Product[];
+    const products = stmt.all(threshold) as Product[];
 
     for (const product of products) {
-
-      product.attributes =
-        this.getAttributes(product.product_uuid);
+      product.attributes = this.getAttributes(product.product_uuid);
     }
 
     return products;
@@ -464,7 +474,6 @@ export class ProductModel {
     const result = db.prepare(`
       SELECT COUNT(*) as count
       FROM products
-      WHERE is_deleted = 0
     `).get() as any;
 
     return result.count;

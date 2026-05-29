@@ -32,4 +32,12 @@ router.post('/:cart_uuid/checkout',
   SaleController.checkout
 );
 
+router.put('/:cart_uuid/items/:product_uuid/:unit_uuid',CartController.updateItem);
+
+router.delete('/:cart_uuid/items/:product_uuid/:unit_uuid',CartController.removeItem);
+
+router.get('/', CartController.getAll);
+
+router.delete('/:cart_uuid', CartController.deleteByUuid);
+
 export default router;

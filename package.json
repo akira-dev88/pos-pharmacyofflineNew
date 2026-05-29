@@ -1,5 +1,5 @@
 {
-  "name": "POS-Hardware",
+  "name": "POS-Pharmacy",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -7,7 +7,7 @@
   "description": "Complete POS billing system for retail stores",
   "author": "Your Name <your.email@example.com>",
   "scripts": {
-    "backend": "cross-env APP_TYPE=hardware APP_DB_NAME=pos_hardware.db tsx watch server/src/index.ts",
+    "backend": "cross-env APP_TYPE=pharmacy APP_DB_NAME=pharmacy.db tsx watch server/src/index.ts",
     "frontend": "vite",
     "electron": "electron electron/main.cjs",
     "dev": "concurrently -n BACK,FRONT,ELEC -c blue,green,yellow \"npm run backend\" \"npm run frontend\" \"wait-on http://localhost:5173 && wait-on http://127.0.0.1:3000/health && npm run electron\"",
@@ -26,8 +26,8 @@
     "predist:linux": "npm run rebuild:electron"
   },
   "build": {
-    "appId": "com.pos.hardware",
-    "productName": "POS Hardware",
+    "appId": "com.pos.pharmacy",
+    "productName": "POS pharmacy",
     "asar": false,
     "win": {
       "icon": "assets/icon.ico"
@@ -43,7 +43,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "POS Hardware",
+      "shortcutName": "POS pharmacy",
       "installerIcon": "assets/icon.ico",
       "uninstallerIcon": "assets/icon.ico",
       "installerHeaderIcon": "assets/icon.ico"
@@ -136,6 +136,7 @@
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.58.0",
     "vite": "^8.0.4",
+    "vite-tsconfig-paths": "^6.1.1",
     "wait-on": "^9.0.5"
   }
 }

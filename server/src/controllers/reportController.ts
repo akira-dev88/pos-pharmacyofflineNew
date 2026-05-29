@@ -1,138 +1,219 @@
 import type { Request, Response } from 'express';
 import { ReportModel } from '../models/Report';
 import type { AuthRequest } from '../middleware/auth';
+import db from '../database/connection';
 
 export class ReportController {
-
+  // Dashboard summary
   static dashboard = (req: AuthRequest, res: Response): void => {
     try {
-      const data = ReportModel.getDashboard();
-      res.json({ success: true, data });
+      const dashboard = ReportModel.getDashboard();
+      res.json(dashboard);
     } catch (error) {
       console.error('Dashboard error:', error);
-      res.status(500).json({ success: false, error: 'Internal server error' });
+      res.status(500).json({ error: 'Internal server error' });
     }
   };
 
+  // Top products
   static topProducts = (req: AuthRequest, res: Response): void => {
     try {
-      const data = ReportModel.getTopProducts();
-      res.json({ success: true, data });
+      const products = ReportModel.getTopProducts();
+      res.json(products);
     } catch (error) {
       console.error('Top products error:', error);
-      res.status(500).json({ success: false, error: 'Internal server error' });
+      res.status(500).json({ error: 'Internal server error' });
     }
   };
 
+  // Stock report
   static stock = (req: AuthRequest, res: Response): void => {
     try {
-      const data = ReportModel.getStockReport();
-      res.json({ success: true, data });
+      const stockReport = ReportModel.getStockReport();
+      res.json(stockReport);
     } catch (error: any) {
       console.error('Stock report error:', error);
-      res.status(500).json({ success: false, error: error.message || 'Internal server error' });
+      res.status(500).json({ error: error.message || 'Internal server error' });
     }
   };
 
+  // Profit estimation
   static profit = (req: AuthRequest, res: Response): void => {
     try {
-      const data = ReportModel.getProfit();
-      res.json({ success: true, data });
+      const profitData = ReportModel.getProfit();
+      res.json(profitData);
     } catch (error) {
       console.error('Profit report error:', error);
-      res.status(500).json({ success: false, error: 'Internal server error' });
+      res.status(500).json({ error: 'Internal server error' });
     }
   };
 
+  // Sales trend (last 7 days)
   static salesTrend = (req: AuthRequest, res: Response): void => {
     try {
-      const data = ReportModel.getSalesTrend();
-      res.json({ success: true, data });
+      const trend = ReportModel.getSalesTrend();
+      res.json(trend);
     } catch (error) {
       console.error('Sales trend error:', error);
-      res.status(500).json({ success: false, error: 'Internal server error' });
+      res.status(500).json({ error: 'Internal server error' });
     }
   };
 
+  // Profit trend (last 7 days)
   static profitTrend = (req: AuthRequest, res: Response): void => {
     try {
-      const data = ReportModel.getProfitTrend();
-      res.json({ success: true, data });
+      const trend = ReportModel.getProfitTrend();
+      res.json(trend);
     } catch (error) {
       console.error('Profit trend error:', error);
-      res.status(500).json({ success: false, error: 'Internal server error' });
+      res.status(500).json({ error: 'Internal server error' });
     }
   };
 
+  // Sales by payment method
   static salesByPayment = (req: AuthRequest, res: Response): void => {
     try {
-      const startDate = req.query.startDate as string | undefined;
-      const endDate = req.query.endDate as string | undefined;
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+
       const data = ReportModel.getSalesByPaymentMethod(startDate, endDate);
-      res.json({ success: true, data });
+      res.json(data);
     } catch (error) {
       console.error('Sales by payment error:', error);
-      res.status(500).json({ success: false, error: 'Internal server error' });
+      res.status(500).json({ error: 'Internal server error' });
     }
   };
 
+  // Daily sales summary
   static dailySales = (req: AuthRequest, res: Response): void => {
     try {
       const days = parseInt(req.query.days as string) || 30;
-      const data = ReportModel.getDailySalesSummary(days);
-      res.json({ success: true, data });
+      const summary = ReportModel.getDailySalesSummary(days);
+      res.json(summary);
     } catch (error) {
       console.error('Daily sales error:', error);
-      res.status(500).json({ success: false, error: 'Internal server error' });
+      res.status(500).json({ error: 'Internal server error' });
     }
   };
 
+  // Product sales report
   static productSales = (req: AuthRequest, res: Response): void => {
     try {
-      const startDate = req.query.startDate as string | undefined;
-      const endDate = req.query.endDate as string | undefined;
-      const data = ReportModel.getProductSalesReport(startDate, endDate);
-      res.json({ success: true, data });
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+
+      const report = ReportModel.getProductSalesReport(startDate, endDate);
+      res.json(report);
     } catch (error) {
       console.error('Product sales report error:', error);
-      res.status(500).json({ success: false, error: 'Internal server error' });
+      res.status(500).json({ error: 'Internal server error' });
     }
   };
 
+  // Customer purchase report
   static customerPurchases = (req: AuthRequest, res: Response): void => {
     try {
-      const data = ReportModel.getCustomerPurchaseReport();
-      res.json({ success: true, data });
+      const report = ReportModel.getCustomerPurchaseReport();
+      res.json(report);
     } catch (error) {
       console.error('Customer purchase report error:', error);
-      res.status(500).json({ success: false, error: 'Internal server error' });
+      res.status(500).json({ error: 'Internal server error' });
     }
   };
 
-  // ── New endpoints ──────────────────────────────────────────────────────────
-
-  static dailyReport = (req: Request, res: Response): void => {
+  static getGSTReport = (req: Request, res: Response): void => {
     try {
-      const date = String(
-        req.query.date || new Date().toISOString().split('T')[0]
-      );
-      const data = ReportModel.getDailyReportByDate(date);
-      res.json({ success: true, data });
-    } catch (error) {
-      console.error('Daily report error:', error);
-      res.status(500).json({ success: false, error: 'Internal server error' });
-    }
-  };
+      const { month } = req.query; // format: YYYY-MM
+      if (!month) {
+        res.status(400).json({ success: false, error: 'Month parameter required (YYYY-MM)' });
+        return;
+      }
 
-  static gstReport = (req: Request, res: Response): void => {
-    try {
-      const month = String(
-        req.query.month || new Date().toISOString().slice(0, 7)
-      );
-      const data = ReportModel.getGSTReport(month);
-      res.json({ success: true, data });
+      const startDate = `${month}-01`;
+      const endDate = new Date(new Date(startDate).getFullYear(), new Date(startDate).getMonth() + 1, 0).toISOString().slice(0, 10);
+
+      // Get shop settings
+      const shop = db.prepare('SELECT shop_name, gstin FROM settings LIMIT 1').get() as any;
+
+      // Get GST slabs
+      const slabs = db.prepare(`
+      SELECT 
+        gst_percent as tax_percent,
+        COUNT(DISTINCT s.sale_uuid) as invoice_count,
+        COALESCE(SUM(si.total), 0) as taxable_value,
+        COALESCE(SUM(si.gst_amount), 0) as total_tax
+      FROM sale_items si
+      JOIN sales s ON s.sale_uuid = si.sale_uuid
+      WHERE s.created_at BETWEEN ? AND ?
+        AND si.gst_percent > 0
+      GROUP BY si.gst_percent
+      ORDER BY si.gst_percent
+    `).all(startDate, endDate);
+
+      // Exempt (0% GST) – items with gst_percent = 0
+      const exempt = db.prepare(`
+      SELECT COALESCE(SUM(si.total), 0) as exempt_value
+      FROM sale_items si
+      JOIN sales s ON s.sale_uuid = si.sale_uuid
+      WHERE s.created_at BETWEEN ? AND ?
+        AND (si.gst_percent = 0 OR si.gst_percent IS NULL)
+    `).get(startDate, endDate) as { exempt_value: number };
+
+      // Invoices list for the month
+      const invoices = db.prepare(`
+      SELECT 
+        s.sale_uuid,
+        s.invoice_number,
+        s.created_at,
+        c.name as customer_name,
+        s.total,
+        s.tax,
+        s.grand_total
+      FROM sales s
+      LEFT JOIN customers c ON c.customer_uuid = s.customer_uuid
+      WHERE s.created_at BETWEEN ? AND ?
+      ORDER BY s.created_at ASC
+    `).all(startDate, endDate);
+
+      // Summary
+      const summary = db.prepare(`
+      SELECT 
+        COUNT(*) as total_invoices,
+        COALESCE(SUM(total), 0) as total_taxable,
+        COALESCE(SUM(tax), 0) as total_tax,
+        COALESCE(SUM(grand_total), 0) as grand_total
+      FROM sales
+      WHERE created_at BETWEEN ? AND ?
+    `).get(startDate, endDate) as any;
+
+      res.json({
+        success: true,
+        data: {
+          shop,
+          slabs,
+          exempt_value: exempt.exempt_value,
+          invoices,
+          summary
+        }
+      });
     } catch (error) {
       console.error('GST report error:', error);
+      res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+  };
+
+  // Add to ReportController class
+  static dailyReport = (req: AuthRequest, res: Response): void => {
+    try {
+      const { date } = req.query;
+      if (!date || typeof date !== 'string') {
+        res.status(400).json({ success: false, error: 'Date parameter required (YYYY-MM-DD)' });
+        return;
+      }
+      const report = ReportModel.getDailyReport(date);
+      res.json({ success: true, data: report });
+    } catch (error) {
+      console.error('Daily report error:', error);
       res.status(500).json({ success: false, error: 'Internal server error' });
     }
   };

@@ -55,7 +55,7 @@ export async function getLowStockProducts(threshold = 10) {
   return [];
 }
 
-// ── Product Units (new in hardware store backend) ──────────────────────────
+// ── Product Units ──────────────────────────────────────────────────────────
 
 export async function getProductUnits(product_uuid: string) {
   const response = await apiGet(`/product-units/product/${product_uuid}`);
@@ -83,7 +83,57 @@ export async function deleteProductUnit(unit_uuid: string) {
   return response.data || response;
 }
 
-// ── Migration (keep as-is) ─────────────────────────────────────────────────
+// ── Product Batches ─────────────────────────────────────────────────────────
+
+export async function getProductBatches(product_uuid: string) {
+  try {
+    const response = await apiGet(`/product-batches/product/${product_uuid}`);
+    // Handle different response formats
+    if (response && response.success && Array.isArray(response.data)) {
+      return response.data;
+    }
+    if (Array.isArray(response)) {
+      return response;
+    }
+    return [];
+  } catch (error) {
+    console.error("Failed to load product batches:", error);
+    return [];
+  }
+}
+
+export async function getAvailableBatches(product_uuid: string) {
+  try {
+    const response = await apiGet(`/product-batches/available/${product_uuid}`);
+    if (response && response.success && Array.isArray(response.data)) {
+      return response.data;
+    }
+    return [];
+  } catch (error) {
+    console.error("Failed to load available batches:", error);
+    return [];
+  }
+}
+
+export async function getNearExpiryBatches() {
+  try {
+    const response = await apiGet(`/product-batches/near-expiry`);
+    if (response && response.success && Array.isArray(response.data)) {
+      return response.data;
+    }
+    return [];
+  } catch (error) {
+    console.error("Failed to load near expiry batches:", error);
+    return [];
+  }
+}
+
+export async function deleteBatch(batch_uuid: string) {
+  const response = await apiDelete(`/product-batches/${batch_uuid}`);
+  return response.data || response;
+}
+
+// ── Migration ───────────────────────────────────────────────────────────────
 
 export async function previewMigration(fileContent: string, fileType: string) {
   const response = await apiPost('/migration/preview', { fileContent, fileType });

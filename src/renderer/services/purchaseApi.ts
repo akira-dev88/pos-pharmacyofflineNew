@@ -2,23 +2,41 @@
 import { apiGet, apiPost } from "./api";
 
 export async function createPurchase(data: any) {
-  const response = await apiPost("/purchases", data);
-  return response.data || response;
+  console.log("🔵 createPurchase - Starting...");
+  console.log("🔵 createPurchase - Payload:", JSON.stringify(data, null, 2));
+  
+  try {
+    const response = await apiPost("/purchases", data);
+    console.log("🟢 createPurchase - Success! Response:", response);
+    return response;
+  } catch (error: any) {
+    console.error("🔴 createPurchase - Failed:", error);
+    console.error("🔴 Error message:", error.message);
+    throw error;
+  }
 }
 
 export async function getPurchases() {
-  const response = await apiGet("/purchases");
-  console.log("🟢 getPurchases raw response:", response);
-  // Our API returns an array directly (as seen in your console)
-  if (Array.isArray(response)) {
-    console.log("✅ Response is array, length:", response.length);
-    return response;
+  console.log("🔵 getPurchases - Starting...");
+  
+  try {
+    const response = await apiGet("/purchases");
+    console.log("🟢 getPurchases - Response:", response);
+    
+    if (Array.isArray(response)) {
+      return response;
+    }
+    if (response && Array.isArray(response.data)) {
+      return response.data;
+    }
+    if (response && response.success && Array.isArray(response.data)) {
+      return response.data;
+    }
+    
+    console.warn("⚠️ Unexpected response type, returning []");
+    return [];
+  } catch (error) {
+    console.error("🔴 getPurchases - Failed:", error);
+    return [];
   }
-  // Fallback for safety (e.g., if wrapped in { data: [...] })
-  if (response && Array.isArray(response.data)) {
-    console.log("✅ Response.data is array, length:", response.data.length);
-    return response.data;
-  }
-  console.warn("⚠️ Unexpected response type, returning []");
-  return [];
 }

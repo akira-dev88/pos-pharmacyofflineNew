@@ -1,6 +1,9 @@
 import db from '../database/connection';
 
 export class ReportModel {
+  // static getDailyReport(date: string) {
+  //   throw new Error('Method not implemented.');
+  // }
   // Dashboard summary
   static getDashboard() {
     const now = new Date();
@@ -143,13 +146,12 @@ export class ReportModel {
   }
 
   // Stock report
-  static getStockReport(month?: string) {
+  static getStockReport() {
     return db.prepare(`
-    SELECT name, stock, price 
-    FROM products
-    WHERE is_deleted = 0
-    ORDER BY name ASC
-  `).all();
+      SELECT name, stock, price 
+      FROM products
+      ORDER BY name ASC
+    `).all();
   }
 
   // Profit estimation
@@ -367,161 +369,98 @@ export class ReportModel {
     `).all();
   }
 
-  static getDailyReportByDate(date: string) {
-    const bills = db.prepare(`
-    SELECT s.invoice_number, s.grand_total, s.created_at,
-           c.name as customer_name
-    FROM sales s
-    LEFT JOIN customers c ON s.customer_uuid = c.customer_uuid
-    WHERE DATE(s.created_at, 'localtime') = ?
-    ORDER BY s.created_at DESC
-  `).all(date) as any[];
+  // Add to ReportModel class
+  static getDailyReport(date: string): any {
+    const startDate = `${date} 00:00:00`;
+    const endDate = `${date} 23:59:59`;
 
+    // Shop details
+    const shop = db.prepare(`
+    SELECT shop_name as name, address, mobile, gstin FROM settings LIMIT 1
+  `).get() as any || { name: 'My Store' };
+
+    // Summary
     const summary = db.prepare(`
     SELECT
       COUNT(*) as total_bills,
-      COALESCE(SUM(grand_total), 0) as grand_total,
       COALESCE(SUM(total), 0) as subtotal,
-      COALESCE(SUM(tax), 0) as total_tax
+      COALESCE(SUM(tax), 0) as total_tax,
+      COALESCE(SUM(grand_total), 0) as grand_total
     FROM sales
-    WHERE DATE(created_at, 'localtime') = ?
-  `).get(date) as any;
+    WHERE created_at BETWEEN ? AND ?
+  `).get(startDate, endDate) as any;
 
+    // Payment breakdown
     const payments = db.prepare(`
     SELECT p.method, COALESCE(SUM(p.amount), 0) as total
     FROM payments p
     JOIN sales s ON p.sale_uuid = s.sale_uuid
-    WHERE DATE(s.created_at, 'localtime') = ?
+    WHERE s.created_at BETWEEN ? AND ?
     GROUP BY p.method
-    ORDER BY total DESC
-  `).all(date) as any[];
+  `).all(startDate, endDate) as Array<{ method: string; total: number }>;
 
-    const top_products = db.prepare(`
+    // GST slabs (tax collected per percentage)
+    const gstSlabs = db.prepare(`
+    SELECT
+      si.gst_percent as tax_percent,
+      COALESCE(SUM(si.total), 0) as taxable_amount,
+      COALESCE(SUM(si.gst_amount), 0) as tax_collected
+    FROM sale_items si
+    JOIN sales s ON si.sale_uuid = s.sale_uuid
+    WHERE s.created_at BETWEEN ? AND ? AND si.gst_percent > 0
+    GROUP BY si.gst_percent
+    ORDER BY si.gst_percent
+  `).all(startDate, endDate) as Array<{
+      tax_percent: number;
+      taxable_amount: number;
+      tax_collected: number;
+    }>;
+
+    // Top 5 products
+    const topProducts = db.prepare(`
     SELECT
       p.name,
       SUM(si.quantity) as qty_sold,
-      SUM(si.price * si.quantity) as revenue
+      COALESCE(SUM(si.total), 0) as revenue
     FROM sale_items si
     JOIN sales s ON si.sale_uuid = s.sale_uuid
-    LEFT JOIN products p ON si.product_uuid = p.product_uuid
-    WHERE DATE(s.created_at, 'localtime') = ?
+    JOIN products p ON si.product_uuid = p.product_uuid
+    WHERE s.created_at BETWEEN ? AND ?
     GROUP BY si.product_uuid
     ORDER BY qty_sold DESC
     LIMIT 5
-  `).all(date) as any[];
+  `).all(startDate, endDate) as Array<{
+      name: string;
+      qty_sold: number;
+      revenue: number;
+    }>;
 
-    // DailyReport.tsx needs gst_slabs with taxable_amount + tax_collected
-    const gst_slabs = db.prepare(`
-    SELECT
-      si.tax_percent,
-      COALESCE(SUM(si.price * si.quantity), 0) as taxable_amount,
-      COALESCE(SUM(si.tax_amount), 0) as tax_collected
-    FROM sale_items si
-    JOIN sales s ON si.sale_uuid = s.sale_uuid
-    WHERE DATE(s.created_at, 'localtime') = ?
-      AND si.tax_percent > 0
-    GROUP BY si.tax_percent
-    ORDER BY si.tax_percent ASC
-  `).all(date) as any[];
-
-    const settings = db.prepare('SELECT * FROM settings LIMIT 1').get() as any;
-
-    // Always return a valid shape even if no sales
-    return {
-      date,
-      shop: settings ? {
-        name: settings.shop_name,
-        address: settings.address,
-        gstin: settings.gstin,
-        mobile: settings.mobile,
-      } : null,
-      summary: {
-        total_bills: summary?.total_bills || 0,
-        grand_total: summary?.grand_total || 0,
-        subtotal: summary?.subtotal || 0,
-        total_tax: summary?.total_tax || 0,
-      },
-      payments,
-      gst_slabs,
-      top_products,
-      bills,
-    };
-  }
-
-  static getGSTReport(month: string) {
-    // month format: YYYY-MM
-
-    const summary = db.prepare(`
-    SELECT
-      COUNT(*) as total_invoices,
-      COALESCE(SUM(total), 0) as total_taxable,
-      COALESCE(SUM(tax), 0) as total_tax,
-      COALESCE(SUM(grand_total), 0) as grand_total
-    FROM sales
-    WHERE strftime('%Y-%m', created_at, 'localtime') = ?
-  `).get(month) as any;
-
-    const slabs = db.prepare(`
-    SELECT
-      si.tax_percent,
-      COUNT(DISTINCT s.sale_uuid) as invoice_count,
-      COALESCE(SUM(si.price * si.quantity), 0) as taxable_value,
-      COALESCE(SUM(si.tax_amount), 0) as total_tax
-    FROM sale_items si
-    JOIN sales s ON si.sale_uuid = s.sale_uuid
-    WHERE strftime('%Y-%m', s.created_at, 'localtime') = ?
-      AND si.tax_percent > 0
-    GROUP BY si.tax_percent
-    ORDER BY si.tax_percent ASC
-  `).all(month) as any[];
-
-    const exempt = db.prepare(`
-    SELECT
-      COALESCE(SUM(si.price * si.quantity), 0) as exempt_value
-    FROM sale_items si
-    JOIN sales s ON si.sale_uuid = s.sale_uuid
-    WHERE strftime('%Y-%m', s.created_at, 'localtime') = ?
-      AND (si.tax_percent = 0 OR si.tax_percent IS NULL)
-  `).get(month) as any;
-
-    const invoices = db.prepare(`
+    // List of bills
+    const bills = db.prepare(`
     SELECT
       s.invoice_number,
-      s.created_at,
-      s.total,
-      s.tax,
       s.grand_total,
+      s.created_at,
       c.name as customer_name
     FROM sales s
-    LEFT JOIN customers c
-      ON s.customer_uuid = c.customer_uuid
-    WHERE strftime('%Y-%m', s.created_at, 'localtime') = ?
-    ORDER BY s.created_at DESC
-  `).all(month) as any[];
-
-    const settings = db.prepare(`
-    SELECT * FROM settings LIMIT 1
-  `).get() as any;
+    LEFT JOIN customers c ON s.customer_uuid = c.customer_uuid
+    WHERE s.created_at BETWEEN ? AND ?
+    ORDER BY s.created_at ASC
+  `).all(startDate, endDate) as Array<{
+      invoice_number: string;
+      grand_total: number;
+      created_at: string;
+      customer_name: string | null;
+    }>;
 
     return {
-      shop: settings ? {
-        name: settings.shop_name,
-        gstin: settings.gstin,
-        address: settings.address,
-        mobile: settings.mobile,
-      } : null,
-
-      summary: {
-        total_invoices: summary?.total_invoices || 0,
-        total_taxable: summary?.total_taxable || 0,
-        total_tax: summary?.total_tax || 0,
-        grand_total: summary?.grand_total || 0,
-      },
-
-      slabs,
-      invoices,
-
-      exempt_value: exempt?.exempt_value || 0,
+      date,
+      shop,
+      summary,
+      payments,
+      gst_slabs: gstSlabs,
+      top_products: topProducts,
+      bills
     };
   }
 }

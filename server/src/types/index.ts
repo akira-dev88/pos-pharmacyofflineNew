@@ -3,25 +3,49 @@ export interface User {
   name: string;
   email: string;
   password: string;
-  role: 'owner' | 'cashier' | 'manager';
+  role:
+  | 'admin'
+  | 'staff';
   created_at: string;
   updated_at: string;
 }
 
 export interface Product {
+
   product_uuid: string;
 
   name: string;
 
   category_uuid?: string;
+
   subcategory?: string;
 
   barcode?: string;
+
   sku?: string;
+
+  // PHARMACY
+
+  product_type?: string;
+
+  manufacturer?: string;
+
+  composition?: string;
+
+  schedule_type?: string;
+
+  prescription_required?: number;
+
+  medicine_type?: string;
+
+  rack_location?: string;
+
+  // GENERAL
 
   unit: string;
 
   price: number;
+
   purchase_price?: number;
 
   gst_percent: number;
@@ -29,9 +53,11 @@ export interface Product {
   stock: number;
 
   hsn_code?: string;
+
   image?: string;
 
   created_at: string;
+
   updated_at: string;
 
   attributes?: ProductAttribute[];
@@ -84,17 +110,39 @@ export interface ProductAttribute {
 }
 
 export interface ProductCreateInput {
+
   name: string;
 
   category_uuid?: string;
+
   subcategory?: string;
 
   barcode?: string;
+
   sku?: string;
+
+  // PHARMACY
+
+  product_type?: string;
+
+  manufacturer?: string;
+
+  composition?: string;
+
+  schedule_type?: string;
+
+  prescription_required?: number;
+
+  medicine_type?: string;
+
+  rack_location?: string;
+
+  // GENERAL
 
   unit?: string;
 
   price: number;
+
   purchase_price?: number;
 
   gst_percent?: number;
@@ -102,11 +150,15 @@ export interface ProductCreateInput {
   stock?: number;
 
   hsn_code?: string;
+
   image?: string;
 
   attributes?: {
+
     attribute_uuid: string;
+
     value: string;
+
   }[];
 }
 
@@ -115,14 +167,35 @@ export interface ProductUpdateInput {
   name?: string;
 
   category_uuid?: string;
+
   subcategory?: string;
 
   barcode?: string;
+
   sku?: string;
+
+  // PHARMACY
+
+  product_type?: string;
+
+  manufacturer?: string;
+
+  composition?: string;
+
+  schedule_type?: string;
+
+  prescription_required?: number;
+
+  medicine_type?: string;
+
+  rack_location?: string;
+
+  // GENERAL
 
   unit?: string;
 
   price?: number;
+
   purchase_price?: number;
 
   gst_percent?: number;
@@ -130,12 +203,88 @@ export interface ProductUpdateInput {
   stock?: number;
 
   hsn_code?: string;
+
   image?: string;
 
   attributes?: {
+
     attribute_uuid: string;
+
     value: string;
+
   }[];
+}
+
+export interface ProductBatch {
+
+  batch_uuid: string;
+
+  product_uuid: string;
+
+  batch_number: string;
+
+  expiry_date: string;
+
+  manufacture_date?: string | null;
+
+  mrp: number;
+
+  ptr: number;
+
+  rate: number;
+
+  purchase_price: number;
+
+  selling_price: number;
+
+  gst_percent: number;
+
+  quantity: number;
+
+  sold_quantity: number;
+
+  free_quantity: number;
+
+  is_quarantined: number;
+
+  supplier_uuid?: string | null;
+
+  purchase_uuid?: string | null;
+
+  created_at: string;
+
+  updated_at: string;
+}
+
+export interface ProductBatchCreateInput {
+
+  product_uuid: string;
+
+  batch_number: string;
+
+  expiry_date: string;
+
+  manufacture_date?: string;
+
+  mrp: number;
+
+  ptr?: number;
+
+  rate?: number;
+
+  purchase_price?: number;
+
+  selling_price?: number;
+
+  gst_percent?: number;
+
+  quantity: number;
+
+  free_quantity?: number;
+
+  supplier_uuid?: string;
+
+  purchase_uuid?: string;
 }
 
 export interface ProductSearchParams {
@@ -214,10 +363,26 @@ export interface SaleItem {
   id: number;
   sale_uuid: string;
   product_uuid: string;
+  batch_uuid: string;
   quantity: number;
   price: number;
   tax_percent: number;
   tax_amount: number;
+  prescription_required?: number;
+
+  prescription_number?: string;
+
+  doctor_name?: string;
+
+  doctor_license?: string;
+
+  patient_name?: string;
+
+  patient_age?: number;
+
+  patient_gender?: string;
+
+  schedule_type?: string;
   created_at: string;
   updated_at: string;
 }
@@ -244,8 +409,17 @@ export interface PurchaseItem {
   id: number;
   purchase_uuid: string;
   product_uuid: string;
+  batch_number: string;
+  expiry_date: string;
+  manufacture_date?: string;
   quantity: number;
+  free_quantity?: number;
+  mrp: number;
+  ptr?: number;
+  rate?: number;
   cost_price: number;
+  selling_price?: number;
+  gst_percent?: number;
   created_at: string;
   updated_at: string;
 }
@@ -294,9 +468,16 @@ export interface Setting {
   address?: string;
   gstin?: string;
   invoice_prefix: string;
+  auto_print?: number;
+  // =========================
+  // PHARMACY COMPLIANCE
+  // =========================
+  drug_license_number?: string;
+  drug_license_valid_upto?: string;
+  pharmacist_name?: string;
+  pharmacist_registration_number?: string;
   created_at: string;
   updated_at: string;
-  auto_print?: number;
 }
 
 export interface Cart {
@@ -311,6 +492,7 @@ export interface CartItem {
   id: number;
   cart_uuid: string;
   product_uuid: string;
+  unit_uuid: string;
   quantity: number;
   price: number;
   discount: number;
@@ -330,4 +512,304 @@ export interface CartSummary {
   bill_discount: number;
   tax: number;
   grand_total: number;
+}
+
+export type StockAdjustmentType =
+  | 'damage'
+  | 'expired'
+  | 'leakage'
+  | 'theft'
+  | 'manual'
+  | 'supplier_return';
+
+export interface StockAdjustment {
+
+  adjustment_uuid: string;
+
+  product_uuid: string;
+
+  batch_uuid: string;
+
+  adjustment_type: StockAdjustmentType;
+
+  quantity: number;
+
+  note?: string | null;
+
+  performed_by?: string | null;
+
+  created_at: string;
+
+  updated_at: string;
+}
+
+export interface CreateStockAdjustmentInput {
+
+  product_uuid: string;
+
+  batch_uuid: string;
+
+  adjustment_type: StockAdjustmentType;
+
+  quantity: number;
+
+  note?: string;
+
+  performed_by?: string;
+}
+
+export type MedicineReturnType =
+  | 'customer_return'
+  | 'supplier_return';
+
+export interface MedicineReturn {
+
+  return_uuid: string;
+
+  sale_uuid?: string | null;
+
+  product_uuid: string;
+
+  batch_uuid: string;
+
+  return_type: MedicineReturnType;
+
+  quantity: number;
+
+  refund_amount: number;
+
+  reason?: string | null;
+
+  performed_by?: string | null;
+
+  created_at: string;
+
+  updated_at: string;
+}
+
+export interface CreateMedicineReturnInput {
+
+  sale_uuid?: string;
+
+  product_uuid: string;
+
+  batch_uuid: string;
+
+  return_type: MedicineReturnType;
+
+  quantity: number;
+
+  refund_amount?: number;
+
+  reason?: string;
+
+  performed_by?: string;
+}
+
+export interface InvoiceItem {
+
+  product_name: string;
+
+  manufacturer?: string | null;
+
+  hsn_code?: string | null;
+
+  batch_number?: string | null;
+
+  expiry_date?: string | null;
+
+  unit: string;
+
+  quantity: number;
+
+  price: number;
+
+  taxable_amount: number;
+
+  gst_percent: number;
+
+  gst_amount: number;
+
+  cgst: number;
+
+  sgst: number;
+
+  total: number;
+
+  schedule_type?: string | null;
+}
+
+export interface InvoiceSummary {
+
+  subtotal: number;
+
+  taxable_total: number;
+
+  gst_total: number;
+
+  cgst_total: number;
+
+  sgst_total: number;
+
+  grand_total: number;
+}
+
+export interface PharmacyInvoice {
+
+  invoice_number: string;
+
+  invoice_date: string;
+
+  customer?: {
+
+    name?: string;
+
+    mobile?: string;
+
+    address?: string;
+
+    gstin?: string;
+  };
+
+  pharmacy: {
+
+    shop_name: string;
+
+    address?: string;
+
+    mobile?: string;
+
+    gstin?: string;
+
+    drug_license_number?: string;
+
+    pharmacist_name?: string;
+
+    pharmacist_registration_number?: string;
+  };
+
+  items: InvoiceItem[];
+
+  summary: InvoiceSummary;
+
+  payments: Payment[];
+
+  compliance: {
+
+    contains_schedule_h: boolean;
+
+    contains_schedule_h1: boolean;
+
+    contains_schedule_x: boolean;
+
+    warnings: string[];
+  };
+}
+
+export interface H1Register {
+
+  id: number;
+
+  register_uuid: string;
+
+  sale_uuid: string;
+
+  sale_item_id: number;
+
+  product_uuid: string;
+
+  batch_uuid?: string | null;
+
+  prescription_number: string;
+
+  doctor_name: string;
+
+  doctor_license?: string | null;
+
+  patient_name: string;
+
+  patient_age?: number | null;
+
+  patient_gender?: string | null;
+
+  quantity: number;
+
+  pharmacist_name?: string | null;
+
+  created_at: string;
+}
+
+export interface CreateH1RegisterInput {
+
+  sale_uuid: string;
+
+  sale_item_id: number;
+
+  product_uuid: string;
+
+  batch_uuid?: string;
+
+  prescription_number: string;
+
+  doctor_name: string;
+
+  doctor_license?: string;
+
+  patient_name: string;
+
+  patient_age?: number;
+
+  patient_gender?: string;
+
+  quantity: number;
+
+  pharmacist_name?: string;
+}
+
+export type AuditActionType =
+
+  | 'sale_created'
+  | 'sale_updated'
+  | 'schedule_h1_sale'
+  | 'schedule_x_sale'
+  | 'batch_quarantined';
+
+export interface AuditLog {
+
+  id: number;
+
+  audit_uuid: string;
+
+  action_type: AuditActionType;
+
+  entity_type: string;
+
+  entity_uuid?: string | null;
+
+  reference_uuid?: string | null;
+
+  user_uuid?: string | null;
+
+  details?: string | null;
+
+  ip_address?: string | null;
+
+  created_at: string;
+}
+
+export interface CreateAuditLogInput {
+
+  action_type: AuditActionType;
+
+  entity_type: string;
+
+  entity_uuid?: string;
+
+  reference_uuid?: string;
+
+  user_uuid?: string;
+
+  details?: string;
+
+  ip_address?: string;
 }

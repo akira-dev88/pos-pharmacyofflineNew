@@ -9,7 +9,6 @@ import DiscountSection from "./components/DiscountSection";
 import PaymentSection from "./components/PaymentSection";
 import CustomerModal from "./modals/CustomerModal";
 import SalesModal from "./modals/SalesModal";
-import CustomerStatement from "../admin/CustomerStatement";
 import { useCart } from "./hooks/useCart";
 import { useProducts } from "./hooks/useProducts";
 import { useCustomers } from "./hooks/useCustomers";
@@ -18,8 +17,8 @@ import { storefrontOutline } from 'ionicons/icons';
 import InvoiceReceipt from "./components/InvoiceReceipt";
 import { getSettings } from "../../renderer/services/settingsApi";
 import { getInvoice } from "../../renderer/services/saleApi";
-import { getCustomers } from "../../renderer/services/customerApi";
 import { addCustomItem } from "../../renderer/services/cartApi";
+import PrescriptionModal from "./components/PrescriptionModal";
 
 function POSpage() {
   const navigate = useNavigate();
@@ -34,6 +33,7 @@ function POSpage() {
   const [showPastInvoiceModal, setShowPastInvoiceModal] = useState(false);
   const [selectedPastInvoice, setSelectedPastInvoice] = useState<any>(null);
 
+  // REMOVED local prescription state - now coming from useCart
 
   // Refs for scrollable containers
   const productGridRef = useRef<HTMLDivElement>(null);
@@ -61,30 +61,24 @@ function POSpage() {
     loading: cartLoading,
     isCartInitializing,
     currentMethodRef,
+    // Prescription modal props from useCart
+    showPrescriptionModal,
+    prescriptionProduct,
+    handlePrescriptionSubmit,
+    setShowPrescriptionModal,
   } = useCart();
 
   const {
     customers,
     selectedCustomer,
     setSelectedCustomer,
-    ledger,
     createNewCustomer,
-    addPayment,
     loadSales,
     sales,
     refreshAllCustomerData,
   } = useCustomers();
 
   const [shopSettings, setShopSettings] = useState<any>(null);
-
-  // useEffect(() => {
-  //   getSettings().then(res => {
-  //     if (res?.data) setShopSettings(res.data);
-  //     else if (res?.shop_name) setShopSettings(res);
-  //   });
-  // }, []);
-
-  // In POSpage.tsx, add this useEffect to monitor payment method changes:
   useEffect(() => {
     console.log("💰 Current payments state:", payments);
     console.log("💰 Current method ref:", currentMethodRef.current);
@@ -110,57 +104,62 @@ function POSpage() {
   };
 
   const handleCheckout = async () => {
-  if (!cartUUID || !cartData) {
-    alert("Cart not ready. Please wait...");
-    return;
-  }
+    console.log("🔵 handleCheckout called");
 
-  const cartStatus = cartData?.status || cartData?.cart?.status;
-  if (cartStatus === 'completed') {
-    await refreshCart();
-    alert("Cart was already processed. Please try again.");
-    return;
-  }
-
-  const cartItems = cartData?.cart?.items || cartData?.items;
-  if (!cartItems || cartItems.length === 0) {
-    alert("No items in cart");
-    return;
-  }
-
-  // For credit payments, customer must be selected
-  const isCreditPayment = currentMethodRef.current === 'pay_later';
-  if (isCreditPayment && !selectedCustomer) {
-    alert("Please select a customer for Pay Later option");
-    return;
-  }
-
-  const forcedPayments = [{
-    method: currentMethodRef.current,
-    amount: grandTotal
-  }];
-
-  console.log("🔍 FORCED PAYMENTS:", forcedPayments);
-  console.log("🔍 CURRENT METHOD REF:", currentMethodRef.current);
-  console.log("🔍 SELECTED CUSTOMER:", selectedCustomer);
-
-  const result = await checkout(
-    forcedPayments,
-    selectedCustomer?.customer_uuid || null,
-    selectedCustomer
-  );
-
-  if (result?.success) {
-    console.log("✅ Checkout successful!");
-    window.dispatchEvent(new Event('refresh-dashboard'));
-    window.dispatchEvent(new Event('refresh-customers'));
-    if (refreshAllCustomerData) {
-      await refreshAllCustomerData();
+    if (!cartUUID || !cartData) {
+      alert("Cart not ready. Please wait...");
+      return;
     }
-    setInvoiceData(result.invoice);
-    setShowInvoiceModal(true);
-  }
-};
+
+    const cartStatus = cartData?.status || cartData?.cart?.status;
+    if (cartStatus === 'completed') {
+      await refreshCart();
+      alert("Cart was already processed. Please try again.");
+      return;
+    }
+
+    const cartItems = cartData?.cart?.items || cartData?.items;
+    if (!cartItems || cartItems.length === 0) {
+      alert("No items in cart");
+      return;
+    }
+
+    const isCreditPayment = currentMethodRef.current === 'pay_later';
+    if (isCreditPayment && !selectedCustomer) {
+      alert("Please select a customer for Pay Later option");
+      return;
+    }
+
+    const forcedPayments = [{
+      method: currentMethodRef.current,
+      amount: grandTotal
+    }];
+
+    const result = await checkout(
+      forcedPayments,
+      selectedCustomer?.customer_uuid || null,
+      selectedCustomer
+    );
+
+    console.log("🔵 Checkout result:", result);
+
+    // Show invoice if checkout was successful
+    if (result && result.success && result.invoice) {
+      console.log("✅ Checkout successful! Showing invoice...");
+      window.dispatchEvent(new Event('refresh-dashboard'));
+      window.dispatchEvent(new Event('refresh-customers'));
+      if (refreshAllCustomerData) {
+        await refreshAllCustomerData();
+      }
+      setInvoiceData(result.invoice);
+      setShowInvoiceModal(true);
+    } else if (result === null) {
+      // Checkout is waiting for prescription or was cancelled
+      console.log("Checkout waiting for prescription or was cancelled");
+    } else {
+      console.log("Checkout failed");
+    }
+  };
 
   // Check cart status
   useEffect(() => {
@@ -208,7 +207,6 @@ function POSpage() {
           } catch (err) {
             console.error('Barcode lookup failed:', err);
           }
-          // 👇 ADD THIS FLAG
           barcodeScannedRef.current = true;
           setTimeout(() => {
             barcodeScannedRef.current = false;
@@ -216,10 +214,8 @@ function POSpage() {
         }
         barcodeBuffer = '';
       } else if (timeDiff < 50) {
-        // Fast typing = scanner input (scanners type < 50ms between chars)
         barcodeBuffer += e.key;
       } else {
-        // Slow typing = human keyboard, reset buffer
         barcodeBuffer = e.key;
       }
     };
@@ -231,18 +227,15 @@ function POSpage() {
   // Keyboard shortcut: Enter to checkout
   useEffect(() => {
     const handleCheckoutShortcut = (e: KeyboardEvent) => {
-      // Ignore if any modal is open
       if (showCustomerModal || showSalesModal || showInvoiceModal || showPastInvoiceModal || showQuickAdd) {
         return;
       }
 
       const target = e.target as HTMLElement;
-      // Ignore if typing in input/textarea
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
         return;
       }
 
-      // Ignore if barcode was just scanned
       if (barcodeScannedRef.current) {
         return;
       }
@@ -299,14 +292,12 @@ function POSpage() {
     };
   }, [cartData]);
 
-  // Save scroll positions before navigating away
   useEffect(() => {
     return () => {
       saveScrollPositions();
     };
   }, []);
 
-  // Save before page unload
   useEffect(() => {
     window.addEventListener('beforeunload', saveScrollPositions);
     return () => {
@@ -314,11 +305,9 @@ function POSpage() {
     };
   }, []);
 
-  // Restore scroll positions when component mounts
   useEffect(() => {
     const restoreTimer = setTimeout(() => {
       const savedPositions = sessionStorage.getItem('pos_scroll_positions');
-      console.log('Restoring scroll positions:', savedPositions);
 
       if (savedPositions) {
         try {
@@ -342,92 +331,6 @@ function POSpage() {
     return () => clearTimeout(restoreTimer);
   }, []);
 
-  // In POSpage.tsx, update the handleCheckout function:
-
-  // const handleCheckout = async () => {
-  //   if (!cartUUID || !cartData) {
-  //     alert("Cart not ready. Please wait...");
-  //     return;
-  //   }
-
-  //   const cartStatus = cartData?.status || cartData?.cart?.status;
-  //   if (cartStatus === 'completed') {
-  //     await refreshCart();
-  //     alert("Cart was already processed. Please try again.");
-  //     return;
-  //   }
-
-  //   const cartItems = cartData?.cart?.items || cartData?.items;
-  //   if (!cartItems || cartItems.length === 0) {
-  //     alert("No items in cart");
-  //     return;
-  //   }
-
-  //   if (totalPaid <= 0) {
-  //     alert("Please enter a payment amount");
-  //     return;
-  //   }
-
-  //   // For credit payments, customer must be selected
-  //   const isCreditPayment = currentMethodRef.current === 'pay_later'; // ✅ Use ref instead of payments state
-  //   if (isCreditPayment && !selectedCustomer) {
-  //     alert("Please select a customer for Pay Later option");
-  //     return;
-  //   }
-
-  //   // For non-credit payments, check if amount is sufficient
-  //   if (!isCreditPayment && totalPaid < grandTotal) {
-  //     alert(`Total amount is ₹${grandTotal}. Please enter full payment.`);
-  //     return;
-  //   }
-
-  //   // ✅ USE forcedPayments instead of payments
-  //   const forcedPayments = [{
-  //     method: currentMethodRef.current,
-  //     amount: grandTotal
-  //   }];
-
-  //   console.log("🔍 FORCED PAYMENTS:", forcedPayments);
-  //   console.log("🔍 CURRENT METHOD REF:", currentMethodRef.current);
-  //   console.log("🔍 SELECTED CUSTOMER:", selectedCustomer);
-
-  //   const result = await checkout(
-  //     forcedPayments,  // ✅ Use forcedPayments here!
-  //     selectedCustomer?.customer_uuid || null,
-  //     selectedCustomer
-  //   );
-
-  //   if (result?.success) {
-  //     console.log("✅ Checkout successful!");
-
-  //     // ✅ Trigger refresh of dashboard and customer pages
-  //     console.log("🔄 Triggering dashboard and customer refresh...");
-
-  //     // Dispatch custom events to refresh other components
-  //     window.dispatchEvent(new Event('refresh-dashboard'));
-  //     window.dispatchEvent(new Event('refresh-customers'));
-
-  //     // Also refresh customer data in POSpage if needed
-  //     if (refreshAllCustomerData) {
-  //       await refreshAllCustomerData();
-  //     }
-
-  //     setInvoiceData(result.invoice);
-  //     setShowInvoiceModal(true);
-  //   }
-  // };
-
-  const handleCloseInvoice = () => {
-    setShowInvoiceModal(false);
-    setInvoiceData(null);
-    // Reset form after closing receipt
-    setPayments([{ method: "cash", amount: 0 }]);
-    setDiscount(0);
-    setSelectedCustomer(null);
-    refetch();
-  };
-
-  // Show loading screen while cart is initializing
   if (isCartInitializing) {
     return (
       <div className="h-screen flex items-center justify-center bg-[#141414]">
@@ -439,6 +342,15 @@ function POSpage() {
     );
   }
 
+  const handleCloseInvoice = () => {
+    setShowInvoiceModal(false);
+    setInvoiceData(null);
+    setPayments([{ method: "cash", amount: 0 }]);
+    setDiscount(0);
+    setSelectedCustomer(null);
+    refetch();
+  };
+
   return (
     <div className="h-screen flex flex-col bg-[#141414] font-inter overflow-hidden">
       <TopBar
@@ -448,7 +360,6 @@ function POSpage() {
         }}
       />
 
-      {/* 3-Column Layout */}
       <div className="flex flex-1 overflow-hidden gap-3 p-3">
 
         {/* COLUMN 1: PRODUCTS */}
@@ -464,7 +375,10 @@ function POSpage() {
             <ProductGrid
               products={products}
               loading={productsLoading}
-              onAddItem={addItem}
+              onAddItem={(product, unitUuid, quantity, unitName) => {
+                // Add to cart with specific unit and quantity
+                addItem(product, unitUuid, quantity, unitName);
+              }}
             />
           </div>
         </div>
@@ -486,7 +400,6 @@ function POSpage() {
             </div>
           </div>
 
-          {/* Store Info - Not scrollable */}
           <div className="m-3 p-3 bg-[#212121] rounded-xl flex-shrink-0">
             <div className="flex items-center gap-3">
               <div className="rounded-xl bg-black p-2">
@@ -508,7 +421,6 @@ function POSpage() {
             </div>
           </div>
 
-          {/* Cart Items List - Scrollable */}
           <div
             ref={cartItemsRef}
             className="flex-1 overflow-y-auto scrollbar-hide"
@@ -539,14 +451,12 @@ function POSpage() {
             className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide"
             id="payment-scroll-container"
           >
-            {/* Cart Summary */}
             <CartSummary
               total={cartData?.summary?.total || 0}
               tax={cartData?.summary?.tax || 0}
               grandTotal={grandTotal}
             />
 
-            {/* Customer Select */}
             <CustomerSelect
               customers={customers}
               selectedCustomer={selectedCustomer}
@@ -554,32 +464,21 @@ function POSpage() {
               onAddNew={() => setShowCustomerModal(true)}
             />
 
-            {/* Discount Section */}
             <DiscountSection
               discount={discount}
               onDiscountChange={setDiscount}
               onApplyDiscount={() => applyDiscount(cartUUID, discount)}
             />
 
-            {/* Payment Section */}
             <PaymentSection
               payments={payments}
-              // In POSpage.tsx, update the onPaymentChange handler:
-              // In POSpage.tsx, update the onPaymentChange handler:
               onPaymentChange={(index, field, value) => {
-                console.log("📝 Payment change in POSpage:", { index, field, value });
-                console.log("📝 Current payments before update:", payments);
-
                 const updated = [...payments];
                 updated[index] = { ...updated[index], [field]: value };
-
-                console.log("📝 Updated payments after change:", updated);
                 setPayments(updated);
 
-                // ✅ CRITICAL: Update the ref when method changes
                 if (field === "method") {
                   currentMethodRef.current = value;
-                  console.log("📝 Updated currentMethodRef to:", value);
                 }
               }}
               onAddRow={() =>
@@ -594,7 +493,6 @@ function POSpage() {
               grandTotal={grandTotal}
             />
 
-            {/* Checkout Button */}
             <button
               className="w-full bg-green-600 text-white p-3 rounded-xl font-bold disabled:opacity-50 hover:bg-green-700 transition-colors"
               onClick={handleCheckout}
@@ -603,7 +501,6 @@ function POSpage() {
               {cartLoading ? "Processing..." : "Checkout"}
             </button>
 
-            {/* Clear Due Button */}
             {selectedCustomer?.credit_balance > 0 && (
               <button
                 className="w-full bg-orange-500 text-white p-2 rounded-xl text-sm hover:bg-orange-600 transition-colors"
@@ -637,11 +534,7 @@ function POSpage() {
           sales={sales}
           onClose={() => setShowSalesModal(false)}
           onViewInvoice={async (saleUUID) => {
-            console.log("View invoice:", saleUUID);
-
-            // First, find the sale from the sales array
             const sale = sales.find(s => s.sale_uuid === saleUUID);
-            console.log("Found sale:", sale);
 
             if (!sale) {
               alert('Sale not found');
@@ -649,10 +542,7 @@ function POSpage() {
             }
 
             try {
-              // Try to fetch full invoice from backend
               const fullInvoice = await getInvoice(saleUUID);
-              console.log("Full invoice from API:", fullInvoice);
-
               if (fullInvoice && fullInvoice.items && fullInvoice.items.length > 0) {
                 setSelectedPastInvoice(fullInvoice);
                 setShowPastInvoiceModal(true);
@@ -662,9 +552,6 @@ function POSpage() {
             } catch (err) {
               console.error('Failed to fetch from API:', err);
             }
-
-            // FALLBACK: Use the sale data we already have
-            console.log("Using fallback with sale data:", sale);
 
             const constructedInvoice = {
               sale_uuid: sale.sale_uuid,
@@ -677,8 +564,8 @@ function POSpage() {
               items: [{
                 product_name: 'Sale Items',
                 quantity: 1,
-                price: sale.total,  // This should be 120
-                total: sale.total   // This should be 120
+                price: sale.total,
+                total: sale.total
               }],
               summary: {
                 total: sale.total || 0,
@@ -691,7 +578,6 @@ function POSpage() {
               }]
             };
 
-            console.log("Constructed invoice:", constructedInvoice);
             setSelectedPastInvoice(constructedInvoice);
             setShowPastInvoiceModal(true);
             setShowSalesModal(false);
@@ -699,7 +585,6 @@ function POSpage() {
         />
       )}
 
-      {/* Invoice Receipt Modal */}
       {showInvoiceModal && invoiceData && (
         <InvoiceReceipt
           invoice={invoiceData}
@@ -715,7 +600,7 @@ function POSpage() {
             setShowPastInvoiceModal(false);
             setSelectedPastInvoice(null);
           }}
-          autoPrint={false} // Don't auto-print for past invoices
+          autoPrint={false}
         />
       )}
 
@@ -731,6 +616,21 @@ function POSpage() {
             });
             await refreshCart();
           }}
+        />
+      )}
+
+      {/* Prescription Modal - Single instance */}
+      {showPrescriptionModal && prescriptionProduct && (
+        <PrescriptionModal
+          isOpen={showPrescriptionModal}
+          productName={prescriptionProduct.name}
+          productSchedule={prescriptionProduct.schedule_type || 'H'}
+          onClose={() => {
+            // Just close the modal, don't call any function
+            setShowPrescriptionModal(false);
+            prescriptionProduct(null);
+          }}
+          onConfirm={handlePrescriptionSubmit}
         />
       )}
     </div>
@@ -829,11 +729,3 @@ function QuickAddModal({ onClose, onAdd }: { onClose: () => void; onAdd: (item: 
 }
 
 export default POSpage;
-
-function refreshAllCustomerData() {
-  throw new Error("Function not implemented.");
-}
-function refreshCustomers() {
-  throw new Error("Function not implemented.");
-}
-

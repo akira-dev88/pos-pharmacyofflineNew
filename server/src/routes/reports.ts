@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { ReportController } from '../controllers/reportController';
-import { authenticate } from '../middleware/auth';
+import { authenticate, authorize } from '../middleware/auth';
 
 const router = Router();
 
@@ -11,8 +11,6 @@ router.use(authenticate);
 router.get('/dashboard', ReportController.dashboard);
 router.get('/top-products', ReportController.topProducts);
 router.get('/stock', ReportController.stock);
-router.get('/daily-report', ReportController.dailyReport);
-router.get('/gst-report', ReportController.gstReport);
 router.get('/profit', ReportController.profit);
 router.get('/sales-trend', ReportController.salesTrend);
 router.get('/profit-trend', ReportController.profitTrend);
@@ -22,5 +20,7 @@ router.get('/sales-by-payment', ReportController.salesByPayment);
 router.get('/daily-sales', ReportController.dailySales);
 router.get('/product-sales', ReportController.productSales);
 router.get('/customer-purchases', ReportController.customerPurchases);
+router.get('/gst-report', authenticate, authorize('owner', 'manager', 'admin'), ReportController.getGSTReport);
+router.get('/daily-report', authenticate, authorize('owner', 'manager'), ReportController.dailyReport);
 
 export default router;

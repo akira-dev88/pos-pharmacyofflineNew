@@ -91,8 +91,8 @@ function startBackend() {
         NODE_ENV: 'production',
         PORT: '3000',
 
-        APP_TYPE: 'hardware',
-        APP_DB_NAME: 'pos_hardware.db',
+        APP_TYPE: 'pharmacy',
+        APP_DB_NAME: 'pos_pharmacy.db',
 
         USER_DATA_PATH: app.getPath('userData')
       }
@@ -119,7 +119,7 @@ function createWindow() {
     minWidth: 1200,
     minHeight: 700,
     show: false,
-    title: 'POS Hardware',
+    title: 'POS Pharmacy',
     icon: path.join(__dirname, '../assets/icon.ico'),
     webPreferences: {
       nodeIntegration: false,
