@@ -541,7 +541,8 @@
     "autoBackupNote": "⚡ Auto-backup runs daily. Backups are stored at:",
     "onWindows": "on Windows",
     "testPrintSuccess": "Test print sent! Check your printer.",
-    "testPrintError": "Test print failed"
+    "testPrintError": "Test print failed",
+    "editSettings": "edit settings"
   },
   "profile": {
     "title": "Profile",

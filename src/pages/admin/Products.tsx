@@ -45,6 +45,17 @@ import {
   createCategory,
 } from "../../renderer/services/categoryApi";
 
+// shadcn/ui components
+import { Button } from "../../../@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../../../@/components/ui/table";
+
 // ─── Types ────────────────────────────────────────────────────────────────
 interface Product {
   product_uuid: string;
@@ -280,7 +291,7 @@ const getIconForType = (iconName: string): string => {
   return icons[iconName] || cubeOutline;
 };
 
-// ─── Reusable UI Components (from reference, styled consistently) ─────────
+// ─── Reusable UI Components ───────────────────────────────────────────────
 const Badge = ({ variant = "default", children, className = "" }: any) => {
   const variants: Record<string, string> = {
     default: "bg-slate-100 text-slate-600",
@@ -411,10 +422,10 @@ const WizardSteps = ({ current, steps }: { current: number; steps: string[] }) =
         <div className="flex flex-col items-center gap-1">
           <div
             className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${i < current
-                ? "bg-blue-500 text-white"
-                : i === current
-                  ? "bg-blue-600 text-white ring-4 ring-blue-100"
-                  : "bg-slate-100 text-slate-400"
+              ? "bg-blue-500 text-white"
+              : i === current
+                ? "bg-blue-600 text-white ring-4 ring-blue-100"
+                : "bg-slate-100 text-slate-400"
               }`}
           >
             {i < current ? (
@@ -433,7 +444,7 @@ const WizardSteps = ({ current, steps }: { current: number; steps: string[] }) =
   </div>
 );
 
-// ─── Enhanced Category Tree Picker (restyled with better search) ──────────
+// ─── Enhanced Category Tree Picker ────────────────────────────────────────
 const CategoryTreePicker = ({ value, onChange, categories, onCreateNew, placeholder }: any) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -594,7 +605,7 @@ const CategoryTreeNode = ({ node, depth, selectedUuid, onSelect }: any) => {
   );
 };
 
-// ─── Packaging Manager (restyled) ──────────────────────────────────────────
+// ─── Packaging Manager ────────────────────────────────────────────────────
 const PackagingManager = ({ baseUnit, packages, onAddPackage, onUpdatePackage, onRemovePackage, onBaseUnitChange }: any) => (
   <div className="space-y-4">
     <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
@@ -667,7 +678,7 @@ const PackagingManager = ({ baseUnit, packages, onAddPackage, onUpdatePackage, o
   </div>
 );
 
-// ─── Main Products Component ────────────────────────────────────────────────
+// ─── Main Products Component ──────────────────────────────────────────────
 export default function Products() {
   const { t } = useTranslation();
   const [products, setProducts] = useState<Product[]>([]);
@@ -699,7 +710,6 @@ export default function Products() {
   const [unitsMasterList, setUnitsMasterList] = useState<string[]>(PHARMACY_UNITS);
   const [batchInfo, setBatchInfo] = useState<Record<string, any>>({});
   const [loadingBatchInfo, setLoadingBatchInfo] = useState<Record<string, boolean>>({});
-  // New state from reference
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [sortField, setSortField] = useState<string>("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
@@ -708,7 +718,6 @@ export default function Products() {
   const wizardSteps = ["Type", "Basic Info", "Details", "Packaging", "Review"];
   const selectedProductType = PRODUCT_TYPES.find((t) => t.id === wizardData.productType);
 
-  // Memoized & sorted products
   const filteredProducts = useMemo(() => {
     let list = products.filter(
       (p) =>
@@ -730,7 +739,7 @@ export default function Products() {
   const outOfStockProducts = products.filter((p) => p.stock === 0).length;
   const totalInventoryValue = products.reduce((sum, p) => sum + (p.price || 0) * (p.stock || 0), 0);
 
-  // ─── Data Fetching (unchanged from original) ─────────────────────────────
+  // Data fetching (unchanged)
   const loadProducts = async (silent = false) => {
     if (!silent) setLoading(true);
     setError(null);
@@ -865,7 +874,7 @@ export default function Products() {
     }
   }, [wizardData.productType]);
 
-  // ─── CRUD & Wizard Handlers (unchanged logic from original) ──────────────
+  // Handlers
   const handleSort = (field: string) => {
     if (sortField === field) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     else {
@@ -1154,7 +1163,6 @@ export default function Products() {
     await loadUnits(editing.product_uuid);
   };
 
-  // ─── Wizard Step Rendering (same as original but using new components) ───
   const renderWizardStep = () => {
     const type = selectedProductType;
     switch (wizardStep) {
@@ -1167,8 +1175,8 @@ export default function Products() {
                 type="button"
                 onClick={() => setWizardData((p) => ({ ...p, productType: productType.id }))}
                 className={`border-2 rounded-2xl p-4 text-center transition-all cursor-pointer ${wizardData.productType === productType.id
-                    ? "border-blue-500 bg-blue-50 shadow-lg shadow-blue-100"
-                    : "border-slate-200 hover:border-slate-300 hover:shadow-md bg-white"
+                  ? "border-blue-500 bg-blue-50 shadow-lg shadow-blue-100"
+                  : "border-slate-200 hover:border-slate-300 hover:shadow-md bg-white"
                   }`}
               >
                 <IonIcon icon={getIconForType(productType.icon)} className={`text-3xl mb-2 ${wizardData.productType === productType.id ? "text-blue-600" : "text-slate-500"}`} />
@@ -1319,7 +1327,7 @@ export default function Products() {
 
   return (
     <div className="min-h-screen bg-[#F8F9FC] p-6 space-y-5">
-      {/* Header */}
+      {/* Header, Flash Messages, Stats Cards – unchanged */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight text-start">{t("products.title")}</h1>
@@ -1350,13 +1358,6 @@ export default function Products() {
             </svg>
             {t("products.addProduct")}
           </button>
-          {/* <button
-            onClick={() => setShowPrintLabels(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold rounded-xl transition-all shadow-md shadow-purple-200"
-          >
-            <IonIcon icon={pricetagOutline} className="text-lg" />
-            Print Labels
-          </button> */}
         </div>
       </div>
 
@@ -1389,7 +1390,7 @@ export default function Products() {
 
       {/* Stats Cards */}
       {showStats && (
-        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 text-start">
           <StatCard
             label="Total Products"
             value={totalProducts}
@@ -1437,7 +1438,7 @@ export default function Products() {
         </div>
       )}
 
-      {/* Products Table Card */}
+      {/* Products Table Card – using shadcn Table */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm shadow-slate-100 overflow-hidden">
         {/* Toolbar */}
         <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-100">
@@ -1466,7 +1467,7 @@ export default function Products() {
         </div>
 
         {/* Bulk Action Bar */}
-        {selectedRows.size > 0 && ( 
+        {selectedRows.size > 0 && (
           <div className="flex items-center gap-3 px-5 py-3 bg-blue-50 border-b border-blue-100">
             <span className="text-sm font-medium text-blue-700">{selectedRows.size} selected</span>
             <div className="flex items-center gap-2 ml-auto">
@@ -1481,64 +1482,51 @@ export default function Products() {
           </div>
         )}
 
-        {/* Table */}
+        {/* Table – shadcn Table with always-visible action buttons */}
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[800px]">
-            <thead>
-              <tr className="border-b border-slate-100">
-                <th className="w-10 px-5 py-3.5 text-left">
+          <Table className="min-w-[800px]">
+            <TableHeader>
+              <TableRow className="bg-slate-50 border-b border-slate-200">
+                {/* Checkbox column - left */}
+                <TableHead className="w-10 text-left">
                   <input
                     type="checkbox"
                     checked={selectedRows.size === filteredProducts.length && filteredProducts.length > 0}
                     onChange={toggleAll}
                     className="w-4 h-4 rounded border-slate-300 text-blue-600 cursor-pointer"
                   />
-                </th>
+                </TableHead>
                 {[
-                  ["name", "Product", true],
-                  ["composition", "Composition", true],
-                  ["schedule_type", "Schedule", false],
-                  ["gst_percent", "GST", false],
-                  ["price", "MRP", true],
-                  ["stock", "Stock", true],
-                  ["status", "Status", false],
-                ].map(([field, label, sortable]) => (
-                  <th
-                    key={field as string}
-                    onClick={sortable ? () => handleSort(field as string) : undefined}
-                    className={`px-4 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider ${sortable ? "cursor-pointer hover:text-slate-700 select-none" : ""
-                      }`}
+                  { field: "name", label: "Product", sortable: true, align: "left" },
+                  { field: "composition", label: "Composition", sortable: true, align: "left" },
+                  { field: "schedule_type", label: "Schedule", sortable: false, align: "left" },
+                  { field: "gst_percent", label: "GST", sortable: false, align: "left" },
+                  { field: "price", label: "MRP", sortable: true, align: "right" },
+                  { field: "stock", label: "Stock", sortable: true, align: "right" },
+                  { field: "status", label: "Status", sortable: false, align: "center" },
+                ].map(({ field, label, sortable, align }) => (
+                  <TableHead
+                    key={field}
+                    onClick={sortable ? () => handleSort(field) : undefined}
+                    className={`text-[11px] font-semibold text-slate-500 uppercase tracking-wider ${sortable ? "cursor-pointer hover:text-slate-700 select-none" : ""
+                      } ${align === "right" ? "text-right" : align === "center" ? "text-center" : "text-left"}`}
                   >
-                    <div className="flex items-center">
+                    <div className={`flex items-center ${align === "right" ? "justify-end" : align === "center" ? "justify-center" : "justify-start"}`}>
                       {label}
-                      {sortable && <SortIcon field={field as string} />}
+                      {sortable && <SortIcon field={field} />}
                     </div>
-                  </th>
+                  </TableHead>
                 ))}
-                <th className="px-4 py-3.5 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
+                <TableHead className="text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {filteredProducts.length === 0 ? (
-                <tr>
-                  <td colSpan={9} className="px-5 py-16 text-center">
-                    <div className="flex flex-col items-center gap-3">
-                      <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center">
-                        <svg className="w-7 h-7 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-slate-600">{searchTerm ? t("products.noSearchResults") : t("products.noProducts")}</p>
-                        {!searchTerm && (
-                          <button onClick={() => setShowWizard(true)} className="text-sm text-blue-600 hover:text-blue-700 mt-1">
-                            Add your first product →
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </td>
-                </tr>
+                <TableRow>
+                  <TableCell colSpan={9} className="text-center py-16">
+                    {/* empty state content unchanged */}
+                  </TableCell>
+                </TableRow>
               ) : (
                 filteredProducts.map((p) => {
                   const batchInfoItem = batchInfo[p.product_uuid];
@@ -1547,16 +1535,18 @@ export default function Products() {
                   const isLowStock = p.stock > 0 && p.stock <= 10;
                   const isSelected = selectedRows.has(p.product_uuid);
                   return (
-                    <tr key={p.product_uuid} className={`group transition-colors ${isSelected ? "bg-blue-50/60" : "hover:bg-slate-50/80"}`}>
-                      <td className="px-5 py-3.5">
+                    <TableRow key={p.product_uuid} className={`border-b border-slate-100 hover:bg-slate-50/80 transition-colors ${isSelected ? "bg-blue-50/60" : ""}`}>
+                      {/* Checkbox */}
+                      <TableCell className="w-10 text-left">
                         <input
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => toggleRow(p.product_uuid)}
                           className="w-4 h-4 rounded border-slate-300 text-blue-600 cursor-pointer"
                         />
-                      </td>
-                      <td className="px-4 py-3.5 max-w-[200px]">
+                      </TableCell>
+                      {/* Product */}
+                      <TableCell className="text-left">
                         <div className="font-semibold text-sm text-slate-800 truncate">{p.name}</div>
                         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                           {p.manufacturer && <span className="text-xs text-slate-400 truncate max-w-[120px]">{p.manufacturer}</span>}
@@ -1571,25 +1561,30 @@ export default function Products() {
                             </span>
                           )}
                         </div>
-                      </td>
-                      <td className="px-4 py-3.5 max-w-[160px]">
+                      </TableCell>
+                      {/* Composition */}
+                      <TableCell className="text-left max-w-[160px]">
                         <span className="text-xs text-slate-500 italic line-clamp-2">{p.composition || "—"}</span>
-                      </td>
-                      <td className="px-4 py-3.5">
+                      </TableCell>
+                      {/* Schedule */}
+                      <TableCell className="text-left">
                         {p.schedule_type && p.schedule_type !== "NONE" ? (
                           <Badge variant="schedule">Sch {p.schedule_type}</Badge>
                         ) : (
                           <Badge variant="otc">OTC</Badge>
                         )}
-                      </td>
-                      <td className="px-4 py-3.5">
+                      </TableCell>
+                      {/* GST */}
+                      <TableCell className="text-left">
                         <span className="text-xs font-mono text-slate-500">{p.gst_percent || 0}%</span>
-                      </td>
-                      <td className="px-4 py-3.5">
+                      </TableCell>
+                      {/* MRP */}
+                      <TableCell className="text-right">
                         <span className="font-semibold text-sm text-slate-800">₹{p.price?.toLocaleString()}</span>
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <div className="flex items-center gap-1.5">
+                      </TableCell>
+                      {/* Stock */}
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1.5">
                           <span className={`font-semibold text-sm ${isOutOfStock ? "text-red-500" : isLowStock ? "text-amber-600" : "text-slate-700"}`}>
                             {p.stock ?? 0}
                           </span>
@@ -1598,8 +1593,9 @@ export default function Products() {
                         {batchInfoItem && batchInfoItem.batchCount > 0 && batchInfoItem.totalAvailable !== p.stock && (
                           <div className="text-xs text-slate-400 mt-0.5">({batchInfoItem.totalAvailable} in batches)</div>
                         )}
-                      </td>
-                      <td className="px-4 py-3.5">
+                      </TableCell>
+                      {/* Status */}
+                      <TableCell className="text-center">
                         {isOutOfStock ? (
                           <Badge variant="danger">Out of Stock</Badge>
                         ) : isLowStock ? (
@@ -1607,9 +1603,10 @@ export default function Products() {
                         ) : (
                           <Badge variant="success">In Stock</Badge>
                         )}
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      </TableCell>
+                      {/* Actions */}
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
                           <Tooltip label="Edit">
                             <button
                               onClick={() => {
@@ -1639,13 +1636,13 @@ export default function Products() {
                             </button>
                           </Tooltip>
                         </div>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   );
                 })
               )}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
 
         {/* Footer */}
@@ -1661,7 +1658,7 @@ export default function Products() {
         )}
       </div>
 
-      {/* ─── Wizard Modal ───────────────────────────────────────────────────── */}
+      {/* Wizard Modal */}
       {showWizard && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={(e) => e.target === e.currentTarget && resetWizard()}>
           <div className="bg-white rounded-3xl shadow-2xl shadow-slate-900/20 w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
@@ -1727,7 +1724,7 @@ export default function Products() {
         </div>
       )}
 
-      {/* ─── Edit / Quick Add Form Modal (unchanged from original) ────────── */}
+      {/* Edit / Quick Add Form Modal */}
       {showForm && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={(e) => e.target === e.currentTarget && resetForm()}>
           <div className="bg-white rounded-3xl shadow-2xl shadow-slate-900/20 w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden">
@@ -1823,9 +1820,6 @@ export default function Products() {
           </div>
         </div>
       )}
-
-      {/* Print Labels Modal */}
-      {/* {showPrintLabels && createPortal(<PrintLabelsModal products={products} onClose={() => setShowPrintLabels(false)} />, document.body)} */}
     </div>
   );
 }

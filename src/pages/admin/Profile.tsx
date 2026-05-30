@@ -17,6 +17,12 @@ import {
   diamondOutline,
 } from "ionicons/icons";
 
+// shadcn/ui components
+import { Card, CardContent, CardHeader, CardTitle } from "../../../@/components/ui/card";
+import { Badge } from "../../../@/components/ui/badge";
+import { Button } from "../../../@/components/ui/button";
+import { Progress } from "../../../@/components/ui/progress";
+
 export default function Profile() {
   const { t } = useTranslation();
   const { user: authUser } = useAuth();
@@ -36,22 +42,17 @@ export default function Profile() {
       const response = await getProfile();
       const userData = response.data.user;
       const tenantData = response.data.tenant;
-
-      console.log("User data:", userData);
-      console.log("Tenant data:", tenantData);
-
       setUser(userData);
       setTenant(tenantData);
     } catch (err) {
       console.error("Profile load error:", err);
-
       if (authUser) {
         setUser(authUser as UserProfile);
         setTenant({
           shop_name: "My Shop",
           invoice_prefix: "INV",
           is_active: true,
-          expiry_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
+          expiry_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
         });
       } else {
         setError(t('profile.loadError'));
@@ -63,30 +64,24 @@ export default function Profile() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
-          <p className="text-gray-500">{t('profile.loading')}</p>
-        </div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-center">
-          <div className="bg-red-50 border border-red-200 rounded-xl p-6 max-w-md">
-            <IonIcon icon={warningOutline} className="text-5xl text-red-500 mx-auto mb-3" />
-            <p className="text-red-700">{error}</p>
-            <button
-              onClick={loadProfile}
-              className="mt-4 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition"
-            >
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-6">
+        <Card className="max-w-md w-full border-rose-200 shadow-xl">
+          <CardContent className="p-6 text-center">
+            <IonIcon icon={warningOutline} className="text-5xl text-rose-500 mx-auto mb-3" />
+            <p className="text-rose-700">{error}</p>
+            <Button onClick={loadProfile} className="mt-4 bg-indigo-600 hover:bg-indigo-700">
               {t('profile.tryAgain')}
-            </button>
-          </div>
-        </div>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -95,169 +90,155 @@ export default function Profile() {
 
   const isExpiringSoon = tenant?.expiry_date &&
     new Date(tenant.expiry_date) < new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
+  const daysRemaining = tenant?.expiry_date
+    ? Math.max(0, Math.ceil((new Date(tenant.expiry_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))
+    : 365;
+  const expiryProgress = tenant?.expiry_date
+    ? Math.min(100, (daysRemaining / 365) * 100)
+    : 100;
 
-  const getDaysRemaining = () => {
-    if (!tenant?.expiry_date) return 365;
-    const today = new Date();
-    const expiry = new Date(tenant.expiry_date);
-    const diffTime = expiry.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays > 0 ? diffDays : 0;
+  // Role badge styling
+  const getRoleBadge = (role: string) => {
+    const styles = {
+      owner: "bg-amber-100 text-amber-800 border-amber-200",
+      manager: "bg-sky-100 text-sky-800 border-sky-200",
+      cashier: "bg-emerald-100 text-emerald-800 border-emerald-200",
+    };
+    const roleKey = role === "owner" ? "owner" : role === "manager" ? "manager" : "cashier";
+    return (
+      <Badge variant="secondary" className={`${styles[roleKey]} font-medium px-3 py-1`}>
+        {t(`profile.roles.${roleKey}`)}
+      </Badge>
+    );
   };
 
-  const daysRemaining = getDaysRemaining();
-
   return (
-    <div className="space-y-3">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div className="font-inter text-start">
-          <h1 className="text-3xl font-bold text-white font-inter">{t('profile.title')}</h1>
-          <p className="text-gray-500 text-sm font-inter">
-            {t('profile.subtitle')}
-          </p>
-        </div>
-        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl px-4 py-2 text-white">
-          <div className="flex items-center gap-2">
-            <IonIcon icon={personOutline} className="text-xl" />
-            <span className="font-semibold capitalize">{t(`profile.roles.${user?.role || "user"}`)}</span>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 p-6">
+      <div className="max-w-6xl mx-auto space-y-6">
+        {/* Header – simple and elegant */}
+        <div className="flex justify-between items-center flex-wrap gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-800 tracking-tight">{t('profile.title')}</h1>
+            <p className="text-slate-500 text-sm mt-1">{t('profile.subtitle')}</p>
           </div>
+          <Button onClick={loadProfile} variant="outline" className="gap-2">
+            <IonIcon icon={timeOutline} className="text-lg" />
+            Refresh
+          </Button>
         </div>
-      </div>
 
-      {/* Profile Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* User Info Card */}
-        <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-          <div className="bg-gradient-to-r from-green-600 to-green-700 px-6 py-4">
-            <div className="flex items-center gap-2">
-              <IonIcon icon={personOutline} className="text-white text-xl" />
-              <h2 className="text-white font-semibold text-lg">{t('profile.userInformation')}</h2>
-            </div>
-          </div>
-          <div className="p-6">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center text-white text-3xl font-bold">
-                {user?.name?.charAt(0).toUpperCase() || "U"}
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-gray-800">{user?.name || t('profile.user')}</h3>
-                <p className="text-gray-500 text-sm capitalize">{t(`profile.roles.${user?.role || "user"}`)}</p>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                <IonIcon icon={personOutline} className="text-green-500 text-lg" />
-                <div className="flex-1">
-                  <p className="text-xs text-gray-500">{t('profile.fullName')}</p>
-                  <p className="text-sm font-medium text-gray-800">{user?.name || "N/A"}</p>
+        {/* Two‑column layout with distinct styling */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* User Profile Card – modern, with large avatar */}
+          <Card className="border-0 shadow-xl overflow-hidden bg-white">
+            <div className="h-28 bg-gradient-to-r from-indigo-500 to-indigo-600" />
+            <CardContent className="relative pt-0 pb-6 px-6">
+              <div className="flex flex-col items-center -mt-14">
+                <div className="w-28 h-28 rounded-full border-4 border-white bg-gradient-to-br from-indigo-400 to-indigo-600 flex items-center justify-center text-white text-4xl font-bold shadow-lg">
+                  {user?.name?.charAt(0).toUpperCase() || "U"}
                 </div>
+                <h2 className="text-2xl font-bold text-slate-800 mt-4">{user?.name}</h2>
+                <div className="mt-2">{getRoleBadge(user?.role || "cashier")}</div>
               </div>
 
-              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                <IonIcon icon={mailOutline} className="text-green-500 text-lg" />
-                <div className="flex-1">
-                  <p className="text-xs text-gray-500">{t('profile.emailAddress')}</p>
-                  <p className="text-sm font-medium text-gray-800">{user?.email || "N/A"}</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                <IonIcon icon={keyOutline} className="text-green-500 text-lg" />
-                <div className="flex-1">
-                  <p className="text-xs text-gray-500">{t('profile.roleLabel')}</p>
-                  <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full ${
-                    user?.role === "owner"
-                      ? "bg-purple-100 text-purple-700"
-                      : user?.role === "manager"
-                        ? "bg-blue-100 text-blue-700"
-                        : "bg-green-100 text-green-700"
-                    }`}>
-                    {t(`profile.roles.${user?.role || "user"}`)}
-                  </span>
-                </div>
-              </div>
-
-              {user?.user_uuid && (
-                <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                  <div className="flex-1">
-                    <p className="text-xs text-gray-500">{t('profile.userId')}</p>
-                    <p className="text-xs font-mono text-gray-600">{user.user_uuid}</p>
+              <div className="mt-6 space-y-4">
+                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
+                  <IonIcon icon={mailOutline} className="text-indigo-500 text-xl shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-slate-500 uppercase tracking-wide">Email</p>
+                    <p className="text-sm font-medium text-slate-800 truncate">{user?.email || "N/A"}</p>
                   </div>
                 </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Shop/Subscription Card */}
-        <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-          <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-6 py-4">
-            <div className="flex items-center gap-2">
-              <IonIcon icon={businessOutline} className="text-white text-xl" />
-              <h2 className="text-white font-semibold text-lg">{t('profile.shopInformation')}</h2>
-            </div>
-          </div>
-          <div className="p-6">
-            <div className="space-y-3">
-              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                <IonIcon icon={businessOutline} className="text-purple-500 text-lg" />
-                <div className="flex-1">
-                  <p className="text-xs text-gray-500">{t('profile.shopName')}</p>
-                  <p className="text-sm font-medium text-gray-800">{tenant?.shop_name || "N/A"}</p>
+                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
+                  <IonIcon icon={keyOutline} className="text-indigo-500 text-xl shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-slate-500 uppercase tracking-wide">Role</p>
+                    <div>{getRoleBadge(user?.role || "cashier")}</div>
+                  </div>
                 </div>
+                {user?.user_uuid && (
+                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-slate-500 uppercase tracking-wide">User ID</p>
+                      <p className="text-xs font-mono text-slate-600 break-all">{user.user_uuid}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Shop & Subscription Card – with progress bar */}
+          <Card className="border-0 shadow-xl overflow-hidden bg-white">
+            <div className="h-28 bg-gradient-to-r from-rose-500 to-rose-600" />
+            <CardContent className="pt-6 px-6 pb-6">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-2 bg-rose-100 rounded-xl">
+                  <IonIcon icon={businessOutline} className="text-rose-600 text-2xl" />
+                </div>
+                <h2 className="text-xl font-bold text-slate-800">Shop Details</h2>
               </div>
 
-              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                <IonIcon icon={cardOutline} className="text-purple-500 text-lg" />
-                <div className="flex-1">
-                  <p className="text-xs text-gray-500">{t('profile.invoicePrefix')}</p>
-                  <p className="text-sm font-medium text-gray-800">{tenant?.invoice_prefix || "INV"}</p>
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
+                  <IonIcon icon={businessOutline} className="text-rose-500 text-xl shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-slate-500 uppercase tracking-wide">Shop Name</p>
+                    <p className="text-sm font-medium text-slate-800">{tenant?.shop_name || "N/A"}</p>
+                  </div>
                 </div>
-              </div>
-
-              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                <IonIcon icon={checkmarkCircleOutline} className="text-purple-500 text-lg" />
-                <div className="flex-1">
-                  <p className="text-xs text-gray-500">{t('profile.status')}</p>
-                  <span className={`inline-flex items-center gap-1 text-sm font-medium ${
-                    tenant?.is_active ? "text-green-600" : "text-red-600"
-                  }`}>
-                    <IonIcon icon={tenant?.is_active ? checkmarkCircleOutline : closeOutline} className="text-sm" />
-                    {tenant?.is_active ? t('profile.active') : t('profile.inactive')}
-                  </span>
+                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
+                  <IonIcon icon={cardOutline} className="text-rose-500 text-xl shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-slate-500 uppercase tracking-wide">Invoice Prefix</p>
+                    <p className="text-sm font-medium text-slate-800">{tenant?.invoice_prefix || "INV"}</p>
+                  </div>
                 </div>
-              </div>
+                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
+                  <IonIcon icon={checkmarkCircleOutline} className="text-rose-500 text-xl shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-slate-500 uppercase tracking-wide">Status</p>
+                    <Badge
+                      variant="secondary"
+                      className={`${tenant?.is_active ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}
+                    >
+                      <IonIcon icon={tenant?.is_active ? checkmarkCircleOutline : closeOutline} className="text-xs mr-1" />
+                      {tenant?.is_active ? t('profile.active') : t('profile.inactive')}
+                    </Badge>
+                  </div>
+                </div>
 
-              {tenant?.expiry_date && (
-                <div className={`flex items-center gap-3 p-3 rounded-lg ${
-                  isExpiringSoon && tenant?.is_active ? "bg-orange-50" : "bg-green-50"
-                }`}>
-                  <IonIcon icon={calendarOutline} className={`text-lg ${
-                    isExpiringSoon && tenant?.is_active ? "text-orange-500" : "text-green-500"
-                  }`} />
-                  <div className="flex-1">
-                    <p className="text-xs text-gray-500">{t('profile.subscriptionExpiry')}</p>
-                    <p className={`text-sm font-bold ${
-                      isExpiringSoon && tenant?.is_active ? "text-orange-600" : "text-green-600"
-                    }`}>
+                {/* Subscription expiry with progress bar */}
+                {tenant?.expiry_date && (
+                  <div className="p-4 rounded-xl bg-gradient-to-r from-slate-50 to-slate-100">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <IonIcon icon={calendarOutline} className={`text-lg ${isExpiringSoon ? "text-amber-500" : "text-emerald-500"}`} />
+                        <span className="text-sm font-semibold text-slate-700">Subscription Expiry</span>
+                      </div>
+                      <span className={`text-sm font-bold ${isExpiringSoon ? "text-amber-600" : "text-emerald-600"}`}>
+                        {daysRemaining} days left
+                      </span>
+                    </div>
+                    <Progress value={expiryProgress} className="h-2" />
+                    <p className="text-xs text-slate-500 mt-2">
                       {new Date(tenant.expiry_date).toLocaleDateString('en-IN', {
                         day: 'numeric',
                         month: 'long',
-                        year: 'numeric'
+                        year: 'numeric',
                       })}
                     </p>
-                    {tenant.is_active && (
-                      <p className="text-xs mt-1">
-                        {t('profile.daysRemaining', { days: daysRemaining })}
+                    {isExpiringSoon && (
+                      <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
+                        <IonIcon icon={warningOutline} className="text-xs" />
+                        Renewal recommended soon
                       </p>
                     )}
                   </div>
-                </div>
-              )}
-            </div>
-          </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>

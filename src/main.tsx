@@ -6,13 +6,16 @@ import App from "./App";
 import { AuthProvider } from "./context/AuthContext";
 import LicenseGate from './components/LicenseGate';
 import './i18n';
+import { ThemeProvider } from "next-themes";   // 👈 import
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <BrowserRouter>
-    <LicenseGate>
-      <AuthProvider>
-        <App />
-      </AuthProvider>
-    </LicenseGate>
+    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+      <LicenseGate>
+        <AuthProvider>
+          <App />
+        </AuthProvider>
+      </LicenseGate>
+    </ThemeProvider>
   </BrowserRouter>
 );

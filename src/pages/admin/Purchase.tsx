@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { format } from "date-fns";
+import { CalendarIcon } from "lucide-react";
 import { createPurchase } from "../../renderer/services/purchaseApi";
 import { getProducts, getProductUnits, getLowStockProducts } from "../../renderer/services/productApi";
 import { getSuppliers } from "../../renderer/services/supplierApi";
@@ -14,137 +19,141 @@ import {
   warningOutline,
   documentTextOutline,
   timeOutline,
-  calendarOutline,
   businessOutline,
   barcodeOutline,
 } from "ionicons/icons";
 
-// ─── UI Components (same as before) ───────────────────────────────────────
-const Spinner = ({ size = "sm" }: { size?: "sm" | "lg" }) => (
-  <div className={`animate-spin rounded-full border-2 border-slate-200 border-t-blue-500 ${size === "sm" ? "w-4 h-4" : "w-8 h-8"}`} />
-);
-
-const StatCard = ({ label, value, delta, gradient, icon }: any) => (
-  <div className={`relative overflow-hidden rounded-2xl p-5 ${gradient} group cursor-default`}>
-    <div className="flex items-start justify-between">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wider opacity-70 mb-1">{label}</p>
-        <p className="text-3xl font-bold mt-0.5">{value}</p>
-        {delta && <p className="text-xs mt-1.5 opacity-80">{delta}</p>}
-      </div>
-      <div className="p-2.5 rounded-xl bg-white/15 backdrop-blur-sm">{icon}</div>
-    </div>
-    <div className="absolute -bottom-4 -right-4 w-24 h-24 rounded-full bg-white/5 group-hover:bg-white/10 transition-colors" />
-  </div>
-);
-
-const Input = ({ label, required, icon, ...props }: any) => (
-  <div>
-    {label && (
-      <label className="block text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wide">
-        {label}{required && <span className="text-red-400 ml-0.5">*</span>}
-      </label>
-    )}
-    <div className="relative">
-      {icon && (
-        <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
-          <IonIcon icon={icon} className="text-base" />
-        </div>
-      )}
-      <input
-        {...props}
-        className={`w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all hover:border-slate-300 ${icon ? "pl-9" : ""} ${props.className || ""}`}
-      />
-    </div>
-  </div>
-);
-
-const Select = ({ label, options, value, onChange, placeholder, disabled, icon }: any) => (
-  <div>
-    {label && (
-      <label className="block text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wide">{label}</label>
-    )}
-    <div className="relative">
-      {icon && (
-        <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
-          <IonIcon icon={icon} className="text-base" />
-        </div>
-      )}
-      <select
-        className={`w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all hover:border-slate-300 disabled:bg-slate-50 disabled:text-slate-400 appearance-none ${icon ? "pl-9" : ""}`}
-        value={value}
-        onChange={onChange}
-        disabled={disabled}
-      >
-        <option value="">{placeholder}</option>
-        {options.map((opt: any) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
-      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-400">
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
-      </div>
-    </div>
-  </div>
-);
+// shadcn/ui components
+import { Button } from "../../../@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "../../../@/components/ui/card";
+import { Input } from "../../../@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../../@/components/ui/select";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "../../../@/components/ui/form";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "../../../@/components/ui/popover";
+import { Calendar } from "../../../@/components/ui/calendar";
 
 // ─── Types ────────────────────────────────────────────────────────────────
-interface Item {
+interface ProductUnit {
+  unit_uuid: string;
+  unit_name: string;
+  is_base_unit: boolean;
+  conversion_factor: number;
+}
+
+interface ItemFormValues {
   product_uuid: string;
-  product_name: string;
   unit_uuid: string;
   batch_number: string;
-  expiry_date: string;
-  manufacture_date: string;
+  expiry_date: Date;
   quantity: number;
-  free_quantity: number;
   mrp: number;
-  ptr: number;
   cost_price: number;
-  gst_percent: number;
-  available_units: any[];
 }
+
+// Zod validation schema
+const itemSchema = z.object({
+  product_uuid: z.string().min(1, "Product is required"),
+  unit_uuid: z.string().min(1, "Unit is required"),
+  batch_number: z.string().min(1, "Batch number is required"),
+  expiry_date: z.date().refine(val => val !== undefined, "Expiry date is required"),
+  quantity: z.number().min(1, "Quantity must be at least 1"),
+  mrp: z.number().min(0.01, "MRP must be greater than 0"),
+  cost_price: z.number().min(0.01, "Cost price must be greater than 0"),
+});
+
+// Reusable calendar classNames for premium dark theme
+const calendarClassNames = {
+  months: "space-y-4",
+  month: "space-y-4",
+  month_caption: "flex items-center justify-center gap-4 pt-1",
+  nav: "absolute inset-x-0 top-1 flex items-center justify-between px-1",
+  button_previous: "h-8 w-8 rounded-md text-zinc-400 hover:bg-white/10 hover:text-white transition flex items-center justify-center",
+  button_next: "h-8 w-8 rounded-md text-zinc-400 hover:bg-white/10 hover:text-white transition flex items-center justify-center",
+  caption_label: "text-sm font-semibold text-white",
+  month_grid: "w-full border-collapse",
+  weekdays: "flex",
+  weekday: "text-zinc-500 rounded-md w-9 font-normal text-[0.8rem]",
+  week: "flex w-full mt-2",
+  day: "h-9 w-9 p-0 font-normal text-zinc-200 rounded-md transition-colors hover:bg-white/10 hover:text-white aria-selected:opacity-100",
+  selected: "bg-green-500 text-black font-semibold",
+  today: "border border-white/20 bg-white/10 text-white",
+  outside: "text-zinc-700 opacity-50",
+  disabled: "text-zinc-700 opacity-30",
+};
 
 export default function PurchasePage() {
   const { t } = useTranslation();
   const [products, setProducts] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [lowStockProducts, setLowStockProducts] = useState<any[]>([]);
-  const [unitsCache, setUnitsCache] = useState<Record<string, any[]>>({});
+  const [unitsCache, setUnitsCache] = useState<Record<string, ProductUnit[]>>({});
+  const [availableUnits, setAvailableUnits] = useState<ProductUnit[]>([]);
 
   const [supplierId, setSupplierId] = useState<string>("");
   const [invoiceNumber, setInvoiceNumber] = useState("");
-  const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
-
-  // Single item state (instead of array)
-  const [currentItem, setCurrentItem] = useState<Item>({
-    product_uuid: "",
-    product_name: "",
-    unit_uuid: "",
-    batch_number: "",
-    expiry_date: "",
-    manufacture_date: new Date().toISOString().split('T')[0],
-    quantity: 1,
-    free_quantity: 0,
-    mrp: 0,
-    ptr: 0,
-    cost_price: 0,
-    gst_percent: 0,
-    available_units: [],
-  });
+  const [invoiceDate, setInvoiceDate] = useState<Date>(new Date());
 
   const [modalOpen, setModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  // Form setup
+  const form = useForm<ItemFormValues>({
+    resolver: zodResolver(itemSchema),
+    defaultValues: {
+      product_uuid: "",
+      unit_uuid: "",
+      batch_number: "",
+      expiry_date: undefined,
+      quantity: 1,
+      mrp: 0,
+      cost_price: 0,
+    },
+  });
+
+  const watchProduct = form.watch("product_uuid");
+  const watchQuantity = form.watch("quantity");
+  const watchCostPrice = form.watch("cost_price");
+  const subtotal = (watchQuantity || 0) * (watchCostPrice || 0);
+
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (watchProduct) {
+      loadProductUnits(watchProduct).then((units) => {
+        setAvailableUnits(units);
+        const baseUnit = units.find((u) => u.is_base_unit);
+        if (baseUnit) {
+          form.setValue("unit_uuid", baseUnit.unit_uuid);
+        } else if (units.length > 0) {
+          form.setValue("unit_uuid", units[0].unit_uuid);
+        }
+      });
+    } else {
+      setAvailableUnits([]);
+      form.setValue("unit_uuid", "");
+    }
+  }, [watchProduct]);
 
   const loadData = async () => {
     try {
@@ -159,7 +168,7 @@ export default function PurchasePage() {
     }
   };
 
-  const loadProductUnits = async (product_uuid: string) => {
+  const loadProductUnits = async (product_uuid: string): Promise<ProductUnit[]> => {
     if (unitsCache[product_uuid]) return unitsCache[product_uuid];
     try {
       const units = await getProductUnits(product_uuid);
@@ -171,96 +180,40 @@ export default function PurchasePage() {
     }
   };
 
-  const handleProductChange = async (product_uuid: string) => {
+  const handleProductSelect = (product_uuid: string) => {
     const product = products.find(p => p.product_uuid === product_uuid);
-    if (!product) return;
-
-    const units = await loadProductUnits(product_uuid);
-    const baseUnit = units.find((u: any) => u.is_base_unit);
-
-    setCurrentItem(prev => ({
-      ...prev,
-      product_uuid,
-      product_name: product.name || "",
-      unit_uuid: baseUnit?.unit_uuid || "",
-      available_units: units,
-      mrp: product.price || 0,
-      cost_price: product.purchase_price || 0,
-      gst_percent: product.gst_percent || 0,
-    }));
+    if (product) {
+      form.setValue("product_uuid", product_uuid);
+      form.setValue("mrp", product.price || 0);
+      form.setValue("cost_price", product.purchase_price || 0);
+    }
   };
 
-  const updateItemField = (field: keyof Item, value: any) => {
-    setCurrentItem(prev => ({ ...prev, [field]: value }));
-  };
-
-  const calculateSubtotal = () => {
-    const qty = Number(currentItem.quantity) || 0;
-    const price = Number(currentItem.cost_price) || 0;
-    return qty * price;
-  };
-
-  // Dashboard stats
-  const totalProducts = products.length;
-  const outOfStockCount = products.filter(p => p.stock === 0).length;
-  const lowStockCount = lowStockProducts.length;
-  const totalStock = products.reduce((sum, p) => sum + (p.stock || 0), 0);
-
-  const handleSubmit = async () => {
-    // Validate fields
-    if (!currentItem.product_uuid) {
-      setError("Please select a product");
-      return;
-    }
-    if (!currentItem.batch_number?.trim()) {
-      setError("Please enter a batch number");
-      return;
-    }
-    if (!currentItem.expiry_date) {
-      setError("Please select expiry date");
-      return;
-    }
-    if (!currentItem.unit_uuid) {
-      setError("Please select a unit");
-      return;
-    }
-    if (currentItem.quantity <= 0) {
-      setError("Quantity must be greater than 0");
-      return;
-    }
-    if (currentItem.mrp <= 0) {
-      setError("MRP must be greater than 0");
-      return;
-    }
-    if (currentItem.cost_price <= 0) {
-      setError("Cost price must be greater than 0");
-      return;
-    }
-
+  const onSubmit = async (data: ItemFormValues) => {
     setError(null);
     setLoading(true);
 
     const payload = {
       supplier_uuid: supplierId || null,
       invoice_number: invoiceNumber.trim() || `INV-${Date.now()}`,
-      invoice_date: invoiceDate,
+      invoice_date: format(invoiceDate, "yyyy-MM-dd"),
       payment_status: "PENDING",
       items: [
         {
-          product_uuid: currentItem.product_uuid,
-          unit_uuid: currentItem.unit_uuid,
-          batch_number: currentItem.batch_number.trim(),
-          expiry_date: currentItem.expiry_date,
-          manufacture_date: currentItem.manufacture_date || new Date().toISOString().split('T')[0],
-          quantity: Number(currentItem.quantity),
-          free_quantity: Number(currentItem.free_quantity) || 0,
-          mrp: Number(currentItem.mrp),
-          ptr: Number(currentItem.ptr) || Number(currentItem.cost_price) * 1.1,
-          rate: Number(currentItem.cost_price),
-          cost_price: Number(currentItem.cost_price),
-          purchase_price: Number(currentItem.cost_price),
-          selling_price: Number(currentItem.mrp),
-          gst_percent: Number(currentItem.gst_percent) || 0,
+          product_uuid: data.product_uuid,
+          unit_uuid: data.unit_uuid,
+          batch_number: data.batch_number.trim(),
+          expiry_date: format(data.expiry_date, "yyyy-MM-dd"),
+          manufacture_date: format(new Date(), "yyyy-MM-dd"),
+          quantity: data.quantity,
+          free_quantity: 0,
+          mrp: data.mrp,
+          ptr: data.cost_price * 1.1,
+          rate: data.cost_price,
+          cost_price: data.cost_price,
+          purchase_price: data.cost_price,
+          selling_price: data.mrp,
+          gst_percent: products.find(p => p.product_uuid === data.product_uuid)?.gst_percent || 0,
         },
       ],
     };
@@ -270,26 +223,11 @@ export default function PurchasePage() {
       console.log("✅ Purchase result:", result);
       setSuccess("Purchase completed successfully! Stock has been added.");
 
-      // Reset form
       setModalOpen(false);
       setSupplierId("");
       setInvoiceNumber("");
-      setInvoiceDate(new Date().toISOString().split('T')[0]);
-      setCurrentItem({
-        product_uuid: "",
-        product_name: "",
-        unit_uuid: "",
-        batch_number: "",
-        expiry_date: "",
-        manufacture_date: new Date().toISOString().split('T')[0],
-        quantity: 1,
-        free_quantity: 0,
-        mrp: 0,
-        ptr: 0,
-        cost_price: 0,
-        gst_percent: 0,
-        available_units: [],
-      });
+      setInvoiceDate(new Date());
+      form.reset();
       await loadData();
 
       setTimeout(() => setSuccess(null), 3000);
@@ -300,6 +238,30 @@ export default function PurchasePage() {
       setLoading(false);
     }
   };
+
+  // Dashboard stats
+  const totalProducts = products.length;
+  const outOfStockCount = products.filter(p => p.stock === 0).length;
+  const lowStockCount = lowStockProducts.length;
+  const totalStock = products.reduce((sum, p) => sum + (p.stock || 0), 0);
+
+  const StatCard = ({ label, value, delta, gradient, icon }: any) => (
+    <div className={`relative overflow-hidden rounded-2xl p-5 ${gradient} group cursor-default text-white`}>
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider opacity-80 mb-1">{label}</p>
+          <p className="text-3xl font-bold mt-0.5">{value}</p>
+          {delta && <p className="text-xs mt-1.5 opacity-80">{delta}</p>}
+        </div>
+        <div className="p-2.5 rounded-xl bg-white/15 backdrop-blur-sm">{icon}</div>
+      </div>
+      <div className="absolute -bottom-4 -right-4 w-24 h-24 rounded-full bg-white/5 group-hover:bg-white/10 transition-colors" />
+    </div>
+  );
+
+  const Spinner = ({ size = "sm" }: { size?: "sm" | "lg" }) => (
+    <div className={`animate-spin rounded-full border-2 border-slate-200 border-t-blue-500 ${size === "sm" ? "w-4 h-4" : "w-8 h-8"}`} />
+  );
 
   return (
     <div className="min-h-screen bg-[#F8F9FC] p-6 space-y-5">
@@ -318,12 +280,12 @@ export default function PurchasePage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 text-start">
         <StatCard
           label="Total Products"
           value={totalProducts}
           delta="In master database"
-          gradient="bg-gradient-to-br from-blue-500 to-blue-700 text-white"
+          gradient="bg-gradient-to-br from-blue-500 to-blue-700"
           icon={
             <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
@@ -334,7 +296,7 @@ export default function PurchasePage() {
           label="Total Stock"
           value={totalStock}
           delta="Units across batches"
-          gradient="bg-gradient-to-br from-violet-500 to-violet-700 text-white"
+          gradient="bg-gradient-to-br from-violet-500 to-violet-700"
           icon={
             <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -345,7 +307,7 @@ export default function PurchasePage() {
           label="Low Stock"
           value={lowStockCount}
           delta="Below threshold"
-          gradient="bg-gradient-to-br from-amber-400 to-amber-600 text-white"
+          gradient="bg-gradient-to-br from-amber-500 to-amber-700"
           icon={
             <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -356,7 +318,7 @@ export default function PurchasePage() {
           label="Out of Stock"
           value={outOfStockCount}
           delta="Needs restock"
-          gradient="bg-gradient-to-br from-red-400 to-rose-600 text-white"
+          gradient="bg-gradient-to-br from-red-500 to-rose-700"
           icon={
             <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
@@ -393,51 +355,86 @@ export default function PurchasePage() {
       </div>
 
       {/* Supplier & Invoice Details */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm shadow-slate-100 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100">
-          <div className="flex items-center gap-2">
-            <IonIcon icon={documentTextOutline} className="text-slate-600 text-xl" />
-            <h2 className="text-black font-semibold text-lg">Supplier Invoice Details</h2>
-          </div>
-        </div>
-        <div className="p-6">
+      <Card className="border-slate-200 shadow-sm bg-white">
+        <CardHeader className="border-b border-slate-100">
+          <CardTitle className="flex items-center gap-2 text-slate-800">
+            <IonIcon icon={documentTextOutline} className="text-slate-500 text-xl" />
+            Supplier Invoice Details
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            <Select
-              label="Supplier"
-              icon={businessOutline}
-              options={suppliers.map(s => ({ value: s.supplier_uuid, label: `${s.name} ${s.phone ? `- ${s.phone}` : ''}` }))}
-              value={supplierId}
-              onChange={(e: any) => setSupplierId(e.target.value)}
-              placeholder="Select a supplier..."
-            />
-            <Input
-              label="Invoice Number"
-              icon={barcodeOutline}
-              type="text"
-              placeholder="INV-001"
-              value={invoiceNumber}
-              onChange={(e: any) => setInvoiceNumber(e.target.value)}
-            />
-            <Input
-              label="Invoice Date"
-              icon={calendarOutline}
-              type="date"
-              value={invoiceDate}
-              onChange={(e: any) => setInvoiceDate(e.target.value)}
-            />
+            {/* Supplier Select */}
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wide">Supplier</label>
+              <Select value={supplierId} onValueChange={setSupplierId}>
+                <SelectTrigger className="w-full bg-white border-slate-200 text-slate-800">
+                  <SelectValue placeholder="Select a supplier..." />
+                </SelectTrigger>
+                <SelectContent
+                  className="bg-white border-slate-200 mt-1"
+                  style={{ width: 'var(--radix-select-trigger-width)' }}
+                >
+                  {suppliers.length === 0 ? (
+                    <SelectItem value="no-supplier" disabled className="text-slate-500 italic">
+                      No suppliers found. Add from Supplier page
+                    </SelectItem>
+                  ) : (
+                    suppliers.map((s) => (
+                      <SelectItem key={s.supplier_uuid} value={s.supplier_uuid} className="text-slate-700 focus:bg-slate-100">
+                        {s.name} {s.phone ? `- ${s.phone}` : ''}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Invoice Number */}
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wide">Invoice Number</label>
+              <Input
+                placeholder="INV-001"
+                value={invoiceNumber}
+                onChange={(e) => setInvoiceNumber(e.target.value)}
+                className="w-full bg-white border-slate-200 text-slate-800 placeholder:text-slate-400"
+              />
+            </div>
+
+            {/* Invoice Date */}
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wide">Invoice Date</label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-start text-left font-normal bg-white border-slate-200 text-slate-700 hover:bg-slate-50">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {invoiceDate ? format(invoiceDate, "PPP") : <span>Pick a date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto border-0 bg-transparent p-0 shadow-none">
+                  <Calendar
+                    mode="single"
+                    selected={invoiceDate}
+                    onSelect={(date) => date && setInvoiceDate(date)}
+                    className="rounded-xl bg-[#141414] p-4 text-white shadow-2xl"
+                    classNames={calendarClassNames}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Add Item Button */}
       <div className="flex justify-center">
-        <button
+        <Button
           onClick={() => setModalOpen(true)}
-          className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-all shadow-md shadow-blue-200"
+          className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md shadow-blue-200"
         >
           <IonIcon icon={addOutline} className="text-xl" />
           Add Item
-        </button>
+        </Button>
       </div>
 
       {/* Modal for Item Entry */}
@@ -454,123 +451,228 @@ export default function PurchasePage() {
               </button>
             </div>
 
-            <div className="p-6 space-y-5">
-              {/* Product */}
-              <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wide">
-                  Product <span className="text-red-400">*</span>
-                </label>
-                <select
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
-                  value={currentItem.product_uuid}
-                  onChange={(e) => handleProductChange(e.target.value)}
-                >
-                  <option value="">Select Product</option>
-                  {products.map(p => (
-                    <option key={p.product_uuid} value={p.product_uuid}>
-                      {p.name} (Stock: {p.stock || 0} {p.unit})
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <div className="p-6">
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+                  {/* Product */}
+                  <FormField
+                    control={form.control}
+                    name="product_uuid"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-slate-700">Product *</FormLabel>
+                        <Select onValueChange={handleProductSelect} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="bg-white border-slate-200 text-slate-800 w-full">
+                              <SelectValue placeholder="Select Product" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent
+                            className="bg-white border-slate-200 mt-1"
+                            style={{ width: 'var(--radix-select-trigger-width)' }}
+                          >
+                            {products.map((p) => (
+                              <SelectItem key={p.product_uuid} value={p.product_uuid} className="text-slate-700 focus:bg-slate-100 rounded-md p-2 font-inter">
+                                {p.name} (Stock: {p.stock || 0} {p.unit})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage className="text-red-500" />
+                      </FormItem>
+                    )}
+                  />
 
-              {/* Unit, Batch, Expiry Row */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wide">Unit</label>
-                  <select
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white"
-                    value={currentItem.unit_uuid}
-                    onChange={(e) => updateItemField("unit_uuid", e.target.value)}
-                    disabled={!currentItem.product_uuid}
+                  {/* Unit, Batch, Expiry row */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="unit_uuid"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-slate-700">Unit *</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value} disabled={!watchProduct}>
+                            <FormControl>
+                              <SelectTrigger className="bg-white border-slate-200 text-slate-800 disabled:bg-slate-50">
+                                <SelectValue placeholder="Select Unit" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent className="bg-white border-slate-200 w-full">
+                              {availableUnits.map((unit) => (
+                                <SelectItem key={unit.unit_uuid} value={unit.unit_uuid} className="text-slate-700 focus:bg-slate-100">
+                                  {unit.unit_name} {unit.is_base_unit ? "(Base)" : ""}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage className="text-red-500" />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="batch_number"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-slate-700">Batch # *</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Batch number"
+                              {...field}
+                              className="bg-white border-slate-200 text-slate-800 placeholder:text-slate-400"
+                            />
+                          </FormControl>
+                          <FormMessage className="text-red-500" />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="expiry_date"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col">
+                          <FormLabel className="text-slate-700">Expiry Date *</FormLabel>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button variant="outline" className="w-full justify-start text-left font-normal bg-white border-slate-200 text-slate-700 hover:bg-slate-50">
+                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                  {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto border-0 bg-transparent p-0 shadow-none">
+                              <Calendar
+                                mode="single"
+                                selected={field.value}
+                                onSelect={field.onChange}
+                                disabled={(date) => date < new Date()}
+                                className="rounded-xl bg-[#141414] p-4 text-white shadow-2xl"
+                                classNames={calendarClassNames}
+                              />
+                            </PopoverContent>
+                          </Popover>
+                          <FormMessage className="text-red-500" />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  {/* Quantity, MRP, Cost Price row */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="quantity"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-slate-700">Quantity *</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min="1"
+                              value={field.value === 0 ? '' : field.value}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (val === '') {
+                                  field.onChange(0);
+                                } else {
+                                  const num = parseInt(val, 10);
+                                  field.onChange(isNaN(num) ? 0 : num);
+                                }
+                              }}
+                              className="bg-white border-slate-200 text-slate-800 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                            />
+                          </FormControl>
+                          <FormMessage className="text-red-500" />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="mrp"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-slate-700">MRP (₹) *</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={field.value === 0 ? '' : field.value}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (val === '') {
+                                  field.onChange(0);
+                                } else {
+                                  const num = parseFloat(val);
+                                  field.onChange(isNaN(num) ? 0 : num);
+                                }
+                              }}
+                              className="bg-white border-slate-200 text-slate-800 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                            />
+                          </FormControl>
+                          <FormMessage className="text-red-500" />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="cost_price"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-slate-700">Cost Price (₹) *</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={field.value === 0 ? '' : field.value}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (val === '') {
+                                  field.onChange(0);
+                                } else {
+                                  const num = parseFloat(val);
+                                  field.onChange(isNaN(num) ? 0 : num);
+                                }
+                              }}
+                              className="bg-white border-slate-200 text-slate-800 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                            />
+                          </FormControl>
+                          <FormMessage className="text-red-500" />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  {/* Subtotal */}
+                  <div className="bg-slate-50 rounded-xl p-4 flex justify-between items-center border border-slate-200">
+                    <span className="text-sm font-medium text-slate-600">Subtotal</span>
+                    <span className="text-2xl font-bold text-emerald-600">₹{subtotal.toFixed(2)}</span>
+                  </div>
+
+                  {/* Submit Button */}
+                  <Button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white py-3 rounded-xl font-bold text-base"
                   >
-                    <option value="">Select Unit</option>
-                    {currentItem.available_units.map(unit => (
-                      <option key={unit.unit_uuid} value={unit.unit_uuid}>
-                        {unit.unit_name} {unit.is_base_unit ? "(Base)" : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wide">Batch #</label>
-                  <input
-                    type="text"
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm"
-                    placeholder="Batch number"
-                    value={currentItem.batch_number}
-                    onChange={(e) => updateItemField("batch_number", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wide">Expiry Date</label>
-                  <input
-                    type="date"
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm"
-                    value={currentItem.expiry_date}
-                    onChange={(e) => updateItemField("expiry_date", e.target.value)}
-                  />
-                </div>
-              </div>
-
-              {/* Quantity, MRP, Cost Price */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wide">Quantity</label>
-                  <input
-                    type="number"
-                    min="1"
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm"
-                    value={currentItem.quantity}
-                    onChange={(e) => updateItemField("quantity", parseInt(e.target.value) || 0)}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wide">MRP (₹)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm"
-                    value={currentItem.mrp}
-                    onChange={(e) => updateItemField("mrp", parseFloat(e.target.value) || 0)}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wide">Cost Price (₹)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm"
-                    value={currentItem.cost_price}
-                    onChange={(e) => updateItemField("cost_price", parseFloat(e.target.value) || 0)}
-                  />
-                </div>
-              </div>
-
-              {/* Subtotal */}
-              <div className="bg-slate-50 rounded-xl p-4 flex justify-between items-center">
-                <span className="text-sm font-medium text-slate-600">Subtotal</span>
-                <span className="text-2xl font-bold text-emerald-600">₹{calculateSubtotal().toFixed(2)}</span>
-              </div>
-
-              {/* Submit Button */}
-              <button
-                onClick={handleSubmit}
-                disabled={loading}
-                className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white py-3 rounded-xl font-bold text-base transition-all disabled:opacity-50 shadow-md shadow-emerald-200 flex items-center justify-center gap-2"
-              >
-                {loading ? (
-                  <>
-                    <Spinner size="sm" />
-                    <span>Processing...</span>
-                  </>
-                ) : (
-                  <>
-                    <IonIcon icon={checkmarkCircleOutline} className="text-xl" />
-                    <span>Add Stock / Create Purchase</span>
-                  </>
-                )}
-              </button>
+                    {loading ? (
+                      <>
+                        <Spinner size="sm" />
+                        <span>Processing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <IonIcon icon={checkmarkCircleOutline} className="text-xl" />
+                        <span>Add Stock / Create Purchase</span>
+                      </>
+                    )}
+                  </Button>
+                </form>
+              </Form>
             </div>
           </div>
         </div>
