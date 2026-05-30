@@ -64,12 +64,6 @@ export class SettingsModel {
         updateFields.push('auto_print = ?');
         values.push(data.auto_print);
       }
-
-      if (updateFields.length > 0) {
-        updateFields.push('updated_at = CURRENT_TIMESTAMP');
-        db.prepare(`UPDATE settings SET ${updateFields.join(', ')}`).run(...values);
-      }
-
       if (data.printer_type !== undefined) {
         updateFields.push('printer_type = ?');
         values.push(data.printer_type);
@@ -85,6 +79,11 @@ export class SettingsModel {
       if (data.printer_name !== undefined) {
         updateFields.push('printer_name = ?');
         values.push(data.printer_name);
+      }
+
+      if (updateFields.length > 0) {
+        updateFields.push('updated_at = CURRENT_TIMESTAMP');
+        db.prepare(`UPDATE settings SET ${updateFields.join(', ')}`).run(...values);
       }
 
     } else {

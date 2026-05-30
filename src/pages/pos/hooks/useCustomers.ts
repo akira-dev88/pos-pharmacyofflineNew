@@ -36,7 +36,7 @@ export function useCustomers() {
     setLedger(data);
   };
 
-  const createNewCustomer = async (customerData: { name: string; mobile: string }) => {
+  const createNewCustomer = async (customerData: { name: string; mobile: string; address?: string; gstin?: string; credit_limit?: number }) => {
     const newCustomer = await createCustomer(customerData);
     await loadCustomers();
     await loadCustomerSummary();

@@ -1,5 +1,4 @@
-import { contextBridge } from 'electron';
-import { app } from 'electron/main';
+import { contextBridge, app } from 'electron';
 
 contextBridge.exposeInMainWorld('electron', {
   platform: process.platform,

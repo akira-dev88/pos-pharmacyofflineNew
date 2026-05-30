@@ -26,10 +26,10 @@ import {
 import InvoiceReceipt from "../pos/components/InvoiceReceipt";
 
 // shadcn/ui components
-import { Card } from "../../../@/components/ui/card";
-import { Input } from "../../../@/components/ui/input";
-import { Button } from "../../../@/components/ui/button";
-import { Badge } from "../../../@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -37,13 +37,13 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "../../../@/components/ui/table";
+} from "@/components/ui/table";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "../../../@/components/ui/popover";
-import { Calendar } from "../../../@/components/ui/calendar";
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 
 // Helper to format money (previously conflicted with date-fns format)
 const formatMoney = (val: any) => {

@@ -18,10 +18,10 @@ import {
 } from "ionicons/icons";
 
 // shadcn/ui components
-import { Card, CardContent, CardHeader, CardTitle } from "../../../@/components/ui/card";
-import { Badge } from "../../../@/components/ui/badge";
-import { Button } from "../../../@/components/ui/button";
-import { Progress } from "../../../@/components/ui/progress";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 
 export default function Profile() {
   const { t } = useTranslation();
@@ -194,20 +194,6 @@ export default function Profile() {
                     <p className="text-sm font-medium text-slate-800">{tenant?.invoice_prefix || "INV"}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
-                  <IonIcon icon={checkmarkCircleOutline} className="text-rose-500 text-xl shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-slate-500 uppercase tracking-wide">Status</p>
-                    <Badge
-                      variant="secondary"
-                      className={`${tenant?.is_active ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}
-                    >
-                      <IonIcon icon={tenant?.is_active ? checkmarkCircleOutline : closeOutline} className="text-xs mr-1" />
-                      {tenant?.is_active ? t('profile.active') : t('profile.inactive')}
-                    </Badge>
-                  </div>
-                </div>
-
                 {/* Subscription expiry with progress bar */}
                 {tenant?.expiry_date && (
                   <div className="p-4 rounded-xl bg-gradient-to-r from-slate-50 to-slate-100">

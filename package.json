@@ -28,7 +28,7 @@
   "build": {
     "appId": "com.pos.pharmacy",
     "productName": "POS pharmacy",
-    "asar": false,
+    "asar": true,
     "win": {
       "icon": "assets/icon.ico"
     },

@@ -24,16 +24,16 @@ import {
 } from "ionicons/icons";
 
 // shadcn/ui components
-import { Button } from "../../../@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "../../../@/components/ui/card";
-import { Input } from "../../../@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "../../../@/components/ui/select";
+} from "@/components/ui/select";
 import {
   Form,
   FormControl,
@@ -41,13 +41,13 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "../../../@/components/ui/form";
+} from "@/components/ui/form";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "../../../@/components/ui/popover";
-import { Calendar } from "../../../@/components/ui/calendar";
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 
 // ─── Types ────────────────────────────────────────────────────────────────
 interface ProductUnit {

@@ -26,12 +26,12 @@ import {
 } from "ionicons/icons";
 
 // shadcn/ui components (except Dialog)
-import { Card, CardContent, CardHeader, CardTitle } from "../../../@/components/ui/card";
-import { Button } from "../../../@/components/ui/button";
-import { Input } from "../../../@/components/ui/input";
-import { Textarea } from "../../../@/components/ui/textarea";
-import { Switch } from "../../../@/components/ui/switch";
-import { ScrollArea } from "../../../@/components/ui/scroll-area";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 const DEFAULT_SETTINGS = {
   shop_name: "",
@@ -268,21 +268,25 @@ export default function Settings() {
           Edit Store Settings
         </Button>
 
-        {/* <div className="flex items-center gap-4 p-3 bg-white rounded-xl shadow-sm border border-slate-200">
-          <div>
-            <p className="text-sm font-medium text-slate-700">{t("settings.autoPrintBill")}</p>
-            <p className="text-xs text-slate-500">{t("settings.autoPrintDesc")}</p>
-          </div>
-          <Switch
-            checked={data.auto_print === 1}
-            onCheckedChange={(checked) => {
-              const newAutoPrint = checked ? 1 : 0;
-              setData({ ...data, auto_print: newAutoPrint });
-              localStorage.setItem("shop_settings", JSON.stringify({ ...data, auto_print: newAutoPrint }));
-              saveSettings({ ...data, auto_print: newAutoPrint }).catch(console.error);
-            }}
-          />
-        </div> */}
+        <Card className="bg-white border-slate-200 shadow-sm">
+          <CardContent className="p-4 flex items-center gap-3">
+            <Switch
+              checked={data.auto_print === 1}
+              className="border-2 border-gray-300 data-[state=checked]:border-green-500 data-[state=unchecked]:bg-black pb-[1px]"
+              thumbClassName="bg-gray-400 data-[state=checked]:bg-green-500"
+              onCheckedChange={(checked) => {
+                const newAutoPrint = checked ? 1 : 0;
+                setData({ ...data, auto_print: newAutoPrint });
+                localStorage.setItem("shop_settings", JSON.stringify({ ...data, auto_print: newAutoPrint }));
+                saveSettings({ ...data, auto_print: newAutoPrint }).catch(console.error);
+              }}
+            />
+            <div>
+              <p className={`text-sm font-medium transition-colors ${data.auto_print === 1 ? 'text-green-500' : 'text-gray-700'}`}>{t("settings.autoPrintBill")}</p>
+              <p className="text-xs text-gray-500">{t("settings.autoPrintDesc")}</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Two‑column layout: Business Info + Backup & Restore */}

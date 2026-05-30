@@ -41,11 +41,11 @@ import {
 } from "recharts";
 
 // shadcn/ui components
-import { Card, CardContent, CardHeader, CardTitle } from "../../../@/components/ui/card";
-import { Badge } from "../../../@/components/ui/badge";
-import { ScrollArea } from "../../../@/components/ui/scroll-area";
-import { Button } from "../../../@/components/ui/button";
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "../../../@/components/ui/chart";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 
 const COLORS = ['#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
 
@@ -396,16 +396,16 @@ export default function Reports() {
 
       {/* ========== SALES TAB ========== */}
       {activeTab === "sales" && (
-        <div className="space-y-5">
-          {/* Top Selling Products */}
-          <Card>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          {/* Top Selling Products - 2 cols */}
+          <Card className="md:col-span-2 shadow-sm border-slate-200 flex flex-col">
             <CardHeader className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-t-2xl">
-              <CardTitle className="flex items-center gap-2 text-white">
+              <CardTitle className="flex items-center gap-2 text-white text-lg">
                 <IonIcon icon={trophyOutline} className="text-xl" />
                 Top Selling Products
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-0">
+            <CardContent className="p-0 flex-1">
               <ScrollArea className="h-[400px]">
                 {top.length === 0 ? (
                   <div className="text-center py-12 text-slate-400">
@@ -441,20 +441,52 @@ export default function Reports() {
             </CardContent>
           </Card>
 
-          {/* Recent Sales */}
+          {/* Payment Methods - 1 col */}
+          <Card className="shadow-sm border-slate-200 flex flex-col">
+            <CardHeader className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-t-2xl">
+              <CardTitle className="flex items-center gap-2 text-white text-lg">
+                <IonIcon icon={walletOutline} className="text-xl" />
+                Payment Methods
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0 flex-1">
+              {paymentMethods.length === 0 ? (
+                <div className="text-center py-12 text-slate-400">
+                  <p className="text-sm">No payment data</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {paymentMethods.map((method, idx) => (
+                    <div key={idx} className="px-6 py-4">
+                      <span className="capitalize font-medium text-slate-700">{method.method}</span>
+                      <div className="mt-1">
+                        <p className="font-semibold text-blue-600">₹{(method.total || 0).toLocaleString()}</p>
+                        <p className="text-xs text-slate-400">{method.count} transactions</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Recent Sales - full width */}
           {dashboard.recent_sales?.length > 0 && (
-            <Card>
+            <Card className="md:col-span-3 shadow-sm border-slate-200">
               <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-t-2xl">
-                <CardTitle className="text-white">Recent Sales</CardTitle>
+                <CardTitle className="flex items-center gap-2 text-white text-lg">
+                  <IonIcon icon={cashOutline} className="text-xl" />
+                  Recent Sales
+                </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
-                <ScrollArea className="h-[300px]">
+                <ScrollArea className="h-[280px]">
                   <div className="divide-y divide-slate-100">
                     {dashboard.recent_sales.map((sale: any, idx: number) => (
                       <div key={idx} className="px-6 py-4 hover:bg-slate-50 transition-colors">
                         <div className="flex justify-between items-center">
                           <div>
-                            <p className="font-medium text-slate-800">Invoice: {sale.invoice_number || sale.sale_uuid?.slice(0, 8)}</p>
+                            <p className="font-medium text-slate-800">{sale.invoice_number || sale.sale_uuid?.slice(0, 8)}</p>
                             <p className="text-xs text-slate-400">
                               {sale.customer_name || 'Walk-in Customer'} • {new Date(sale.created_at).toLocaleDateString()}
                             </p>
@@ -468,36 +500,14 @@ export default function Reports() {
               </CardContent>
             </Card>
           )}
-
-          {/* Sales by Payment Method */}
-          {paymentMethods.length > 0 && (
-            <Card>
-              <CardHeader className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-t-2xl">
-                <CardTitle className="text-white">Sales by Payment Method</CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="divide-y divide-slate-100">
-                  {paymentMethods.map((method, idx) => (
-                    <div key={idx} className="flex justify-between items-center px-6 py-4">
-                      <span className="capitalize font-medium text-slate-700">{method.method}</span>
-                      <div className="text-right">
-                        <p className="font-semibold text-blue-600">₹{(method.total || 0).toLocaleString()}</p>
-                        <p className="text-xs text-slate-400">{method.count} transactions</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
         </div>
       )}
 
       {/* ========== INVENTORY TAB ========== */}
       {activeTab === "inventory" && (
-        <div className="space-y-5">
-          {/* Stock Summary */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          {/* Stat cards row */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 md:col-span-3">
             <StatCard
               label="Total Products"
               value={stock.length.toLocaleString()}
@@ -518,10 +528,10 @@ export default function Reports() {
             />
           </div>
 
-          {/* Inventory Status List */}
-          <Card>
+          {/* Inventory Status - 2 cols */}
+          <Card className="md:col-span-2 shadow-sm border-slate-200">
             <CardHeader className="bg-gradient-to-r from-green-500 to-green-600 rounded-t-2xl">
-              <CardTitle className="flex items-center gap-2 text-white">
+              <CardTitle className="flex items-center gap-2 text-white text-lg">
                 <IonIcon icon={cubeOutline} className="text-xl" />
                 Inventory Status
               </CardTitle>
@@ -581,14 +591,17 @@ export default function Reports() {
             </CardContent>
           </Card>
 
-          {/* Recent Purchases */}
+          {/* Recent Purchases - 1 col */}
           {dashboard.recent_purchases?.length > 0 && (
-            <Card>
+            <Card className="shadow-sm border-slate-200">
               <CardHeader className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-t-2xl">
-                <CardTitle className="text-white">Recent Purchases</CardTitle>
+                <CardTitle className="flex items-center gap-2 text-white text-lg">
+                  <IonIcon icon={cartOutline} className="text-xl" />
+                  Recent Purchases
+                </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
-                <ScrollArea className="h-[300px]">
+                <ScrollArea className="h-[500px]">
                   <div className="divide-y divide-slate-100">
                     {dashboard.recent_purchases.map((purchase: any, idx: number) => (
                       <div key={idx} className="px-6 py-4 hover:bg-slate-50 transition-colors">
@@ -613,27 +626,14 @@ export default function Reports() {
 
       {/* ========== CUSTOMERS TAB ========== */}
       {activeTab === "customers" && (
-        <div className="space-y-5">
-          {/* Customer Summary */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <StatCard
-              label="Total Customers"
-              value={customerReport.length.toLocaleString()}
-              gradient="bg-gradient-to-br from-blue-500 to-blue-700"
-              icon={<IonIcon icon={peopleOutline} className="w-5 h-5 text-white" />}
-            />
-            <StatCard
-              label="Total Credit Balance"
-              value={`₹${customerReport.reduce((sum, c) => sum + (c.credit_balance || 0), 0).toLocaleString()}`}
-              gradient="bg-gradient-to-br from-emerald-500 to-emerald-700"
-              icon={<IonIcon icon={walletOutline} className="w-5 h-5 text-white" />}
-            />
-          </div>
-
-          {/* Top Customers */}
-          <Card>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          {/* Top Customers - 2 cols */}
+          <Card className="md:col-span-2 shadow-sm border-slate-200">
             <CardHeader className="bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-t-2xl">
-              <CardTitle className="text-white">Top Customers</CardTitle>
+              <CardTitle className="flex items-center gap-2 text-white text-lg">
+                <IonIcon icon={peopleOutline} className="text-xl" />
+                Top Customers
+              </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <ScrollArea className="h-[500px]">
@@ -671,6 +671,22 @@ export default function Reports() {
               </ScrollArea>
             </CardContent>
           </Card>
+
+          {/* Stat cards - 1 col */}
+          <div className="space-y-5">
+            <StatCard
+              label="Total Customers"
+              value={customerReport.length.toLocaleString()}
+              gradient="bg-gradient-to-br from-blue-500 to-blue-700"
+              icon={<IonIcon icon={peopleOutline} className="w-5 h-5 text-white" />}
+            />
+            <StatCard
+              label="Total Credit Balance"
+              value={`₹${customerReport.reduce((sum, c) => sum + (c.credit_balance || 0), 0).toLocaleString()}`}
+              gradient="bg-gradient-to-br from-emerald-500 to-emerald-700"
+              icon={<IonIcon icon={walletOutline} className="w-5 h-5 text-white" />}
+            />
+          </div>
         </div>
       )}
     </div>

@@ -16,10 +16,10 @@ import {
 } from "ionicons/icons";
 
 // shadcn/ui components
-import { Card, CardContent } from "../../../@/components/ui/card";
-import { Input } from "../../../@/components/ui/input";
-import { Button } from "../../../@/components/ui/button";
-import { Badge } from "../../../@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -27,14 +27,14 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "../../../@/components/ui/table";
+} from "@/components/ui/table";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "../../../@/components/ui/select";
+} from "@/components/ui/select";
 
 // ─── Types ────────────────────────────────────────────────────────────────
 interface StockItem {
@@ -282,8 +282,8 @@ export default function Stock() {
             <TableHeader>
               <TableRow className="bg-slate-50 border-b border-slate-200">
                 <TableHead className="text-left text-slate-600 w-[40%]">Product</TableHead>
-                <TableHead className="text-right text-slate-600 w-[9%]">Current Stock</TableHead>
-                <TableHead className="text-center text-slate-600 w-[20%]">Status</TableHead>
+                <TableHead className=" text-slate-600 w-[10%]">Current Stock</TableHead>
+                <TableHead className=" text-slate-600 w-[20%] text-center">Status</TableHead>
                 <TableHead className="text-center text-slate-600 w-[15%]">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -320,13 +320,13 @@ export default function Stock() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="text-center">
-                        <div>
+                      <TableCell className="text-right">
+                        <div className="inline-block text-right">
                           <span className={`text-xl font-bold ${isOut ? "text-red-600" : isLow ? "text-amber-600" : "text-emerald-600"}`}>
                             {stock}
                           </span>
                           {item.unit && <span className="text-xs text-slate-400 ml-1">{item.unit}</span>}
-                          <div className="w-32 ml-auto mt-2">
+                          <div className="w-full min-w-[100px] mt-2">
                             <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                               <div
                                 className={`h-full rounded-full transition-all duration-500 ${isOut ? "bg-red-500" : isLow ? "bg-amber-500" : "bg-emerald-500"}`}
@@ -336,8 +336,8 @@ export default function Stock() {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell className="text-center items-center flex justify-center">
-                        {getStatusBadge(stock)}
+                      <TableCell className="text-center">
+                        <div className="flex justify-center">{getStatusBadge(stock)}</div>
                       </TableCell>
                       <TableCell className="text-center">
                         <Button

@@ -25,20 +25,19 @@ import {
 } from "ionicons/icons";
 
 // shadcn/ui components
-import { Card, CardContent, CardHeader, CardTitle } from "../../../@/components/ui/card";
-import { Button } from "../../../@/components/ui/button";
-import { Input } from "../../../@/components/ui/input";
-import { Textarea } from "../../../@/components/ui/textarea";
-import { Badge } from "../../../@/components/ui/badge";
-import { ScrollArea } from "../../../@/components/ui/scroll-area";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "../../../@/components/ui/dialog";
+} from "@/components/ui/dialog";
 
 // ── Reusable StatCard (same as other pages)
 const StatCard = ({ label, value, gradient, icon }: any) => (
@@ -248,36 +247,142 @@ export default function CustomerPage() {
         />
       </div>
 
-      {/* Search Bar */}
-      <div className="relative">
-        <IonIcon icon={searchOutline} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg" />
-        <Input
-          placeholder={t('customers.searchPlaceholder')}
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-11 pr-10 py-2.5 bg-white border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
-        />
-        {searchTerm && (
-          <button
-            onClick={() => setSearchTerm("")}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-          >
-            <IonIcon icon={closeOutline} className="text-lg" />
-          </button>
-        )}
-      </div>
-
-      {/* Main Grid: Insights + Customer List */}
+      {/* Bento Grid: Insights + Customer List */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Left Column - Credit Aging & Reminders */}
+        {/* Customer List - 2 cols */}
+        <div className="lg:col-span-2">
+          <Card className="shadow-sm border-slate-200 h-full">
+            <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-t-2xl">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-white text-lg">
+                  <IonIcon icon={peopleOutline} className="text-xl" />
+                  {t('customers.customerList')}
+                </CardTitle>
+                <Badge variant="secondary" className="bg-white/20 text-white border-0">
+                  {t('customers.customersFound', { count: filteredCustomers.length })}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {/* Search inside card */}
+              <div className="p-4 border-b border-slate-100">
+                <div className="relative">
+                  <IonIcon icon={searchOutline} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg" />
+                  <Input
+                    placeholder={t('customers.searchPlaceholder')}
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-11 pr-10 bg-white border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                  />
+                  {searchTerm && (
+                    <button
+                      onClick={() => setSearchTerm("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                    >
+                      <IonIcon icon={closeOutline} className="text-lg" />
+                    </button>
+                  )}
+                </div>
+              </div>
+              <ScrollArea className={filteredCustomers.length > 0 ? "max-h-[520px]" : "h-[200px]"}>
+                {filteredCustomers.length === 0 ? (
+                  <div className="text-center py-12 text-slate-400">
+                    {searchTerm ? t('customers.noSearchResults') : t('customers.noCustomers')}
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-100">
+                    {filteredCustomers.map((c) => {
+                      const creditBalance = Number(c.credit_balance) || 0;
+                      const creditLimit = Number(c.credit_limit) || 0;
+                      const availableCredit = creditLimit - creditBalance;
+                      const isOverdue = creditBalance > creditLimit;
+                      const creditPercentage = Math.min((creditBalance / (creditLimit || 1)) * 100, 100);
+
+                      return (
+                        <div key={c.customer_uuid} className="p-4 hover:bg-slate-50/80 transition-colors group">
+                          <div className="flex items-start gap-3">
+                            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                              <span className="text-blue-600 font-semibold">{c.name?.charAt(0).toUpperCase() || '?'}</span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex justify-between items-start gap-2">
+                                <div className="min-w-0">
+                                  <h3 className="font-semibold text-slate-800 truncate">{c.name}</h3>
+                                  {c.mobile && (
+                                    <div className="flex items-center gap-1 text-xs text-slate-400 mt-0.5">
+                                      <IonIcon icon={callOutline} className="text-xs" />
+                                      <span>{c.mobile}</span>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setSelectedCustomer(c)}
+                                    className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                    title={t('customers.viewLedger')}
+                                  >
+                                    <IonIcon icon={eyeOutline} className="text-lg" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleEdit(c)}
+                                    className="text-slate-600 hover:text-slate-700 hover:bg-slate-100"
+                                    title={t('customers.edit')}
+                                  >
+                                    <IonIcon icon={createOutline} className="text-lg" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleDelete(c.customer_uuid)}
+                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                    title={t('customers.delete')}
+                                  >
+                                    <IonIcon icon={trashOutline} className="text-lg" />
+                                  </Button>
+                                </div>
+                              </div>
+
+                              {/* Credit Bar */}
+                              <div className="mt-3">
+                                <div className="flex justify-between text-xs mb-1">
+                                  <span className="text-slate-500">{t('customers.creditUsed')}</span>
+                                  <span className={isOverdue ? "text-red-600 font-semibold" : "text-slate-700"}>
+                                    ₹{creditBalance.toLocaleString()} / ₹{creditLimit.toLocaleString()}
+                                  </span>
+                                </div>
+                                <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-full rounded-full transition-all ${isOverdue ? "bg-red-500" : "bg-emerald-500"}`}
+                                    style={{ width: `${creditPercentage}%` }}
+                                  />
+                                </div>
+                                <div className="text-xs text-slate-400 mt-1">
+                                  {t('customers.availableCredit')}: ₹{availableCredit.toLocaleString()}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right Column - Credit Aging & Reminders */}
         <div className="space-y-5">
           {/* Credit Aging */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base font-semibold text-slate-800 flex items-center gap-2">
-                <div className="p-1 bg-orange-100 rounded-lg">
-                  <IonIcon icon={timeOutline} className="text-orange-500 text-lg" />
-                </div>
+          <Card className="shadow-sm border-slate-200">
+            <CardHeader className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-t-2xl">
+              <CardTitle className="flex items-center gap-2 text-white text-lg">
+                <IonIcon icon={timeOutline} className="text-xl" />
                 {t('customers.creditAging')}
               </CardTitle>
             </CardHeader>
@@ -290,19 +395,19 @@ export default function CustomerPage() {
                     <div key={i} className="border-b border-slate-100 last:border-0 pb-3">
                       <div className="font-medium text-slate-800 mb-2">{c.name}</div>
                       <div className="grid grid-cols-4 gap-2 text-xs">
-                        <div className="text-center p-1 bg-slate-50 rounded">
+                        <div className="text-center p-1.5 bg-slate-50 rounded-lg">
                           <div className="text-slate-400">0-30</div>
                           <div className="font-semibold text-slate-700">₹{c.aging?.["0_30"] || 0}</div>
                         </div>
-                        <div className="text-center p-1 bg-slate-50 rounded">
+                        <div className="text-center p-1.5 bg-slate-50 rounded-lg">
                           <div className="text-slate-400">31-60</div>
                           <div className="font-semibold text-slate-700">₹{c.aging?.["31_60"] || 0}</div>
                         </div>
-                        <div className="text-center p-1 bg-slate-50 rounded">
+                        <div className="text-center p-1.5 bg-slate-50 rounded-lg">
                           <div className="text-slate-400">61-90</div>
                           <div className="font-semibold text-slate-700">₹{c.aging?.["61_90"] || 0}</div>
                         </div>
-                        <div className="text-center p-1 bg-red-50 rounded">
+                        <div className="text-center p-1.5 bg-red-50 rounded-lg">
                           <div className="text-slate-400">90+</div>
                           <div className="font-semibold text-red-600">₹{c.aging?.["90_plus"] || 0}</div>
                         </div>
@@ -315,12 +420,10 @@ export default function CustomerPage() {
           </Card>
 
           {/* Payment Reminders */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base font-semibold text-slate-800 flex items-center gap-2">
-                <div className="p-1 bg-red-100 rounded-lg">
-                  <IonIcon icon={alertCircleOutline} className="text-red-500 text-lg" />
-                </div>
+          <Card className="shadow-sm border-slate-200">
+            <CardHeader className="bg-gradient-to-r from-red-500 to-red-600 rounded-t-2xl">
+              <CardTitle className="flex items-center gap-2 text-white text-lg">
+                <IonIcon icon={alertCircleOutline} className="text-xl" />
                 {t('customers.paymentReminders')}
               </CardTitle>
             </CardHeader>
@@ -331,7 +434,7 @@ export default function CustomerPage() {
                   {t('customers.noPendingDues')}
                 </div>
               ) : (
-                <ScrollArea className="h-[250px] pr-2">
+                <ScrollArea className="h-[220px] pr-2">
                   <div className="space-y-2">
                     {reminders.slice(0, 5).map((r: any, i) => (
                       <div key={i} className="flex justify-between items-center p-3 bg-slate-50 rounded-xl">
@@ -350,115 +453,9 @@ export default function CustomerPage() {
             </CardContent>
           </Card>
         </div>
-
-        {/* Right Column - Customer List */}
-        <div className="lg:col-span-2">
-          <Card className="h-full">
-            <CardHeader className="border-b border-slate-100">
-              <div className="flex justify-between items-center">
-                <CardTitle className="text-base font-semibold text-slate-800">{t('customers.customerList')}</CardTitle>
-                <Badge variant="secondary" className="bg-slate-100 text-slate-600">
-                  {t('customers.customersFound', { count: filteredCustomers.length })}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              <ScrollArea className="h-[600px]">
-                {filteredCustomers.length === 0 ? (
-                  <div className="text-center py-12 text-slate-400">
-                    {searchTerm ? t('customers.noSearchResults') : t('customers.noCustomers')}
-                  </div>
-                ) : (
-                  <div className="divide-y divide-slate-100">
-                    {filteredCustomers.map((c) => {
-                      const creditBalance = Number(c.credit_balance) || 0;
-                      const creditLimit = Number(c.credit_limit) || 0;
-                      const availableCredit = creditLimit - creditBalance;
-                      const isOverdue = creditBalance > creditLimit;
-                      const creditPercentage = Math.min((creditBalance / (creditLimit || 1)) * 100, 100);
-
-                      return (
-                        <div key={c.customer_uuid} className="p-4 hover:bg-slate-50/80 transition-colors group">
-                          <div className="flex justify-between items-start gap-3">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                                  <span className="text-blue-600 font-semibold">{c.name?.charAt(0).toUpperCase() || '?'}</span>
-                                </div>
-                                <div className="min-w-0">
-                                  <h3 className="font-semibold text-slate-800 truncate">{c.name}</h3>
-                                  {c.mobile && (
-                                    <div className="flex items-center gap-1 text-xs text-slate-400 mt-0.5">
-                                      <IonIcon icon={callOutline} className="text-xs" />
-                                      <span className="truncate">{c.mobile}</span>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-
-                              {/* Credit Info */}
-                              <div className="mt-3 ml-13">
-                                <div className="flex justify-between text-xs mb-1">
-                                  <span className="text-slate-500">{t('customers.creditUsed')}</span>
-                                  <span className={isOverdue ? "text-red-600 font-semibold" : "text-slate-700"}>
-                                    ₹{creditBalance.toLocaleString()} / ₹{creditLimit.toLocaleString()}
-                                  </span>
-                                </div>
-                                <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                  <div
-                                    className={`h-full rounded-full transition-all ${isOverdue ? "bg-red-500" : "bg-emerald-500"}`}
-                                    style={{ width: `${creditPercentage}%` }}
-                                  />
-                                </div>
-                                <div className="text-xs text-slate-400 mt-1">
-                                  {t('customers.availableCredit')}: ₹{availableCredit.toLocaleString()}
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="flex gap-1 shrink-0">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => setSelectedCustomer(c)}
-                                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                                title={t('customers.viewLedger')}
-                              >
-                                <IonIcon icon={eyeOutline} className="text-lg" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleEdit(c)}
-                                className="text-slate-600 hover:text-slate-700 hover:bg-slate-100"
-                                title={t('customers.edit')}
-                              >
-                                <IonIcon icon={createOutline} className="text-lg" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleDelete(c.customer_uuid)}
-                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                title={t('customers.delete')}
-                              >
-                                <IonIcon icon={trashOutline} className="text-lg" />
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </ScrollArea>
-            </CardContent>
-          </Card>
-        </div>
       </div>
 
-      {/* Add/Edit Customer Dialog (shadcn Dialog) */}
-      {/* Customer Add/Edit Modal – Premium Dark UI (matching supplier page) */}
+      {/* Add/Edit Customer Modal */}
       {dialogOpen && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="bg-[#171717] rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-gray-700">
@@ -470,7 +467,6 @@ export default function CustomerPage() {
                 <IonIcon icon={closeOutline} className="text-2xl" />
               </button>
             </div>
-
             <div className="p-6 space-y-5">
               <div>
                 <label className="block text-sm text-start font-bold text-gray-300 mb-1.5">
@@ -480,7 +476,7 @@ export default function CustomerPage() {
                   placeholder={t('customers.namePlaceholder')}
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="h-10 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none file:inline-flex file:h-6 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:disabled:bg-input/80 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40"
+                  className="dark:bg-input/30"
                 />
               </div>
               <div>
@@ -491,7 +487,7 @@ export default function CustomerPage() {
                   placeholder={t('customers.mobilePlaceholder')}
                   value={form.mobile}
                   onChange={(e) => setForm({ ...form, mobile: e.target.value })}
-                  className="h-10 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none file:inline-flex file:h-6 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:disabled:bg-input/80 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40"
+                  className="dark:bg-input/30"
                 />
               </div>
               <div>
@@ -503,7 +499,7 @@ export default function CustomerPage() {
                   placeholder={t('customers.addressPlaceholder')}
                   value={form.address}
                   onChange={(e) => setForm({ ...form, address: e.target.value })}
-                  className="w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none resize-vertical focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:disabled:bg-input/80 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40"
+                  className="dark:bg-input/30"
                 />
               </div>
               <div>
@@ -514,7 +510,7 @@ export default function CustomerPage() {
                   placeholder={t('customers.gstinPlaceholder')}
                   value={form.gstin}
                   onChange={(e) => setForm({ ...form, gstin: e.target.value })}
-                  className="h-10 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none file:inline-flex file:h-6 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:disabled:bg-input/80 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40"
+                  className="dark:bg-input/30"
                 />
               </div>
               <div>
@@ -524,25 +520,25 @@ export default function CustomerPage() {
                 <Input
                   type="number"
                   placeholder={t('customers.creditLimitPlaceholder')}
-                  value={form.credit_limit}
-                  onChange={(e) => setForm({ ...form, credit_limit: Number(e.target.value) })}
-                  className="h-10 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none file:inline-flex file:h-6 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:disabled:bg-input/80 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40"
+                  value={form.credit_limit || ""}
+                  onChange={(e) => setForm({ ...form, credit_limit: e.target.value === "" ? 0 : Number(e.target.value) })}
+                  className="dark:bg-input/30 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-search-cancel-button]:appearance-none [appearance:textfield]"
                 />
               </div>
             </div>
-
-            <div className="border-t border-gray-700 px-6 py-4 flex justify-end gap-3 bg-[#171717]">
+            <div className="border-t border-gray-700 px-6 py-4 flex justify-end gap-3">
               <Button variant="outline" onClick={resetForm} className="border-gray-600 text-gray-300 hover:bg-gray-800 hover:text-white">
                 {t('common.cancel')}
               </Button>
-              <Button onClick={handleSave} disabled={loading} className="bg-green-600 hover:bg-green-700 text-white shadow-md shadow-green-900/20">
+              <Button onClick={handleSave} disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-900/20">
                 {loading ? (editing ? t('customers.updating') : t('customers.adding')) : (editing ? t('customers.updateCustomer') : t('customers.createCustomer'))}
               </Button>
             </div>
           </div>
         </div>
       )}
-      {/* Ledger Modal (external component, unchanged) */}
+
+      {/* Ledger Modal */}
       {selectedCustomer && (
         <CustomerLedgerModal
           customer={selectedCustomer}

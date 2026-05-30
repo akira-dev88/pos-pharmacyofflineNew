@@ -21,7 +21,7 @@ async function handleResponse(res: Response, url: string) {
   if (res.status === 401 && !res.url.includes('/auth/login')) {
     console.log("🔴 Unauthorized, redirecting to login");
     localStorage.removeItem("token");
-    window.location.href = "/login";
+    window.location.hash = "#/login";
     return;
   }
 

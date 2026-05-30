@@ -33,3 +33,7 @@ server/database/
 # Build output
 release/
 server/dist/
+dist-electron/
+
+# Build artifacts
+meta.json

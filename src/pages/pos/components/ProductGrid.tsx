@@ -3,7 +3,12 @@ import { useTranslation } from "react-i18next";
 import type { Product } from "../../../renderer/types/product";
 import { getProductBatches, getProductUnits } from "../../../renderer/services/productApi";
 import { IonIcon } from "@ionic/react";
-import { alertCircleOutline, timeOutline, closeOutline } from "ionicons/icons";
+import { alertCircleOutline, timeOutline } from "ionicons/icons";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Minus, Plus, ShoppingCart } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface ProductGridProps {
   products: Product[];
@@ -100,89 +105,89 @@ function UnitSelectionModal({
     setSelectedUnit(unit || null);
   }, [selectedUnitUuid, units]);
 
-  if (!isOpen || !product) return null;
-
   const getUnitPrice = (unit: ProductUnit | null) => {
-    if (!unit) return product.price;
-    return unit.price || product.price;
+    if (!unit) return product?.price || 0;
+    return unit.price || product?.price || 0;
   };
 
-  const totalPrice = (getUnitPrice(selectedUnit) * quantity).toFixed(2);
+  const totalPrice = selectedUnit ? (getUnitPrice(selectedUnit) * quantity).toFixed(2) : "0.00";
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-        <div className="bg-gradient-to-r from-green-600 to-teal-600 p-5 text-white rounded-t-2xl">
-          <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-xl font-bold">Add to Cart</h2>
-              <p className="text-sm text-green-100 mt-0.5">{product.name}</p>
-            </div>
-            <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-full">
-              <IonIcon icon={closeOutline} className="text-2xl" />
-            </button>
-          </div>
-        </div>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="bg-[#1a1a1a] border-[#333] text-white sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-white text-lg">Add to Cart</DialogTitle>
+          {product && (
+            <p className="text-sm text-gray-400 mt-1">{product.name}</p>
+          )}
+        </DialogHeader>
 
-        <div className="p-6 space-y-5">
+        <div className="space-y-5">
           {/* Unit Selection */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-400 mb-2">
               Select Unit Type
             </label>
-            <select
-              className="w-full border border-gray-300 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              value={selectedUnitUuid}
-              onChange={(e) => setSelectedUnitUuid(e.target.value)}
-            >
-              {units.map((unit) => (
-                <option key={unit.unit_uuid} value={unit.unit_uuid}>
-                  {unit.unit_name} {unit.is_base_unit && "(Base Unit)"}
-                  {unit.price && ` - ₹${unit.price}`}
-                </option>
-              ))}
-            </select>
+            <Select value={selectedUnitUuid} onValueChange={setSelectedUnitUuid}>
+              <SelectTrigger className="bg-[#212121] border-gray-700 text-white">
+                <SelectValue placeholder="Select unit type" />
+              </SelectTrigger>
+              <SelectContent className="bg-[#212121] border-gray-700 text-white">
+                {units.map((unit) => (
+                  <SelectItem key={unit.unit_uuid} value={unit.unit_uuid}>
+                    {unit.unit_name} {unit.is_base_unit && "(Base)"}
+                    {unit.price && ` - ₹${unit.price}`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Quantity Selection */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-400 mb-2">
               Quantity
             </label>
             <div className="flex items-center gap-3">
-              <button
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
                 onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                className="w-10 h-10 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 flex items-center justify-center text-xl font-bold"
+                className="border-gray-700 text-white"
               >
-                -
-              </button>
-              <input
+                <Minus className="h-4 w-4" />
+              </Button>
+              <Input
                 type="number"
                 min="1"
-                className="w-24 text-center border border-gray-300 rounded-xl p-2 focus:outline-none focus:ring-2 focus:ring-green-500"
                 value={quantity}
                 onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                className="w-20 text-center bg-[#212121] border-gray-700 text-white"
               />
-              <button
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
                 onClick={() => setQuantity(quantity + 1)}
-                className="w-10 h-10 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 flex items-center justify-center text-xl font-bold"
+                className="border-gray-700 text-white"
               >
-                +
-              </button>
+                <Plus className="h-4 w-4" />
+              </Button>
             </div>
           </div>
 
           {/* Price Preview */}
-          <div className="bg-gray-50 rounded-xl p-4">
+          <div className="bg-[#212121] rounded-xl p-4 space-y-2">
             <div className="flex justify-between items-center">
-              <span className="text-gray-600">Unit Price:</span>
-              <span className="font-semibold text-gray-800">
+              <span className="text-gray-400">Unit Price:</span>
+              <span className="font-semibold text-white">
                 ₹{getUnitPrice(selectedUnit).toFixed(2)}
               </span>
             </div>
-            <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-200">
-              <span className="text-gray-600">Total Price:</span>
-              <span className="text-xl font-bold text-green-600">
+            <div className="flex justify-between items-center pt-2 border-t border-gray-700">
+              <span className="text-gray-400">Total Price:</span>
+              <span className="text-xl font-bold text-green-500">
                 ₹{totalPrice}
               </span>
             </div>
@@ -190,13 +195,16 @@ function UnitSelectionModal({
 
           {/* Buttons */}
           <div className="flex gap-3 pt-2">
-            <button
+            <Button
+              type="button"
+              variant="outline"
               onClick={onClose}
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50 transition-colors font-medium"
+              className="flex-1 border-gray-700 text-white hover:bg-gray-800"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
+              type="button"
               onClick={() => {
                 if (selectedUnit) {
                   onConfirm(
@@ -207,14 +215,15 @@ function UnitSelectionModal({
                   );
                 }
               }}
-              className="flex-1 bg-green-600 text-white px-4 py-3 rounded-xl hover:bg-green-700 transition-colors font-medium"
+              className="flex-1 bg-green-600 hover:bg-green-700 text-white"
             >
+              <ShoppingCart className="h-4 w-4 mr-1" />
               Add to Cart
-            </button>
+            </Button>
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

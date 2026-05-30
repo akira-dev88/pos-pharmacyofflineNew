@@ -21,12 +21,18 @@ const getBackupDir = (): string => {
   return path.join(base, 'backups');
 };
 
+const getDbName = (): string => {
+  return process.env.APP_DB_NAME || 'pos_billing.db';
+};
+
 const getDbPath = (): string => {
+  const dbName = getDbName();
+
   // Check if running in Electron production mode
   if (process.env.NODE_ENV === 'production') {
     try {
       const { app } = require('electron');
-      const dbPath = path.join(app.getPath('userData'), 'database', 'pos_billing.db');
+      const dbPath = path.join(app.getPath('userData'), 'database', dbName);
       return dbPath;
     } catch (error) {
       console.warn('Electron not available, using fallback database path');
@@ -35,7 +41,7 @@ const getDbPath = (): string => {
 
   // Development mode or fallback
   const base = process.env.USER_DATA_PATH || process.cwd();
-  return path.join(base, 'database', 'pos_billing.db');
+  return path.join(base, 'database', dbName);
 };
 
 export function ensureBackupDir(): void {

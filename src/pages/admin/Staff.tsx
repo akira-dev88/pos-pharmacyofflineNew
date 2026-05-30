@@ -23,10 +23,10 @@ import {
 } from "ionicons/icons";
 
 // shadcn/ui components (only those that work)
-import { Card, CardContent, CardHeader, CardTitle } from "../../../@/components/ui/card";
-import { Button } from "../../../@/components/ui/button";
-import { Input } from "../../../@/components/ui/input";
-import { Badge } from "../../../@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -34,14 +34,14 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "../../../@/components/ui/table";
+} from "@/components/ui/table";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "../../../@/components/ui/select";
+} from "@/components/ui/select";
 
 // ── Reusable StatCard
 const StatCard = ({ label, value, gradient, icon }: any) => (

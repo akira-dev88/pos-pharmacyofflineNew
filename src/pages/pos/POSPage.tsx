@@ -17,13 +17,11 @@ import { storefrontOutline } from 'ionicons/icons';
 import InvoiceReceipt from "./components/InvoiceReceipt";
 import { getSettings } from "../../renderer/services/settingsApi";
 import { getInvoice } from "../../renderer/services/saleApi";
-import { addCustomItem } from "../../renderer/services/cartApi";
 import PrescriptionModal from "./components/PrescriptionModal";
 
 function POSpage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [showSalesModal, setShowSalesModal] = useState(false);
   const [invoiceData, setInvoiceData] = useState<any>(null);
@@ -66,6 +64,7 @@ function POSpage() {
     prescriptionProduct,
     handlePrescriptionSubmit,
     setShowPrescriptionModal,
+    setPrescriptionProduct,
   } = useCart();
 
   const {
@@ -227,7 +226,7 @@ function POSpage() {
   // Keyboard shortcut: Enter to checkout
   useEffect(() => {
     const handleCheckoutShortcut = (e: KeyboardEvent) => {
-      if (showCustomerModal || showSalesModal || showInvoiceModal || showPastInvoiceModal || showQuickAdd) {
+      if (showCustomerModal || showSalesModal || showInvoiceModal || showPastInvoiceModal) {
         return;
       }
 
@@ -253,7 +252,6 @@ function POSpage() {
     showSalesModal,
     showInvoiceModal,
     showPastInvoiceModal,
-    showQuickAdd,
     cartLoading,
     isCartInitializing,
     cartData
@@ -388,12 +386,6 @@ function POSpage() {
           <div className="p-4 font-bold text-white text-start border-b border-gray-800 flex justify-between items-center">
             <span>Cart Items</span>
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowQuickAdd(true)}
-                className="text-xs bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded-lg transition-colors"
-              >
-                + Quick Add
-              </button>
               <span className="text-sm text-gray-400">
                 {cartData?.cart?.items?.length || 0} items
               </span>
@@ -604,21 +596,6 @@ function POSpage() {
         />
       )}
 
-      {showQuickAdd && (
-        <QuickAddModal
-          onClose={() => setShowQuickAdd(false)}
-          onAdd={async (item, quantity) => {
-            await addCustomItem(cartUUID!, {
-              name: item.name,
-              price: item.price,
-              gst_percent: item.gst_percent,
-              quantity,
-            });
-            await refreshCart();
-          }}
-        />
-      )}
-
       {/* Prescription Modal - Single instance */}
       {showPrescriptionModal && prescriptionProduct && (
         <PrescriptionModal
@@ -626,104 +603,12 @@ function POSpage() {
           productName={prescriptionProduct.name}
           productSchedule={prescriptionProduct.schedule_type || 'H'}
           onClose={() => {
-            // Just close the modal, don't call any function
             setShowPrescriptionModal(false);
-            prescriptionProduct(null);
+            setPrescriptionProduct(null);
           }}
           onConfirm={handlePrescriptionSubmit}
         />
       )}
-    </div>
-  );
-}
-
-function QuickAddModal({ onClose, onAdd }: { onClose: () => void; onAdd: (item: any, quantity: number) => void }) {
-  const [name, setName] = useState("");
-  const [price, setPrice] = useState("");
-  const [gst, setGst] = useState("0");
-  const [qty, setQty] = useState("1");
-
-  const handleAdd = () => {
-    if (!name || !price) return;
-    onAdd({
-      product_uuid: `quick-${Date.now()}`,
-      name,
-      price: Number(price),
-      gst_percent: Number(gst),
-      stock: 999,
-      barcode: null,
-      sku: null,
-    }, Number(qty));
-    onClose();
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
-      <div className="bg-[#1a1a1a] rounded-2xl w-full max-w-sm p-6 space-y-4">
-        <div className="flex justify-between items-center">
-          <h2 className="text-white font-bold text-lg">Quick Add Item</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white">✕</button>
-        </div>
-
-        <div>
-          <label className="text-gray-400 text-sm mb-1 block">Item Name *</label>
-          <input
-            autoFocus
-            className="w-full bg-[#212121] text-white border border-gray-700 rounded-xl p-2.5 focus:outline-none focus:ring-2 focus:ring-green-500"
-            placeholder="e.g. Loose Rice 1kg"
-            value={name}
-            onChange={e => setName(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleAdd()}
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-gray-400 text-sm mb-1 block">Price (₹) *</label>
-            <input
-              type="number"
-              className="w-full bg-[#212121] text-white border border-gray-700 rounded-xl p-2.5 focus:outline-none focus:ring-2 focus:ring-green-500"
-              placeholder="0.00"
-              value={price}
-              onChange={e => setPrice(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleAdd()}
-            />
-          </div>
-          <div>
-            <label className="text-gray-400 text-sm mb-1 block">Qty</label>
-            <input
-              type="number"
-              className="w-full bg-[#212121] text-white border border-gray-700 rounded-xl p-2.5 focus:outline-none focus:ring-2 focus:ring-green-500"
-              value={qty}
-              min="1"
-              onChange={e => setQty(e.target.value)}
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="text-gray-400 text-sm mb-1 block">GST</label>
-          <select
-            className="w-full bg-[#212121] text-white border border-gray-700 rounded-xl p-2.5 focus:outline-none focus:ring-2 focus:ring-green-500"
-            value={gst}
-            onChange={e => setGst(e.target.value)}
-          >
-            <option value="0">0% — Exempt</option>
-            <option value="5">5%</option>
-            <option value="12">12%</option>
-            <option value="18">18%</option>
-            <option value="28">28%</option>
-          </select>
-        </div>
-
-        <button
-          onClick={handleAdd}
-          disabled={!name || !price}
-          className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl disabled:opacity-40 transition-colors"
-        >
-          Add to Cart
-        </button>
-      </div>
     </div>
   );
 }

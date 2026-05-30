@@ -6,17 +6,17 @@ import { IonIcon } from "@ionic/react";
 import { printOutline, refreshOutline, calendarOutline } from "ionicons/icons";
 
 // shadcn/ui components
-import { Card, CardContent, CardHeader, CardTitle } from "../../../@/components/ui/card";
-import { Button } from "../../../@/components/ui/button";
-import { Input } from "../../../@/components/ui/input";
-import { Badge } from "../../../@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "../../../@/components/ui/popover";
-import { Calendar } from "../../../@/components/ui/calendar";
-import { ScrollArea } from "../../../@/components/ui/scroll-area";
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 // ── Reusable StatCard (matches other pages)
 const StatCard = ({ label, value, prefix = "", gradient = "bg-gradient-to-br from-blue-500 to-blue-700" }: any) => (

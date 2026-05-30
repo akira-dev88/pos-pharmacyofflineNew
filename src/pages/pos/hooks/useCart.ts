@@ -315,7 +315,7 @@ export function useCart() {
 
     const normalizedPayments = paymentMethods.map((p) => ({
       method: String(p.method),
-      amount: Number(p.amount || 0),
+      amount: grandTotal,
     }));
 
     const totalPaidAmount = normalizedPayments.reduce(
@@ -346,7 +346,7 @@ export function useCart() {
         const errorMessage = res.error || res.message || "";
         console.log("🔴 Error message:", errorMessage);
         
-        if (errorMessage.includes('requires prescription')) {
+        if (errorMessage.toLowerCase().includes('prescription')) {
           console.log("🔴 Prescription required detected!");
           const prescriptionItem = findPrescriptionProduct();
           

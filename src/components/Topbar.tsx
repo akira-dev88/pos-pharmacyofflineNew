@@ -17,8 +17,8 @@ import {
 } from "ionicons/icons";
 
 // shadcn/ui components
-import { Button } from "../../@/components/ui/button";
-import { Avatar, AvatarFallback } from "../../@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -26,9 +26,9 @@ import {
     DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
-} from "../../@/components/ui/dropdown-menu";
-import { Badge } from "../../@/components/ui/badge";
-import { ScrollArea } from "../../@/components/ui/scroll-area";
+} from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface TopbarProps {
     onMenuClick?: () => void;

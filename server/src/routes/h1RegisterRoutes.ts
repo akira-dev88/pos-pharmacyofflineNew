@@ -5,8 +5,12 @@ import {
 import {
   H1RegisterController
 } from '../controllers/H1RegisterController';
+import { authenticate, authorize } from '../middleware/auth';
 
 const router = Router();
+
+router.use(authenticate);
+router.use(authorize(['owner', 'manager']));
 
 // =========================
 // LIST ALL

@@ -123,7 +123,8 @@ function createWindow() {
     icon: path.join(__dirname, '../assets/icon.ico'),
     webPreferences: {
       nodeIntegration: false,
-      contextIsolation: true
+      contextIsolation: true,
+      sandbox: true
     }
   });
 
@@ -189,6 +190,23 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  const { session } = require('electron');
+
+  const isDev = !app.isPackaged;
+
+  const csp = isDev
+    ? "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; connect-src 'self' http://127.0.0.1:3000 http://localhost:5173 ws://localhost:5173; font-src 'self' data: https://fonts.gstatic.com"
+    : "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; connect-src 'self' http://127.0.0.1:3000; font-src 'self' data: https://fonts.gstatic.com";
+
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [csp]
+      }
+    });
+  });
+
   startBackend();
   createWindow();
 });

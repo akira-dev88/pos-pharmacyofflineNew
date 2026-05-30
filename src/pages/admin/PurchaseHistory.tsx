@@ -15,9 +15,9 @@ import {
 } from "ionicons/icons";
 
 // shadcn/ui components
-import { Card, CardContent, CardHeader, CardTitle } from "../../../@/components/ui/card";
-import { Button } from "../../../@/components/ui/button";
-import { Badge } from "../../../@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -25,8 +25,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "../../../@/components/ui/table";
-import { ScrollArea } from "../../../@/components/ui/scroll-area";
+} from "@/components/ui/table";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 // ── Reusable StatCard (matches other pages)
 const StatCard = ({ label, value, gradient, icon }: any) => (
@@ -125,7 +125,7 @@ export default function PurchaseHistory() {
       )}
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-start">
         <StatCard
           label={t('purchaseHistory.totalPurchases')}
           value={totalPurchases}
@@ -159,23 +159,22 @@ export default function PurchaseHistory() {
             </span>
           </div>
         </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
+        <div className="overflow-x-auto">
+          <Table>
               <TableHeader>
                 <TableRow className="bg-slate-50 border-b border-slate-200">
-                  <TableHead className="text-left text-slate-600 min-w-[180px]">{t('purchaseHistory.tableSupplier')}</TableHead>
-                  <TableHead className="text-left text-slate-600 min-w-[150px]">{t('purchaseHistory.tableItems')}</TableHead>
-                  <TableHead className="text-right text-slate-600 min-w-[120px]">{t('purchaseHistory.tableTotalAmount')}</TableHead>
-                  <TableHead className="text-left text-slate-600 min-w-[160px]">{t('purchaseHistory.tableDate')}</TableHead>
-                  <TableHead className="text-center text-slate-600 min-w-[100px]">{t('purchaseHistory.tableStatus')}</TableHead>
+                  <TableHead className="text-slate-600 min-w-[180px]">{t('purchaseHistory.tableSupplier')}</TableHead>
+                  <TableHead className="text-slate-600 min-w-[150px]">{t('purchaseHistory.tableItems')}</TableHead>
+                  <TableHead className="text-right text-slate-600 min-w-[120px] text-center">{t('purchaseHistory.tableTotalAmount')}</TableHead>
+                  <TableHead className="text-slate-600 min-w-[160px]">{t('purchaseHistory.tableDate')}</TableHead>
+                  <TableHead className="text-slate-600 min-w-[100px] text-start">{t('purchaseHistory.tableStatus')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {purchases.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-12 text-slate-500">
-                      <div className="flex flex-col items-center gap-2">
+                    <TableCell colSpan={5} className=" py-12 text-slate-500">
+                      <div className="flex flex-col gap-2">
                         <IonIcon icon={cartOutline} className="text-6xl text-slate-300" />
                         <p className="text-lg">{t('purchaseHistory.noPurchases')}</p>
                         <p className="text-sm">{t('purchaseHistory.noPurchasesSubtext')}</p>
@@ -190,7 +189,7 @@ export default function PurchaseHistory() {
                       className="border-b border-slate-100 hover:bg-slate-50/80 transition-colors cursor-pointer"
                     >
                       <TableCell>
-                        <div className="flex items-center gap-3">
+                        <div className="flex  gap-3">
                           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm">
                             {purchase.supplier?.name?.charAt(0).toUpperCase() || 
                              purchase.supplier_name?.charAt(0).toUpperCase() || 
@@ -207,17 +206,17 @@ export default function PurchaseHistory() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="text-sm text-slate-600">
+                        <div className="text-sm text-start text-slate-600">
                           {t('purchaseHistory.itemsCount', { count: purchase.items?.length || 0 })}
                         </div>
-                        <div className="text-xs text-slate-400 truncate max-w-[200px]">
+                        <div className="text-xs text-start text-slate-400 truncate max-w-[200px]">
                           {purchase.items?.slice(0, 2).map((item: any) => 
                             item.product?.name || item.name
                           ).join(", ")}
                           {purchase.items?.length > 2 && "..."}
                         </div>
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="">
                         <span className="font-semibold text-emerald-600">₹{formatNumber(purchase.total).toLocaleString()}</span>
                       </TableCell>
                       <TableCell>
@@ -230,7 +229,7 @@ export default function PurchaseHistory() {
                           <span>{purchase.created_at ? new Date(purchase.created_at).toLocaleTimeString() : 'N/A'}</span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-center">
+                      <TableCell className="text-left">
                         <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-emerald-200">
                           <IonIcon icon={checkmarkCircleOutline} className="text-xs mr-1" />
                           {t('purchaseHistory.statusCompleted')}
@@ -241,8 +240,7 @@ export default function PurchaseHistory() {
                 )}
               </TableBody>
             </Table>
-          </div>
-        </CardContent>
+        </div>
       </Card>
 
       {/* Purchase Details Modal - Premium Dark Design (same as supplier modal) */}
@@ -319,26 +317,24 @@ export default function PurchaseHistory() {
                   <IonIcon icon={cartOutline} className="text-blue-400 text-lg" />
                   <h3 className="font-semibold text-gray-200">{t('purchaseHistory.itemsPurchased')}</h3>
                 </div>
-                <div className="space-y-2">
-                  <div className="grid grid-cols-3 text-xs font-semibold text-gray-400 pb-2 border-b border-gray-700">
+                <ScrollArea className="h-[300px]">
+                  <div className="grid grid-cols-3 text-xs font-semibold text-gray-400 pb-2 mb-2 border-b border-gray-700">
                     <span>{t('purchaseHistory.productLabel')}</span>
                     <span className="text-center">{t('purchaseHistory.quantityLabel')}</span>
                     <span className="text-right">{t('purchaseHistory.costPriceLabel')}</span>
                   </div>
-                  <ScrollArea className="h-[300px]">
-                    {selected.items && selected.items.length > 0 ? (
-                      selected.items.map((item: any, i: number) => (
-                        <div key={i} className="grid grid-cols-3 text-sm py-2 border-b border-gray-700 last:border-0">
-                          <span className="text-gray-200">{item.product?.name || item.name || t('purchaseHistory.unknownProduct')}</span>
-                          <span className="text-center text-gray-400">x{item.quantity || 0}</span>
-                          <span className="text-right text-emerald-400 font-medium">₹{formatNumber(item.cost_price).toFixed(2)}</span>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-center text-gray-400 py-4">{t('purchaseHistory.noItemDetails')}</div>
-                    )}
-                  </ScrollArea>
-                </div>
+                  {selected.items && selected.items.length > 0 ? (
+                    selected.items.map((item: any, i: number) => (
+                      <div key={i} className="grid grid-cols-3 text-sm py-2 border-b border-gray-700 last:border-0">
+                        <span className="text-gray-200">{item.product?.name || item.name || t('purchaseHistory.unknownProduct')}</span>
+                        <span className="text-center text-gray-400">x{item.quantity || 0}</span>
+                        <span className="text-right text-emerald-400 font-medium">₹{formatNumber(item.cost_price).toFixed(2)}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center text-gray-400 py-4">{t('purchaseHistory.noItemDetails')}</div>
+                  )}
+                </ScrollArea>
               </div>
 
               {/* Total */}

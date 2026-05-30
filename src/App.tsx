@@ -21,9 +21,8 @@ import DailyReport from "./pages/admin/DailyReport";
 import GSTReport from "./pages/admin/GSTReport";
 
 import AuthGate from "./context/AuthGate";
-import ProtectedRoute from "./context/ProtectedRoute";
 import SignupPage from "./pages/SignUpPage";
-import { ScrollRestoration } from "react-router-dom";
+import ProtectedRoute from "./context/ProtectedRoute";
 
 export default function App() {
   return (

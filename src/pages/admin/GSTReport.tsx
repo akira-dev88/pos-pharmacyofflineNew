@@ -7,16 +7,16 @@ import { calendarOutline, downloadOutline, printOutline, refreshOutline } from "
 import * as XLSX from "xlsx";
 
 // shadcn/ui components
-import { Card, CardContent, CardHeader, CardTitle } from "../../../@/components/ui/card";
-import { Button } from "../../../@/components/ui/button";
-import { Badge } from "../../../@/components/ui/badge";
-import { ScrollArea } from "../../../@/components/ui/scroll-area";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
     Popover,
     PopoverContent,
     PopoverTrigger,
-} from "../../../@/components/ui/popover";
-import { Calendar } from "../../../@/components/ui/calendar";
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import {
     Table,
     TableBody,
@@ -24,7 +24,7 @@ import {
     TableHead,
     TableHeader,
     TableRow,
-} from "../../../@/components/ui/table";
+} from "@/components/ui/table";
 
 // ── Reusable StatCard (matches other pages)
 const StatCard = ({ label, value, prefix = "", gradient = "bg-gradient-to-br from-blue-500 to-blue-700" }: any) => (
@@ -157,7 +157,7 @@ export default function GSTReport() {
             {/* Header */}
             <div className="flex justify-between items-center flex-wrap gap-4 print:hidden">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900 tracking-tight">{t("gstReport.title")}</h1>
+                    <h1 className="text-2xl font-bold text-slate-900 tracking-tight text-start">{t("gstReport.title")}</h1>
                     <p className="text-slate-500 text-sm mt-0.5">{t("gstReport.subtitle")}</p>
                 </div>
                 <div className="flex items-center gap-3 flex-wrap">
@@ -273,7 +273,7 @@ export default function GSTReport() {
                             <p className="text-slate-300 text-sm">{t("gstReport.slabSummaryDesc")}</p>
                         </CardHeader>
                         <CardContent className="p-0">
-                            <ScrollArea className="h-[400px]">
+                            <ScrollArea className={report.summary.total_invoices > 0 ? "max-h-[400px]" : "h-[200px]"}>
                                 <Table>
                                     <TableHeader>
                                         <TableRow className="bg-slate-50 border-b border-slate-200">
@@ -286,7 +286,7 @@ export default function GSTReport() {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {report.slabs.length === 0 ? (
+                                        {report.summary.total_invoices === 0 ? (
                                             <TableRow>
                                                 <TableCell colSpan={6} className="text-center py-8 text-slate-400">
                                                     {t("gstReport.noGstTransactions")}
@@ -304,11 +304,11 @@ export default function GSTReport() {
                                                         <TableCell className="text-right font-semibold text-slate-800">₹{fmt(s.total_tax)}</TableCell>
                                                     </TableRow>
                                                 ))}
-                                                {report.exempt_value > 0 && (
+                                                {(report.exempt_value > 0 || report.slabs.length === 0) && (
                                                     <TableRow className="border-b border-slate-100 hover:bg-slate-50/80">
                                                         <TableCell className="font-semibold text-slate-800">0% ({t("gstReport.exemptLabel")})</TableCell>
-                                                        <TableCell className="text-right text-slate-600">—</TableCell>
-                                                        <TableCell className="text-right text-slate-700">₹{fmt(report.exempt_value)}</TableCell>
+                                                        <TableCell className="text-right text-slate-600">{report.summary.total_invoices}</TableCell>
+                                                        <TableCell className="text-right text-slate-700">₹{fmt(report.exempt_value || report.summary.total_taxable)}</TableCell>
                                                         <TableCell className="text-right text-slate-400">₹0.00</TableCell>
                                                         <TableCell className="text-right text-slate-400">₹0.00</TableCell>
                                                         <TableCell className="text-right font-semibold text-slate-800">₹0.00</TableCell>

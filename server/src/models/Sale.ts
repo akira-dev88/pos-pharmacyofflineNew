@@ -226,7 +226,7 @@ export class SaleModel {
 
         const itemTotal =
           Number(item.price) *
-          Number(item.quantity);
+          normalizedQuantity;
 
         const taxAmount =
           (

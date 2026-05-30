@@ -1,8 +1,11 @@
 import { Router, Request, Response } from 'express';
 import { ThermalPrinterService } from '../services/printerService';
+import { authenticate } from '../middleware/auth';
 
 const router = Router();
 const printerService = new ThermalPrinterService('localhost', 9104);
+
+router.use(authenticate);
 
 router.post('/print-receipt', async (req: Request, res: Response) => {
   try {

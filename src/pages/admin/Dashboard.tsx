@@ -25,10 +25,10 @@ import {
   ChartTooltip,
   ChartTooltipContent,
   type ChartConfig,
-} from "../../../@/components/ui/chart";
-import { Card, CardContent, CardHeader, CardTitle } from "../../../@/components/ui/card";
-import { Badge } from "../../../@/components/ui/badge";
-import { ScrollArea } from "../../../@/components/ui/scroll-area";
+} from "@/components/ui/chart";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 import { getDashboardReport } from "../../renderer/services/reportApi";
 import { getSalesTrend } from "../../renderer/services/reportApi";

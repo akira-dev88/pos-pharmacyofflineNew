@@ -1,5 +1,5 @@
 import * as net from 'net';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -209,8 +209,7 @@ export class ThermalPrinterService {
             fs.writeFileSync(tmpFile, data);
 
             // Send raw data to Windows printer using print command
-            const cmd = `copy /b "${tmpFile}" "${this.printerName}"`;
-            exec(cmd, (error) => {
+            execFile('cmd.exe', ['/c', 'copy', '/b', tmpFile, this.printerName], (error) => {
                 fs.unlinkSync(tmpFile); // clean up temp file
                 if (error) {
                     resolve({ success: false, error: error.message, printed: false });

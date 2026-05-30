@@ -5,6 +5,11 @@ import path from 'path';
 import { runMigrations } from './database/migrations/001_initial';
 import { addHsnCode } from './database/migrations/002_hsn';
 import { addAutoPrint } from './database/migrations/003_auto_print';
+import { up as addUnitUuidToPurchaseItems } from './database/migrations/002_add_unit_uuid_to_purchase_items';
+import { up as addNormalizedQuantity } from './database/migrations/003_add_normalized_quantity_to_purchase_items';
+import { upgradeProductsTable } from './database/migrations/004_products_upgrade';
+import { up as addUnitUuidToCartItems } from './database/migrations/004_add_unit_uuid_to_cart_items';
+import { addSoftDelete } from './database/migrations/005_soft_delete';
 import printingRoutes from './routes/printing';
 
 // Import routes
@@ -61,6 +66,11 @@ app.use(express.urlencoded({ extended: true }));
 runMigrations();
 addHsnCode();
 addAutoPrint();
+addUnitUuidToPurchaseItems();
+addNormalizedQuantity();
+upgradeProductsTable();
+addUnitUuidToCartItems();
+addSoftDelete();
 
 const licensed = LicenseService.isLicensed();
 if (!licensed) {
@@ -70,17 +80,6 @@ if (!licensed) {
 } else {
   process.env.APP_LICENSED = 'true';
 }
-
-// After startServer():
-startServer().then(() => {
-  // Check DB integrity on startup
-  const isHealthy = checkDbIntegrity();
-  if (!isHealthy) {
-    console.error('⚠️ DB integrity check failed on startup!');
-  }
-  // Start auto backup schedule
-  scheduleAutoBackup();
-});
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -188,10 +187,18 @@ const isElectron = process.env.ELECTRON_RUNNING === 'true';
 // 1. Not in Electron (Electron will call startServer manually)
 // 2. It's the main module
 // if (isMainModule) {
-startServer().catch((error) => {
-  console.error('Failed to start server:', error);
-  process.exit(1);
-});
+startServer()
+  .then(() => {
+    const isHealthy = checkDbIntegrity();
+    if (!isHealthy) {
+      console.error('⚠️ DB integrity check failed on startup!');
+    }
+    scheduleAutoBackup();
+  })
+  .catch((error) => {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  });
 // }
 
 export default app;
