@@ -1,7 +1,5 @@
-// src/pages/pos/components/CartItems.tsx
-
 import { IonIcon } from '@ionic/react';
-import { addOutline, removeOutline, trashOutline } from 'ionicons/icons';
+import { addOutline, removeOutline, trashOutline, medkit } from 'ionicons/icons';
 import { useTranslation } from 'react-i18next';
 import { useEffect } from 'react';
 
@@ -38,7 +36,6 @@ export default function CartItems({
 }: CartItemsProps) {
   const { t } = useTranslation();
 
-  // Debug: Log when items change
   useEffect(() => {
     console.log("🛒 CartItems received items update:", items);
     console.log("🛒 Number of items:", items.length);
@@ -74,112 +71,108 @@ export default function CartItems({
         return (
           <div
             key={`${item.product_uuid}_${item.unit_uuid || index}`}
-            className="bg-[#212121] rounded-xl p-3 transition-all hover:bg-[#2a2a2a]"
+            className="border-2 border-gray-200 bg-white hover:bg-gray-50 text-gray-800 rounded-2xl flex flex-row overflow-hidden transition-all duration-200 font-inter"
           >
-            {/* Product Name + Remove */}
-            <div className="flex justify-between items-start mb-2">
-              <div className="flex-1 min-w-0">
-                <h3 className="text-white font-medium text-sm truncate">
-                  {(item.product?.name || t('pos.unknownProduct')).replace(
-                    '[Custom] ',
-                    ''
-                  )}
-                </h3>
-                <div className="flex items-center gap-2 mt-0.5">
-                  {item.product?.manufacturer && (
-                    <span className="text-gray-500 text-xs truncate">
-                      {item.product.manufacturer}
-                    </span>
-                  )}
-                  {item.product?.schedule_type &&
-                    item.product.schedule_type !== 'NONE' && (
-                      <span className="text-xs bg-red-900/40 text-red-400 px-1.5 py-0.5 rounded shrink-0">
-                        Sch {item.product.schedule_type}
-                      </span>
-                    )}
-                  {item.product?.prescription_required ? (
-                    <span className="text-xs bg-orange-900/40 text-orange-400 px-1.5 py-0.5 rounded shrink-0">
-                      Rx
-                    </span>
-                  ) : null}
-                </div>
+            <div className="flex-shrink-0 self-center overflow-hidden rounded-xl aspect-square mx-[1.3%]" style={{ width: '22%' }}>
+              <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: '#83df1a' }}>
+                <IonIcon icon={medkit} className="text-xl text-white" />
+              </div>
+            </div>
+
+            <div className="flex-1 min-w-0 px-2 py-0.5 flex flex-col justify-start text-left gap-[1px]">
+              <div className="font-semibold text-xs truncate leading-tight text-gray-900">
+                {(item.product?.name || t('pos.unknownProduct')).replace('[Custom] ', '')}
               </div>
 
-              {onRemove && (
-                <button
-                  onClick={() => {
-                    console.log("🗑 Removing item:", item.product?.name);
-                    onRemove(item);
-                  }}
-                  className="text-red-500 hover:text-red-400 transition-colors p-1 shrink-0"
-                >
-                  <IonIcon icon={trashOutline} className="text-lg" />
-                </button>
+              {item.product?.manufacturer && (
+                <div className="text-[10px] truncate leading-tight text-gray-500">
+                  {item.product.manufacturer}
+                </div>
+              )}
+
+              <div className="flex items-center gap-1.5">
+                <div className="text-xs font-bold text-gray-900">
+                  ₹{item.price.toFixed(2)}
+                </div>
+                {item.product?.prescription_required ? (
+                  <span className="text-[9px] bg-red-500 text-white px-1.5 py-0.5 rounded-full font-medium leading-none">
+                    Rx
+                  </span>
+                ) : null}
+                {item.product?.schedule_type && item.product.schedule_type !== 'NONE' && (
+                  <span className="text-[9px] bg-yellow-600 text-white px-1.5 py-0.5 rounded-full font-medium leading-none">
+                    Sch {item.product.schedule_type}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1 bg-gray-100 rounded-lg">
+                  <button
+                    onClick={() => {
+                      console.log("➖ Decrease item:", item.product?.name);
+                      onDecrease(item);
+                    }}
+                    className="w-5 h-5 flex items-center justify-center text-gray-600 hover:bg-gray-200 rounded-l-lg transition-colors"
+                  >
+                    <IonIcon icon={removeOutline} className="text-[10px]" />
+                  </button>
+
+                  <span className="text-gray-900 text-xs font-medium min-w-[16px] text-center">
+                    {item.quantity}
+                  </span>
+
+                  <button
+                    onClick={() => {
+                      console.log("➕ Increase item:", item.product?.name);
+                      onIncrease(item);
+                    }}
+                    className="w-5 h-5 flex items-center justify-center text-gray-600 hover:bg-gray-200 rounded-r-lg transition-colors"
+                  >
+                    <IonIcon icon={addOutline} className="text-[10px]" />
+                  </button>
+                </div>
+
+                {onRemove && (
+                  <button
+                    onClick={() => {
+                      console.log("🗑 Removing item:", item.product?.name);
+                      onRemove(item);
+                    }}
+                    className="text-red-400 hover:text-red-500 transition-colors p-0.5 shrink-0"
+                  >
+                    <IonIcon icon={trashOutline} className="text-sm" />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex justify-between items-center border-t border-gray-100">
+                <span className="text-gray-500 text-[9px]">{t('pos.subtotal')}:</span>
+                <span className="text-green-600 text-[10px] font-semibold">
+                  ₹{subtotal.toFixed(2)}
+                </span>
+              </div>
+
+              {item.tax_percent > 0 && (
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400 text-[9px]">
+                    {t('pos.taxWithPercent', { percent: item.tax_percent })}:
+                  </span>
+                  <span className="text-gray-500 text-[9px]">
+                    ₹{taxAmount.toFixed(2)}
+                  </span>
+                </div>
+              )}
+
+              {item.discount > 0 && (
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400 text-[9px]">Discount:</span>
+                  <span className="text-blue-500 text-[9px]">
+                    -₹{item.discount.toFixed(2)}
+                  </span>
+                </div>
               )}
             </div>
-
-            {/* Price + Quantity Controls */}
-            <div className="flex justify-between items-center">
-              <div className="text-white font-semibold">
-                ₹{item.price.toFixed(2)}
-              </div>
-
-              <div className="flex items-center gap-2 bg-[#333333] rounded-lg">
-                <button
-                  onClick={() => {
-                    console.log("➖ Decrease item:", item.product?.name);
-                    onDecrease(item);
-                  }}
-                  className="w-7 h-7 flex items-center justify-center text-white hover:bg-[#444444] rounded-l-lg transition-colors"
-                >
-                  <IonIcon icon={removeOutline} className="text-sm" />
-                </button>
-
-                <span className="text-white text-sm font-medium min-w-[24px] text-center">
-                  {item.quantity}
-                </span>
-
-                <button
-                  onClick={() => {
-                    console.log("➕ Increase item:", item.product?.name);
-                    onIncrease(item);
-                  }}
-                  className="w-7 h-7 flex items-center justify-center text-white hover:bg-[#444444] rounded-r-lg transition-colors"
-                >
-                  <IonIcon icon={addOutline} className="text-sm" />
-                </button>
-              </div>
-            </div>
-
-            {/* Subtotal */}
-            <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-700">
-              <span className="text-gray-400 text-xs">{t('pos.subtotal')}:</span>
-              <span className="text-green-500 text-sm font-semibold">
-                ₹{subtotal.toFixed(2)}
-              </span>
-            </div>
-
-            {/* Tax */}
-            {item.tax_percent > 0 && (
-              <div className="flex justify-between items-center mt-1">
-                <span className="text-gray-500 text-xs">
-                  {t('pos.taxWithPercent', { percent: item.tax_percent })}:
-                </span>
-                <span className="text-gray-400 text-xs">
-                  ₹{taxAmount.toFixed(2)}
-                </span>
-              </div>
-            )}
-
-            {/* Item discount badge */}
-            {item.discount > 0 && (
-              <div className="flex justify-between items-center mt-1">
-                <span className="text-gray-500 text-xs">Discount:</span>
-                <span className="text-blue-400 text-xs">
-                  -₹{item.discount.toFixed(2)}
-                </span>
-              </div>
-            )}
           </div>
         );
       })}

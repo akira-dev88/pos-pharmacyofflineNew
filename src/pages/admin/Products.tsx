@@ -9,6 +9,7 @@ import {
   createProductUnit,
   deleteProductUnit,
   getProductBatches,
+  quarantineExpiredBatches,
 } from "../../renderer/services/productApi";
 import { IonIcon } from "@ionic/react";
 import {
@@ -714,6 +715,7 @@ export default function Products() {
   const [sortField, setSortField] = useState<string>("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [showStats, setShowStats] = useState(true);
+  const [quarantining, setQuarantining] = useState(false);
 
   const wizardSteps = ["Type", "Basic Info", "Details", "Packaging", "Review"];
   const selectedProductType = PRODUCT_TYPES.find((t) => t.id === wizardData.productType);
@@ -744,8 +746,8 @@ export default function Products() {
     if (!silent) setLoading(true);
     setError(null);
     try {
-      const data = await getProducts();
-      setProducts(Array.isArray(data) ? data : []);
+      const { products } = await getProducts();
+      setProducts(products);
     } catch (err) {
       console.error("Load products error:", err);
       setError(t("products.loadError"));
@@ -763,6 +765,24 @@ export default function Products() {
   const loadCategories = async () => {
     const data = await getCategories();
     setCategories(data);
+  };
+
+  const handleQuarantineExpired = async () => {
+    if (!confirm("Quarantine all expired batches? Stock will be removed from available inventory.")) return;
+    setQuarantining(true);
+    try {
+      const result = await quarantineExpiredBatches();
+      if (result?.success !== false) {
+        setSuccess("Expired batches quarantined successfully!");
+      } else {
+        setError(result?.error || "Quarantine failed");
+      }
+      await loadProducts(true);
+    } catch (err) {
+      setError("Failed to quarantine expired batches");
+    } finally {
+      setQuarantining(false);
+    }
   };
 
   const loadCustomUnits = () => {
@@ -1334,6 +1354,21 @@ export default function Products() {
           <p className="text-slate-500 text-sm mt-0.5">{t("products.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2.5">
+          <Tooltip label="Quarantine expired batches">
+            <button
+              onClick={handleQuarantineExpired}
+              disabled={quarantining}
+              className="p-2.5 rounded-xl border border-slate-200 bg-white transition-all text-red-500 hover:bg-red-50 hover:border-red-200 disabled:opacity-40"
+            >
+              {quarantining ? (
+                <Spinner size="sm" />
+              ) : (
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                </svg>
+              )}
+            </button>
+          </Tooltip>
           <Tooltip label="Toggle statistics">
             <button
               onClick={() => setShowStats(!showStats)}
@@ -1558,6 +1593,14 @@ export default function Products() {
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                               </svg>
                               Expires in {batchInfoItem.nearestExpiryDays}d
+                            </span>
+                          )}
+                          {batchInfoItem?.hasExpiredStock && (
+                            <span className="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded flex items-center gap-1">
+                              <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                              </svg>
+                              {batchInfoItem.expiredCount} expired
                             </span>
                           )}
                         </div>

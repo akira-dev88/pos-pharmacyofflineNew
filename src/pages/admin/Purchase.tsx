@@ -159,7 +159,7 @@ export default function PurchasePage() {
     try {
       setError(null);
       const [p, s, low] = await Promise.all([getProducts(), getSuppliers(), getLowStockProducts(20)]);
-      setProducts(Array.isArray(p) ? p : []);
+      setProducts(p.products);
       setSuppliers(Array.isArray(s) ? s : []);
       setLowStockProducts(Array.isArray(low) ? low : []);
     } catch (e) {

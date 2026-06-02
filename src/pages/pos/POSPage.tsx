@@ -39,7 +39,7 @@ function POSpage() {
   const paymentSummaryRef = useRef<HTMLDivElement>(null);
   const barcodeScannedRef = useRef(false);
 
-  const { products, loading: productsLoading, refetch } = useProducts();
+  const { products, loading: productsLoading, page, totalPages, goToPage, refetch } = useProducts();
   const {
     cartUUID,
     cartData,
@@ -197,6 +197,9 @@ function POSpage() {
             const res = await fetch(`http://127.0.0.1:3000/api/products/barcode/${barcodeBuffer}`, {
               headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
             });
+            if (!res.ok) {
+              throw new Error(`Server returned ${res.status}`);
+            }
             const data = await res.json();
             if (data.success && data.data) {
               await addItem(data.data);
@@ -205,6 +208,7 @@ function POSpage() {
             }
           } catch (err) {
             console.error('Barcode lookup failed:', err);
+            alert('Barcode scanning not available. Please search for the product manually.');
           }
           barcodeScannedRef.current = true;
           setTimeout(() => {
@@ -329,6 +333,20 @@ function POSpage() {
     return () => clearTimeout(restoreTimer);
   }, []);
 
+  // F5 to refresh products
+  const refetchRef = useRef(refetch);
+  refetchRef.current = refetch;
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'F5') {
+        e.preventDefault();
+        refetchRef.current();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   if (isCartInitializing) {
     return (
       <div className="h-screen flex items-center justify-center bg-[#141414]">
@@ -373,6 +391,9 @@ function POSpage() {
             <ProductGrid
               products={products}
               loading={productsLoading}
+              page={page}
+              totalPages={totalPages}
+              onPageChange={goToPage}
               onAddItem={(product, unitUuid, quantity, unitName) => {
                 // Add to cart with specific unit and quantity
                 addItem(product, unitUuid, quantity, unitName);

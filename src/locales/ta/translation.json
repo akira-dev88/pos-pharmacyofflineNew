@@ -628,7 +628,11 @@
       "profile": "சுயவிவரம்",
       "dailyReport": "தினசரி அறிக்கை",
       "endOfDay": "நாள் முடிவு",
-      "gstReport": "GST அறிக்கை"
+      "gstReport": "GST அறிக்கை",
+      "h1Register": "H1 பதிவேடு",
+      "auditLogs": "செயல்பாட்டு பதிவுகள்",
+      "stockAdjustments": "பங்கு சரிசெய்தல்கள்",
+      "medicineReturns": "மருந்து திரும்பப்பெறல்கள்"
     },
     "roles": {
       "owner": "உரிமையாளர்",

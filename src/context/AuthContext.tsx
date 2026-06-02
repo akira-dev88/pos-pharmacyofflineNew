@@ -1,10 +1,14 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { apiGet } from "../renderer/services/api";
 
+const VALID_ROLES = ["owner", "manager", "admin", "cashier"] as const;
+
+type UserRole = typeof VALID_ROLES[number];
+
 type User = {
   user_uuid?: string;
   name: string;
-  role: "owner" | "manager" | "cashier";
+  role: UserRole;
   email?: string;
 };
 
@@ -23,7 +27,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // 🔥 INIT AUTH (runs once on app load)
+  function isValidRole(role: string): role is UserRole {
+  return VALID_ROLES.includes(role as UserRole);
+}
+
+function isUserValid(user: any): user is User {
+  return user && typeof user === "object" && user.name && isValidRole(user.role);
+}
+
+// 🔥 INIT AUTH (runs once on app load)
   useEffect(() => {
     const init = async () => {
       const storedToken = localStorage.getItem("token");
@@ -41,22 +53,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const res = await apiGet("/auth/me");
         const userData = res?.data?.user || res?.user;
 
-        if (userData) {
+        if (userData && isUserValid(userData)) {
           setUser(userData);
           localStorage.setItem("user", JSON.stringify(userData));
+        } else if (userData && !isUserValid(userData)) {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          setToken(null);
+          setUser(null);
         } else {
-          // No user data returned — clear everything
           localStorage.removeItem("token");
           localStorage.removeItem("user");
           setToken(null);
           setUser(null);
         }
       } catch (e) {
+        let parsedUser: any;
         try {
-          const parsedUser = JSON.parse(storedUser);
-          setUser(parsedUser); // ← keeps old user!
+          parsedUser = JSON.parse(storedUser);
         } catch (error) {
           console.error("Failed to parse stored user data", error);
+        }
+        if (parsedUser && isUserValid(parsedUser)) {
+          setUser(parsedUser);
+        } else {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          setToken(null);
+          setUser(null);
         }
       } finally {
         setLoading(false);
@@ -67,6 +91,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // ✅ LOGIN - Store both token and user
   const login = (newToken: string, newUser: User) => {
+    if (!isUserValid(newUser)) {
+      console.error("Invalid user role:", newUser.role);
+      return;
+    }
     setToken(newToken);
     setUser(newUser);
 

@@ -19,6 +19,11 @@ import PurchaseHistory from "./pages/admin/PurchaseHistory";
 import CustomerPage from "./pages/admin/Customer";
 import DailyReport from "./pages/admin/DailyReport";
 import GSTReport from "./pages/admin/GSTReport";
+import H1Register from "./pages/admin/H1Register";
+import AuditLogs from "./pages/admin/AuditLogs";
+import StockAdjustments from "./pages/admin/StockAdjustments";
+import MedicineReturns from "./pages/admin/MedicineReturns";
+import RequireRole from "./components/RequireRole";
 
 import AuthGate from "./context/AuthGate";
 import SignupPage from "./pages/SignUpPage";
@@ -55,7 +60,7 @@ export default function App() {
       <Route
         path="/admin"
         element={
-          <ProtectedRoute allowedRoles={["owner", "manager"]}>
+          <ProtectedRoute allowedRoles={["owner", "manager", "admin"]}>
             <AdminLayout />
           </ProtectedRoute>
         }
@@ -72,8 +77,12 @@ export default function App() {
         <Route path="staff" element={<Staff />} />
         <Route path="settings" element={<Settings />} />
         <Route path="profile" element={<Profile />} />
-        <Route path="/admin/daily-report" element={<DailyReport />} />
-        <Route path="/admin/gst-report" element={<GSTReport />} />
+        <Route path="daily-report" element={<DailyReport />} />
+        <Route path="gst-report" element={<GSTReport />} />
+        <Route path="h1-register" element={<RequireRole roles={["owner", "manager"]}><H1Register /></RequireRole>} />
+        <Route path="audit-logs" element={<RequireRole roles={["owner", "manager"]}><AuditLogs /></RequireRole>} />
+        <Route path="stock-adjustments" element={<StockAdjustments />} />
+        <Route path="medicine-returns" element={<MedicineReturns />} />
       </Route>
 
       {/* FALLBACK */}

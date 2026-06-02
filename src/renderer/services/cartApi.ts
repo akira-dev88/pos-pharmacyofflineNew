@@ -176,6 +176,11 @@ export async function addCustomItem(
     quantity: number;
   }
 ) {
-  const response = await apiPost(`/carts/${cart_uuid}/custom-item`, item);
-  return response.data || response;
+  try {
+    const response = await apiPost(`/carts/${cart_uuid}/custom-item`, item);
+    return response.data || response;
+  } catch (error) {
+    console.error('Add custom item failed:', error);
+    return { success: false, error: 'Custom item feature not available' };
+  }
 }

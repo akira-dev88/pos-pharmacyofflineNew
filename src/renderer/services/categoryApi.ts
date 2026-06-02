@@ -59,6 +59,19 @@ export async function deleteAttribute(uuid: string) {
 
 // ── Category Attributes ────────────────────────────────────────────────────
 
+export async function getAllCategoryAttributes() {
+  try {
+    const response = await apiGet(`/category-attributes`);
+    if (response?.success && Array.isArray(response.data)) {
+      return response.data;
+    }
+    return [];
+  } catch (error) {
+    console.error("Failed to load all category attributes:", error);
+    return [];
+  }
+}
+
 export async function getCategoryAttributes(category_uuid: string) {
   try {
     const response = await apiGet(`/category-attributes/${category_uuid}`);

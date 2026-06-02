@@ -8,19 +8,21 @@ export async function getProducts(page = 1, limit = 20) {
 
     // New backend returns { success, products, total }
     if (response && response.success && Array.isArray(response.products)) {
-      return response.products;
+      return { products: response.products, total: response.total ?? 0 };
     }
     // Old fallback: { success, data: [...] }
     if (response && response.success && Array.isArray(response.data)) {
-      return response.data;
+      return { products: response.data, total: response.total ?? 0 };
     }
-    if (Array.isArray(response)) return response;
+    if (Array.isArray(response)) {
+      return { products: response, total: response.length };
+    }
 
     console.warn("Unexpected products response structure", response);
-    return [];
+    return { products: [], total: 0 };
   } catch (error) {
     console.error("Failed to load products:", error);
-    return [];
+    return { products: [], total: 0 };
   }
 }
 
@@ -133,14 +135,83 @@ export async function deleteBatch(batch_uuid: string) {
   return response.data || response;
 }
 
-// ── Migration ───────────────────────────────────────────────────────────────
+// ── Single Product ───────────────────────────────────────────────────────────
 
-export async function previewMigration(fileContent: string, fileType: string) {
-  const response = await apiPost('/migration/preview', { fileContent, fileType });
+export async function getProduct(uuid: string) {
+  try {
+    const response = await apiGet(`/products/${uuid}`);
+    if (response?.success && response.data) {
+      return response.data;
+    }
+    return response?.data || response;
+  } catch (error) {
+    console.error("Failed to load product:", error);
+    return null;
+  }
+}
+
+// ── Product Batches ─────────────────────────────────────────────────────────
+
+export async function createProductBatch(data: {
+  product_uuid: string;
+  batch_number: string;
+  expiry_date: string;
+  manufacture_date?: string;
+  mrp?: number;
+  ptr?: number;
+  rate?: number;
+  purchase_price?: number;
+  selling_price?: number;
+  gst_percent?: number;
+  quantity: number;
+  supplier_uuid?: string;
+}) {
+  const response = await apiPost("/product-batches", data);
   return response.data || response;
 }
 
+export async function consumeFefo(data: {
+  product_uuid: string;
+  quantity: number;
+  unit_uuid?: string;
+}) {
+  try {
+    const response = await apiPost("/product-batches/consume-fefo", data);
+    return response.data || response;
+  } catch (error) {
+    console.error("FEFO consumption failed:", error);
+    return { success: false, error: "FEFO consumption failed" };
+  }
+}
+
+export async function quarantineExpiredBatches() {
+  try {
+    const response = await apiPost("/product-batches/quarantine-expired", {});
+    return response.data || response;
+  } catch (error) {
+    console.error("Quarantine expired failed:", error);
+    return { success: false, error: "Quarantine expired feature not available" };
+  }
+}
+
+// ── Migration ───────────────────────────────────────────────────────────────
+
+export async function previewMigration(fileContent: string, fileType: string) {
+  try {
+    const response = await apiPost('/migration/preview', { fileContent, fileType });
+    return response.data || response;
+  } catch (error) {
+    console.error('Migration preview failed:', error);
+    return [];
+  }
+}
+
 export async function confirmMigration(products: any[], onDuplicate: 'skip' | 'overwrite') {
-  const response = await apiPost('/migration/confirm', { products, onDuplicate });
-  return response.data || response;
+  try {
+    const response = await apiPost('/migration/confirm', { products, onDuplicate });
+    return response.data || response;
+  } catch (error) {
+    console.error('Migration confirm failed:', error);
+    return { success: false, error: 'Migration endpoint not available' };
+  }
 }

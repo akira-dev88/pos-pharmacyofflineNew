@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import LanguageToggle from "../../components/LanguageToggle";
 import {
   getSettings,
   saveSettings,
   createBackup,
   listBackups,
   restoreBackup,
+  getLicenseStatus,
+  activateLicense,
 } from "../../renderer/services/settingsApi";
 import { apiPost } from "../../renderer/services/api";
 import { IonIcon } from "@ionic/react";
@@ -23,6 +26,10 @@ import {
   cloudUploadOutline,
   cloudDownloadOutline,
   createOutline,
+  keyOutline,
+  shieldCheckmarkOutline,
+  checkmarkCircle,
+  closeCircleOutline,
 } from "ionicons/icons";
 
 // shadcn/ui components (except Dialog)
@@ -53,6 +60,9 @@ export default function Settings() {
   const [backupLoading, setBackupLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formData, setFormData] = useState(DEFAULT_SETTINGS);
+  const [licenseStatus, setLicenseStatus] = useState<any>(null);
+  const [licenseKey, setLicenseKey] = useState("");
+  const [activating, setActivating] = useState(false);
 
   const extractCleanSettings = (obj: any) => {
     if (!obj) return null;
@@ -99,9 +109,43 @@ export default function Settings() {
     }
   };
 
+  const loadLicenseStatus = async () => {
+    try {
+      const res = await getLicenseStatus();
+      setLicenseStatus(res);
+    } catch (err) {
+      console.error("Failed to load license status:", err);
+    }
+  };
+
+  const handleActivate = async () => {
+    if (!licenseKey.trim()) {
+      setError("License key is required");
+      return;
+    }
+    setActivating(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const res = await activateLicense(licenseKey.trim());
+      if (res?.success) {
+        setSuccess("License activated successfully!");
+        await loadLicenseStatus();
+        setLicenseKey("");
+      } else {
+        setError(res?.error || "License activation failed");
+      }
+    } catch (err) {
+      setError("License activation failed");
+    } finally {
+      setActivating(false);
+    }
+  };
+
   useEffect(() => {
     syncFromBackend();
     loadBackups();
+    loadLicenseStatus();
   }, []);
 
   const loadBackups = async () => {
@@ -235,6 +279,7 @@ export default function Settings() {
           <p className="text-slate-500 text-sm mt-0.5">{t("settings.subtitle")}</p>
         </div>
         <div className="flex gap-2">
+          <LanguageToggle />
           <Button variant="outline" onClick={handleRefresh} className="gap-2">
             <IonIcon icon={refreshOutline} className="text-lg" />
             {t("settings.refresh")}
@@ -398,6 +443,70 @@ export default function Settings() {
           </CardContent>
         </Card>
       </div>
+
+      {/* License Management Card */}
+      <Card className="border-slate-200 shadow-sm bg-white">
+        <CardHeader className="bg-gradient-to-r from-slate-700 to-slate-800 rounded-t-2xl">
+          <CardTitle className="flex items-center gap-2 text-white">
+            <IonIcon icon={keyOutline} className="text-xl" />
+            License Management
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* License Status */}
+            <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-xl">
+              <div className={`p-3 rounded-xl ${licenseStatus?.licensed ? "bg-green-100" : "bg-red-100"}`}>
+                <IonIcon
+                  icon={licenseStatus?.licensed ? checkmarkCircle : closeCircleOutline}
+                  className={`text-2xl ${licenseStatus?.licensed ? "text-green-600" : "text-red-600"}`}
+                />
+              </div>
+              <div>
+                <p className="text-xs text-slate-500 uppercase tracking-wide font-semibold">Status</p>
+                <p className={`text-lg font-bold ${licenseStatus?.licensed ? "text-green-600" : "text-red-600"}`}>
+                  {licenseStatus?.licensed ? "Licensed" : "Not Licensed"}
+                </p>
+                {licenseStatus?.machine_id && (
+                  <p className="text-xs font-mono text-slate-400 mt-1">Machine: {licenseStatus.machine_id.slice(0, 16)}...</p>
+                )}
+              </div>
+            </div>
+
+            {/* Activation Form */}
+            <div className="space-y-3">
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide">Activate License</label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Enter license key"
+                  value={licenseKey}
+                  onChange={(e) => setLicenseKey(e.target.value)}
+                  className="flex-1 h-10"
+                  disabled={licenseStatus?.licensed}
+                />
+                <Button
+                  onClick={handleActivate}
+                  disabled={activating || licenseStatus?.licensed}
+                  className="bg-blue-600 hover:bg-blue-700 text-white gap-2 h-10"
+                >
+                  {activating ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                  ) : (
+                    <IonIcon icon={shieldCheckmarkOutline} className="text-lg" />
+                  )}
+                  Activate
+                </Button>
+              </div>
+              {licenseStatus?.licensed && (
+                <p className="text-xs text-green-600 flex items-center gap-1">
+                  <IonIcon icon={checkmarkCircle} className="text-sm" />
+                  Already activated on this machine
+                </p>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Custom Edit Modal (replaces shadcn Dialog) */}
       {dialogOpen && (

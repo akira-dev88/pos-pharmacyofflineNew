@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { Product } from "../../../renderer/types/product";
 import { getProductBatches, getProductUnits } from "../../../renderer/services/productApi";
 import { IonIcon } from "@ionic/react";
-import { alertCircleOutline, timeOutline } from "ionicons/icons";
+import { alertCircleOutline, timeOutline, medkit, searchOutline } from "ionicons/icons";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 interface ProductGridProps {
   products: Product[];
   loading: boolean;
+  page: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
   onAddItem: (product: Product, unitUuid: string, quantity: number, unitName: string) => void;
 }
 
@@ -33,37 +36,6 @@ interface ProductUnit {
   price: number | null;
   is_base_unit: boolean;
 }
-
-// Predefined color classes
-const colorClasses = [
-  'bg-blue-100 hover:bg-blue-200 text-blue-800',
-  'bg-purple-100 hover:bg-purple-200 text-purple-800',
-  'bg-pink-100 hover:bg-pink-200 text-pink-800',
-  'bg-green-100 hover:bg-green-200 text-green-800',
-  'bg-yellow-100 hover:bg-yellow-200 text-yellow-800',
-  'bg-indigo-100 hover:bg-indigo-200 text-indigo-800',
-  'bg-teal-100 hover:bg-teal-200 text-teal-800',
-  'bg-orange-100 hover:bg-orange-200 text-orange-800',
-  'bg-cyan-100 hover:bg-cyan-200 text-cyan-800',
-  'bg-amber-100 hover:bg-amber-200 text-amber-800',
-  'bg-lime-100 hover:bg-lime-200 text-lime-800',
-  'bg-emerald-100 hover:bg-emerald-200 text-emerald-800',
-  'bg-rose-100 hover:bg-rose-200 text-rose-800',
-  'bg-sky-100 hover:bg-sky-200 text-sky-800',
-  'bg-violet-100 hover:bg-violet-200 text-violet-800',
-];
-
-// Get color based on stock status
-const getStockColorClass = (product: Product): string | null => {
-  const stock = product.stock ?? 0;
-  if (stock === 0) {
-    return 'bg-red-100 hover:bg-red-200 text-red-800';
-  }
-  if (stock < 10) {
-    return 'bg-orange-100 hover:bg-orange-200 text-orange-800';
-  }
-  return null;
-};
 
 // Calculate days until expiry
 const getDaysUntilExpiry = (expiryDate: string): number => {
@@ -227,7 +199,7 @@ function UnitSelectionModal({
   );
 }
 
-export default function ProductGrid({ products, loading, onAddItem }: ProductGridProps) {
+export default function ProductGrid({ products, loading, page, totalPages, onPageChange, onAddItem }: ProductGridProps) {
   const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState("");
   const [recentUUIDs, setRecentUUIDs] = useState<string[]>([]);
@@ -238,6 +210,22 @@ export default function ProductGrid({ products, loading, onAddItem }: ProductGri
   const [showUnitModal, setShowUnitModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [productUnits, setProductUnits] = useState<ProductUnit[]>([]);
+
+  // Virtual scrolling state
+  const gridRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const [scrollTop, setScrollTop] = useState(0);
+  const [gridDimensions, setGridDimensions] = useState({ width: 0, height: 0 });
+
+  // Responsive columns: 2 below 1800px, 3 at 1800px+
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1800);
+
+  useEffect(() => {
+    setWindowWidth(window.innerWidth);
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Load batch info for products
   const loadBatchInfoForProduct = async (productUuid: string) => {
@@ -327,22 +315,93 @@ export default function ProductGrid({ products, loading, onAddItem }: ProductGri
   }, [products]);
 
   // Filter products based on search term
-  const filteredProducts = products.filter((product) => {
+  const filteredProducts = useMemo(() => products.filter((product) => {
     const searchLower = searchTerm.toLowerCase();
     return (
       product.name.toLowerCase().includes(searchLower) ||
       (product.sku && product.sku.toLowerCase().includes(searchLower)) ||
       (product.barcode && product.barcode.toLowerCase().includes(searchLower))
     );
-  });
+  }), [products, searchTerm]);
 
-  const sortedProducts = searchTerm
+  const sortedProducts = useMemo(() => searchTerm
     ? filteredProducts
     : [
         ...filteredProducts.filter(p => recentUUIDs.includes(p.product_uuid))
           .sort((a, b) => recentUUIDs.indexOf(a.product_uuid) - recentUUIDs.indexOf(b.product_uuid)),
         ...filteredProducts.filter(p => !recentUUIDs.includes(p.product_uuid))
-      ];
+      ], [searchTerm, filteredProducts, recentUUIDs]);
+
+  // Virtual scrolling handlers and calculations
+  const handleScroll = useCallback(() => {
+    if (gridRef.current) {
+      setScrollTop(gridRef.current.scrollTop);
+    }
+  }, []);
+
+  useEffect(() => {
+    const el = gridRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry) {
+        setGridDimensions({
+          width: entry.contentRect.width,
+          height: entry.contentRect.height,
+        });
+      }
+    });
+    observer.observe(el);
+    setGridDimensions({
+      width: el.clientWidth,
+      height: el.clientHeight,
+    });
+    return () => observer.disconnect();
+  }, []);
+
+  const PADDING = 12;
+  const GAP = 8;
+  const BUFFER_ROWS = 3;
+
+  const containerWidth = gridDimensions.width;
+  const containerHeight = gridDimensions.height;
+  const COLS = windowWidth >= 1800 ? 3 : 2;
+  const colWidth = containerWidth > 0
+    ? (containerWidth - PADDING * 2 - GAP * (COLS - 1)) / COLS
+    : 0;
+  const cardHeight = colWidth > 0 ? Math.max(colWidth * 0.45, 100) : 0;
+  const rowHeight = cardHeight > 0 ? cardHeight + GAP : 0;
+  const totalRows = colWidth > 0 ? Math.ceil(sortedProducts.length / COLS) : 0;
+  const totalHeight = totalRows * rowHeight;
+  const startRow = colWidth > 0
+    ? Math.max(0, Math.floor(scrollTop / rowHeight) - BUFFER_ROWS)
+    : 0;
+  const endRow = colWidth > 0
+    ? Math.min(totalRows, Math.ceil((scrollTop + containerHeight) / rowHeight) + BUFFER_ROWS)
+    : 0;
+  const startIndex = startRow * COLS;
+  const endIndex = Math.min(sortedProducts.length, endRow * COLS);
+  const visibleProducts = sortedProducts.slice(startIndex, endIndex);
+
+  // Reset scroll when search results change
+  useEffect(() => {
+    setScrollTop(0);
+    if (gridRef.current) {
+      gridRef.current.scrollTop = 0;
+    }
+  }, [sortedProducts]);
+
+  // Ctrl+K to focus search
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   if (loading) {
     return (
@@ -350,9 +409,9 @@ export default function ProductGrid({ products, loading, onAddItem }: ProductGri
         <div className="p-3">
           <div className="h-10 rounded-lg bg-gray-100 animate-pulse" />
         </div>
-        <div className="flex-1 overflow-y-auto p-3 grid grid-cols-3 gap-2">
-          {[...Array(9)].map((_, i) => (
-            <div key={i} className="rounded-xl animate-pulse bg-gray-100 aspect-square" />
+        <div className="flex-1 overflow-y-auto p-3 gap-2" style={{ display: 'grid', gridTemplateColumns: `repeat(${COLS}, 1fr)` }}>
+          {[...Array(COLS * 3)].map((_, i) => (
+            <div key={i} className="rounded-xl animate-pulse bg-gray-100" style={{ aspectRatio: '2.22 / 1' }} />
           ))}
         </div>
       </div>
@@ -361,15 +420,20 @@ export default function ProductGrid({ products, loading, onAddItem }: ProductGri
 
   return (
     <div className="flex flex-col h-full">
+
       {/* Search Bar */}
       <div className="p-3 sticky top-0 z-10 bg-[#141414]">
         <div className="relative">
+          <div className="absolute left-4 inset-y-0 flex items-center text-gray-400 pointer-events-none">
+            <IonIcon icon={searchOutline} className="text-lg" />
+          </div>
           <input
+            ref={searchRef}
             type="text"
             placeholder={t('pos.searchProducts')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all font-inter bg-white"
+            className="w-full pl-10 pr-20 py-2.5 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all font-inter bg-white"
             autoComplete="off"
           />
           {searchTerm && (
@@ -380,6 +444,12 @@ export default function ProductGrid({ products, loading, onAddItem }: ProductGri
               ✕
             </button>
           )}
+          {!searchTerm && (
+            <kbd className="absolute right-4 top-1/2 -translate-y-1/2 px-2 py-1 text-xs font-bold bg-gray-100 rounded-full pointer-events-none flex items-center gap-0.5">
+              <span className="text-green-600">Ctrl</span>
+              <span className="text-gray-400">+K</span>
+            </kbd>
+          )}
         </div>
         {searchTerm && (
           <div className="text-xs text-gray-500 mt-1.5 ml-1">
@@ -388,126 +458,187 @@ export default function ProductGrid({ products, loading, onAddItem }: ProductGri
         )}
       </div>
 
-      {/* Product Grid - Perfect Squares */}
-      <div className="overflow-y-auto p-3 grid grid-cols-3 gap-2 scrollbar-hide">
+      {/* Product Grid - Virtual Scrolling */}
+      <div ref={gridRef} className="flex-1 min-h-0 overflow-y-auto scrollbar-hide" onScroll={handleScroll}>
         {sortedProducts.length === 0 ? (
-          <div className="col-span-3 flex flex-col items-center justify-center py-12 text-gray-500">
+          <div className="flex flex-col items-center justify-center py-12 text-gray-500">
             <div className="text-4xl mb-2">🔍</div>
             <p className="text-sm">{t('pos.noProductsFound')}</p>
             <p className="text-xs mt-1">{t('pos.tryDifferentSearch')}</p>
           </div>
-        ) : (
-          sortedProducts.map((p, index) => {
-            const stock = p.stock ?? 0;
-            const stockColor = getStockColorClass(p);
-            const productBatches = batchInfo[p.product_uuid] || [];
-            const hasBatches = productBatches.length > 0;
-            const nearestExpiry = hasBatches ? productBatches[0] : null;
-            const daysUntilExpiry = nearestExpiry ? getDaysUntilExpiry(nearestExpiry.expiry_date) : null;
-            const isExpiringSoon = daysUntilExpiry !== null && daysUntilExpiry <= 90 && daysUntilExpiry > 0;
-            const batchCount = productBatches.length;
+        ) : colWidth > 0 ? (
+          <div style={{ height: Math.max(totalHeight + PADDING * 2, containerHeight), position: 'relative', paddingBottom: 48 }}>
+            {visibleProducts.map((p, i) => {
+              const actualIndex = startIndex + i;
+              const row = Math.floor(actualIndex / COLS);
+              const col = actualIndex % COLS;
+              const stock = p.stock ?? 0;
+              const productBatches = batchInfo[p.product_uuid] || [];
+              const hasBatches = productBatches.length > 0;
+              const nearestExpiry = hasBatches ? productBatches[0] : null;
+              const daysUntilExpiry = nearestExpiry ? getDaysUntilExpiry(nearestExpiry.expiry_date) : null;
+              const isExpiringSoon = daysUntilExpiry !== null && daysUntilExpiry <= 90 && daysUntilExpiry > 0;
+              const batchCount = productBatches.length;
+              const hasImage = !!(p as any).image;
 
-            let colorIndex: number;
-            if (p.product_uuid) {
-              const hash = p.product_uuid.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-              colorIndex = Math.abs(hash) % colorClasses.length;
-            } else {
-              colorIndex = index % colorClasses.length;
-            }
-
-            const colorClass = stockColor || colorClasses[colorIndex];
-            const hasImage = !!(p as any).image;
-
-            return (
-              <div
-                key={p.product_uuid}
-                className={`border-2 ${hasImage ? 'border-gray-200 bg-white hover:bg-gray-50 text-gray-800' : colorClass} rounded-xl cursor-pointer aspect-square flex flex-col justify-end p-3 transition-all duration-200 font-inter hover:scale-105 hover:shadow-lg relative overflow-hidden`}
-                onClick={() => handleProductClick(p)}
-              >
-                {/* Background image */}
-                {hasImage && (
-                  <img
-                    src={(p as any).image}
-                    alt={p.name}
-                    className="absolute inset-0 w-full h-full object-cover"
-                  />
-                )}
-
-                {/* Dark overlay for image cards */}
-                {hasImage && (
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-                )}
-
-                {/* Content - Bottom Left */}
-                <div className="relative z-10 w-full text-start">
-                  {/* Product Name */}
-                  <div className={`font-medium text-md truncate w-full ${hasImage ? 'text-white' : ''}`}>
-                    {p.name}
-                  </div>
-                  
-                  {/* Manufacturer (if available) */}
-                  {p.manufacturer && (
-                    <div className={`text-xs truncate mt-0.5 ${hasImage ? 'text-gray-300' : 'text-gray-500'}`}>
-                      {p.manufacturer}
-                    </div>
-                  )}
-
-                  {/* Price */}
-                  <div className={`text-sm font-semibold mt-1 ${hasImage ? 'text-white' : ''}`}>
-                    ₹{p.price}
+              return (
+                <div
+                  key={p.product_uuid}
+                  className="border-2 border-gray-200 bg-white hover:bg-gray-50 text-gray-800 rounded-2xl cursor-pointer flex flex-row overflow-hidden transition-all duration-200 font-inter hover:scale-[1.02] hover:shadow-lg"
+                  style={{
+                    position: 'absolute',
+                    top: row * rowHeight + PADDING,
+                    left: col * (colWidth + GAP) + PADDING,
+                    width: colWidth,
+                    height: cardHeight,
+                  }}
+                  onClick={() => handleProductClick(p)}
+                >
+                  {/* Left: Image or Placeholder - square, sized relative to card */}
+                  <div className="flex-shrink-0 self-center overflow-hidden rounded-xl aspect-square mx-[1.3%]" style={{ width: '40%' }}>
+                    {hasImage ? (
+                      <img
+                        src={(p as any).image}
+                        alt={p.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: '#83df1a' }}>
+                          <IonIcon icon={medkit} className="text-xl text-white" />
+                      </div>
+                    )}
                   </div>
 
-                  {/* Prescription Required Badge */}
-                  {p.prescription_required === 1 && (
-                    <div className="mt-1">
-                      <span className="text-xs bg-red-500 text-white px-1.5 py-0.5 rounded-full inline-block">
-                        Rx Required
-                      </span>
+                  {/* Right: Product Details */}
+                  <div className="flex-1 min-w-0 px-2.5 py-1.5 flex flex-col justify-start gap-[1px] text-left">
+                    {/* Product Name */}
+                    <div className="font-semibold text-xs truncate leading-tight text-gray-900">
+                      {p.name}
                     </div>
-                  )}
 
-                  {/* Batch & Expiry Info */}
-                  {stock > 0 && (
-                    <div className="mt-1 space-y-0.5">
-                      {isExpiringSoon && (
-                        <div className={`text-xs flex items-center gap-1 ${hasImage ? 'text-orange-300' : 'text-orange-600'}`}>
-                          <IonIcon icon={timeOutline} className="text-xs" />
-                          <span>{daysUntilExpiry}d</span>
+                    {/* Manufacturer */}
+                    {p.manufacturer && (
+                      <div className="text-[10px] truncate leading-tight text-gray-500">
+                        {p.manufacturer}
+                      </div>
+                    )}
+
+                    {/* Batch & Expiry Info */}
+                    <div className="flex flex-wrap gap-x-2">
+                      {batchCount > 0 && (
+                        <div className="text-[10px] flex items-center gap-0.5 text-gray-500">
+                          <IonIcon icon={alertCircleOutline} className="text-[10px]" />
+                          <span>{batchCount} batch{batchCount > 1 ? 'es' : ''}</span>
                         </div>
                       )}
-                      
-                      {batchCount > 1 && (
-                        <div className={`text-xs flex items-center gap-1 ${hasImage ? 'text-gray-300' : 'text-gray-500'}`}>
-                          <IonIcon icon={alertCircleOutline} className="text-xs" />
-                          <span>{batchCount} batches</span>
+                      {stock > 0 && (
+                        <div className={`text-[10px] flex items-center gap-0.5 ${isExpiringSoon ? 'text-orange-600' : 'text-gray-500'}`}>
+                          {isExpiringSoon ? (
+                            <>
+                              <IonIcon icon={timeOutline} className="text-[10px]" />
+                              <span>{daysUntilExpiry}d expiry</span>
+                            </>
+                          ) : nearestExpiry ? (
+                            <span>Exp: {new Date(nearestExpiry.expiry_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' })}</span>
+                          ) : null}
                         </div>
                       )}
                     </div>
-                  )}
 
-                  {/* Stock Status Badges */}
-                  <div className="mt-1">
-                    {stock > 0 && stock < 10 && (
-                      <div className="text-xs bg-red-600 text-white px-1.5 py-0.5 rounded-full inline-block">
-                        Only {stock}
+                    {/* Price and Rx Badge */}
+                    <div className="flex items-center gap-1.5">
+                      <div className="text-xs font-bold text-gray-900">
+                        ₹{p.price}
                       </div>
-                    )}
-                    {stock === 0 && (
-                      <div className="text-xs bg-gray-600 text-white px-1.5 py-0.5 rounded-full inline-block">
-                        Out
-                      </div>
-                    )}
-                    {stock > 0 && !isExpiringSoon && batchCount === 1 && (
-                      <div className="text-xs bg-green-600 text-white px-1.5 py-0.5 rounded-full inline-block">
-                        In Stock
-                      </div>
-                    )}
+                      {p.prescription_required === 1 && (
+                        <span className="text-[9px] bg-red-500 text-white px-1.5 py-0.5 rounded-full font-medium leading-none">
+                          Rx
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Stock Badge */}
+                    <div>
+                      {stock === 0 ? (
+                        <span className="text-[9px] bg-gray-700 text-white px-1.5 py-0.5 rounded-full font-medium inline-block leading-none">
+                          Out of Stock
+                        </span>
+                      ) : stock < 10 ? (
+                        <span className="text-[9px] bg-red-600 text-white px-1.5 py-0.5 rounded-full font-medium inline-block leading-none">
+                          Only {stock} left
+                        </span>
+                      ) : (
+                        <span className="text-[9px] bg-green-700 text-white px-1.5 py-0.5 rounded-full font-medium inline-block leading-none">
+                          {stock} remaining
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
+              );
+            })}
+          </div>
+        ) : null}
+      {totalPages > 1 && (
+        <div className="sticky bottom-0 flex justify-center py-3 pointer-events-none">
+          <div className="flex items-center pointer-events-auto gap-x-1.5">
+            <div className="rounded-lg border border-gray-700 bg-black px-2 py-1.5 flex items-center">
+              <button
+                onClick={() => onPageChange(page - 1)}
+                disabled={page <= 1}
+                className="px-2 py-1 text-sm font-medium transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-gray-400 hover:text-white"
+              >
+                ‹ Prev
+              </button>
+            </div>
+            <div className="rounded-lg border border-gray-700 bg-black px-2 py-1.5 flex items-center">
+              <div className="flex items-center gap-1.5">
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(p => {
+                    if (totalPages <= 7) return true;
+                    if (p === 1 || p === totalPages) return true;
+                    if (Math.abs(p - page) <= 1) return true;
+                    return false;
+                  })
+                  .reduce<(number | 'ellipsis')[]>((acc, p, idx, arr) => {
+                    if (idx > 0) {
+                      const prev = arr[idx - 1];
+                      if (p - prev > 1) acc.push('ellipsis');
+                    }
+                    acc.push(p);
+                    return acc;
+                  }, [])
+                  .map((item, idx) =>
+                    item === 'ellipsis' ? (
+                      <span key={`e${idx}`} className="px-1.5 text-gray-600 text-sm">...</span>
+                    ) : (
+                      <button
+                        key={item}
+                        onClick={() => onPageChange(item)}
+                        className={`text-sm font-medium transition-colors ${
+                          item === page
+                            ? 'bg-green-600 text-white rounded px-2.5 py-1'
+                            : 'px-1.5 text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        {item}
+                      </button>
+                    )
+                  )}
               </div>
-            );
-          })
-        )}
+            </div>
+            <div className="rounded-lg border border-gray-700 bg-black px-2 py-1.5 flex items-center">
+              <button
+                onClick={() => onPageChange(page + 1)}
+                disabled={page >= totalPages}
+                className="px-2 py-1 text-sm font-medium transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-gray-400 hover:text-white"
+              >
+                Next ›
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       </div>
 
       {/* Unit Selection Modal */}

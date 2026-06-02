@@ -34,3 +34,25 @@ export async function updateStaff(
 export async function deleteStaff(uuid: string): Promise<void> {
   await apiDelete(`/staff/${uuid}`);
 }
+
+// 📊 SUMMARY
+export async function getStaffSummary() {
+  try {
+    const res = await apiGet("/staff/summary");
+    return res?.data || res;
+  } catch (error) {
+    console.error("Failed to load staff summary:", error);
+    return null;
+  }
+}
+
+// 👥 BY ROLE
+export async function getStaffByRole(role: string) {
+  try {
+    const res = await apiGet(`/staff/role/${role}`);
+    return Array.isArray(res) ? res : res?.data ?? [];
+  } catch (error) {
+    console.error("Failed to load staff by role:", error);
+    return [];
+  }
+}

@@ -37,13 +37,13 @@ function NavItem({ label, path, currentPath, icon, onClick }: NavItemProps) {
       onClick={onClick}
       className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${
         active
-          ? "bg-green-600 text-white shadow-md"
-          : "text-gray-400 hover:bg-white/10 hover:text-white"
+          ? "bg-white text-green-700 shadow-md"
+          : "text-white/80 hover:bg-white/20 hover:text-white"
       }`}
     >
-      <IonIcon icon={icon} className={`text-xl ${active ? "text-white" : "text-gray-500"}`} />
+      <IonIcon icon={icon} className={`text-xl ${active ? "text-green-700" : "text-white/60"}`} />
       <span className="text-sm font-medium">{label}</span>
-      {active && <IonIcon icon={checkmarkCircle} className="text-white text-sm ml-auto" />}
+      {active && <IonIcon icon={checkmarkCircle} className="text-green-700 text-sm ml-auto" />}
     </button>
   );
 }
@@ -59,7 +59,7 @@ interface NavSectionProps {
 function NavSection({ title, children }: NavSectionProps) {
   return (
     <div className="space-y-1">
-      <div className="px-3 pt-2 pb-1 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+      <div className="px-3 pt-2 pb-1 text-xs font-semibold text-white/50 uppercase tracking-wider">
         {title}
       </div>
       {children}
@@ -92,14 +92,15 @@ function SidebarContent({ user, currentPath, navigate, t, onMobileClose }: Sideb
           <div className="text-lg font-bold text-white tracking-tight">
             {t('adminLayout.adminPanel')}
           </div>
-          <div className="text-xs text-gray-400 capitalize mt-0.5">
+          <div className="text-xs text-white/60 capitalize mt-0.5">
             {t(`adminLayout.roles.${user.role}`)}
           </div>
         </div>
       </div>
 
       {/* Navigation */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-2 scrollbar-thin scrollbar-track-gray-800 scrollbar-thumb-gray-600">
+      <div className="flex-1 overflow-hidden">
+        <div className="h-full overflow-y-auto p-3 space-y-2" style={{ marginRight: '-17px', paddingRight: 'calc(0.75rem + 17px)' }}>
         {user.role === "owner" && (
           <NavItem
             label={t('adminLayout.nav.dashboard')}
@@ -154,10 +155,38 @@ function SidebarContent({ user, currentPath, navigate, t, onMobileClose }: Sideb
               icon={peopleCircleOutline}
               onClick={() => handleNavigate("/admin/staff")}
             />
+            <NavItem
+              label={t('adminLayout.nav.h1Register')}
+              path="/admin/h1-register"
+              currentPath={currentPath}
+              icon={documentTextOutline}
+              onClick={() => handleNavigate("/admin/h1-register")}
+            />
+            <NavItem
+              label={t('adminLayout.nav.auditLogs')}
+              path="/admin/audit-logs"
+              currentPath={currentPath}
+              icon={documentTextOutline}
+              onClick={() => handleNavigate("/admin/audit-logs")}
+            />
+            <NavItem
+              label={t('adminLayout.nav.stockAdjustments')}
+              path="/admin/stock-adjustments"
+              currentPath={currentPath}
+              icon={documentTextOutline}
+              onClick={() => handleNavigate("/admin/stock-adjustments")}
+            />
+            <NavItem
+              label={t('adminLayout.nav.medicineReturns')}
+              path="/admin/medicine-returns"
+              currentPath={currentPath}
+              icon={documentTextOutline}
+              onClick={() => handleNavigate("/admin/medicine-returns")}
+            />
           </NavSection>
         )}
 
-        {["owner", "manager"].includes(user.role) && (
+        {["owner", "manager", "admin"].includes(user.role) && (
           <NavSection title={t('adminLayout.sections.management')}>
             <NavItem
               label={t('adminLayout.nav.products')}
@@ -214,21 +243,22 @@ function SidebarContent({ user, currentPath, navigate, t, onMobileClose }: Sideb
           />
         </NavSection>
       </div>
+      </div>
 
       {/* Sidebar Footer */}
-      <div className="p-3 border-t border-gray-800 mt-auto">
+      <div className="p-3 border-t border-white/20 mt-auto">
         <div className="flex items-center gap-2 mb-3 px-2">
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center text-white font-semibold">
             {user.name?.charAt(0).toUpperCase() || "U"}
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-white truncate">{user.name}</p>
-            <p className="text-xs text-gray-400 capitalize">{user.role}</p>
+            <p className="text-xs text-white/60 capitalize">{user.role}</p>
           </div>
         </div>
         <button
           onClick={() => navigate("/pos")}
-          className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 p-2.5 rounded-xl font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2 shadow-md"
+          className="w-full bg-white text-green-700 hover:bg-green-50 p-2.5 rounded-xl font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2 shadow-md"
         >
           <IonIcon icon={logOutOutline} className="text-lg" />
           <span>{t('adminLayout.goToPos')}</span>
@@ -250,7 +280,7 @@ export default function AdminLayout() {
 
   if (!user) {
     return (
-      <div className="h-screen flex items-center justify-center bg-[#F8F9FC]">
+      <div className="h-screen flex items-center justify-center bg-[#F8F8F8]">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500" />
       </div>
     );
@@ -259,12 +289,9 @@ export default function AdminLayout() {
   const currentPath = location.pathname;
 
   return (
-    <div className="h-screen flex flex-col bg-[#141414]">
-      <Topbar onMenuClick={() => setMobileMenuOpen(!mobileMenuOpen)} />
-
-      <div className="flex-1 flex overflow-hidden">
+    <div className="h-screen flex bg-[#F8F8F8]">
         {/* Desktop Sidebar */}
-        <aside className="hidden md:flex md:w-64 flex-col bg-[#1a1a1a] text-white shadow-xl overflow-y-auto scrollbar-thin scrollbar-track-gray-800 scrollbar-thumb-gray-600">
+        <aside className="hidden md:flex md:w-64 flex-col bg-[#0c391d] text-white shadow-xl rounded-2xl m-3">
           <SidebarContent user={user} currentPath={currentPath} navigate={navigate} t={t} />
         </aside>
 
@@ -283,14 +310,14 @@ export default function AdminLayout() {
           />
           {/* Sidebar panel */}
           <aside
-            className={`absolute left-0 top-0 bottom-0 w-64 bg-[#1a1a1a] text-white shadow-2xl transition-transform duration-300 ease-out ${
+            className={`absolute left-0 top-0 bottom-0 w-64 bg-[#0c391d] text-white shadow-2xl transition-transform duration-300 ease-out ${
               mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
             }`}
           >
-            <div className="flex justify-end p-2 border-b border-gray-800">
+            <div className="flex justify-end p-2 border-b border-white/20">
               <button
                 onClick={() => setMobileMenuOpen(false)}
-                className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-white/10"
+                className="p-2 text-white/80 hover:text-white rounded-lg hover:bg-white/20"
               >
                 <IonIcon icon={closeOutline} className="text-2xl" />
               </button>
@@ -305,13 +332,17 @@ export default function AdminLayout() {
           </aside>
         </div>
 
-        {/* Main Content */}
-        <main className="flex-1 flex flex-col overflow-hidden bg-[#F8F9FC] rounded-tl-2xl rounded-bl-2xl shadow-inner">
-          <div className="flex-1 overflow-y-auto p-1 scrollbar-thin scrollbar-track-slate-200 scrollbar-thumb-slate-300">
-            <Outlet />
-          </div>
-        </main>
+        {/* Right Column: Topbar + Content */}
+        <div className="flex-1 flex flex-col">
+          <Topbar onMenuClick={() => setMobileMenuOpen(!mobileMenuOpen)} />
+
+          {/* Main Content */}
+          <main className="flex-1 flex flex-col overflow-hidden bg-[#F8F8F8] shadow-inner">
+            <div className="flex-1 overflow-y-auto p-1 scrollbar-thin scrollbar-track-slate-200 scrollbar-thumb-slate-300">
+              <Outlet />
+            </div>
+          </main>
+        </div>
       </div>
-    </div>
   );
 }

@@ -628,7 +628,11 @@
       "profile": "Profile",
       "dailyReport": "Daily Report",
       "endOfDay": "End of Day",
-      "gstReport": "GST Report"
+      "gstReport": "GST Report",
+      "h1Register": "H1 Register",
+      "auditLogs": "Audit Logs",
+      "stockAdjustments": "Stock Adjustments",
+      "medicineReturns": "Medicine Returns"
     },
     "roles": {
       "owner": "Owner",

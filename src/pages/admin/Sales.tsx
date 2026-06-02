@@ -69,8 +69,12 @@ export default function Sales() {
     if (!confirm(`Delete invoice ${sale.invoice_number}? Stock will be restored.`)) return;
     setDeleting(sale.sale_uuid);
     try {
-      await deleteSale(sale.sale_uuid);
-      await loadSales();
+      const result = await deleteSale(sale.sale_uuid);
+      if (result?.success) {
+        await loadSales();
+      } else {
+        alert('Failed to delete: ' + (result?.error || 'Unknown error'));
+      }
     } catch (err: any) {
       alert('Failed to delete: ' + err.message);
     } finally {

@@ -1,0 +1,36 @@
+import { apiGet, apiPost } from "./api";
+
+export async function getMedicineReturns() {
+  try {
+    const response = await apiGet("/medicine-returns");
+    if (response?.success && Array.isArray(response.data)) {
+      return response.data;
+    }
+    if (response && !response.success) {
+      console.warn("Medicine returns API error:", response.error);
+      return [];
+    }
+    return [];
+  } catch (error) {
+    console.error("Failed to load medicine returns:", error);
+    return [];
+  }
+}
+
+export async function createMedicineReturn(data: {
+  sale_uuid?: string;
+  product_uuid: string;
+  batch_uuid: string;
+  return_type: string;
+  quantity: number;
+  refund_amount?: number;
+  reason?: string;
+}) {
+  try {
+    const response = await apiPost("/medicine-returns", data);
+    return response.data || response;
+  } catch (error) {
+    console.error("Failed to create medicine return:", error);
+    return { success: false, error: "Medicine return failed" };
+  }
+}

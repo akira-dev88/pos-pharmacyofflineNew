@@ -48,7 +48,9 @@ export default function ImportProductsModal({ onClose, onImported }: { onClose: 
       }
 
       const result = await previewMigration(fileContent, fileType);
-      if (!result || result.length === 0) throw new Error(t('importProducts.noProducts'));
+      if (!result || result.error || result.length === 0) {
+        throw new Error(result?.error || t('importProducts.noProducts'));
+      }
       setPreviewData(result);
       setStep('preview');
     } catch (e: any) {
@@ -63,6 +65,9 @@ export default function ImportProductsModal({ onClose, onImported }: { onClose: 
     setError(null);
     try {
       const result = await confirmMigration(previewData, onDuplicate);
+      if (result && !result.success) {
+        throw new Error(result.error || 'Migration failed');
+      }
       setResult(result);
       setStep('done');
     } catch (e: any) {

@@ -64,5 +64,14 @@ export async function getInvoice(saleUUID: string): Promise<Invoice> {
 }
 
 export async function deleteSale(saleUuid: string) {
-  return await apiDelete(`/sales/${saleUuid}`);
+  try {
+    const response = await apiDelete(`/sales/${saleUuid}`);
+    if (response && !response.success) {
+      console.warn('Delete sale failed:', response.error);
+    }
+    return response;
+  } catch (error) {
+    console.error('Delete sale error:', error);
+    return { success: false, error: 'Delete sale feature not available' };
+  }
 }
