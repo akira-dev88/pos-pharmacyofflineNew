@@ -27,6 +27,11 @@ export function runMigrations(): void {
       drug_license_valid_upto TEXT,
       pharmacist_name TEXT,
       pharmacist_registration_number TEXT,
+      auto_print INTEGER DEFAULT 0,
+      printer_type TEXT DEFAULT 'network',
+      printer_host TEXT DEFAULT 'localhost',
+      printer_port INTEGER DEFAULT 9104,
+      printer_name TEXT,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
@@ -70,6 +75,7 @@ export function runMigrations(): void {
 
       image TEXT,
 
+      is_deleted INTEGER DEFAULT 0,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -226,6 +232,8 @@ export function runMigrations(): void {
       cost_price REAL NOT NULL,
       selling_price REAL DEFAULT 0,
       gst_percent REAL DEFAULT 0,
+      unit_uuid TEXT,
+      normalized_quantity REAL DEFAULT 0,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (purchase_uuid) REFERENCES purchases(purchase_uuid),
@@ -303,6 +311,7 @@ export function runMigrations(): void {
       price REAL NOT NULL,
       discount REAL NOT NULL DEFAULT 0.00,
       tax_percent REAL NOT NULL DEFAULT 0.00,
+      unit_uuid TEXT,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (cart_uuid) REFERENCES carts(cart_uuid),
@@ -522,6 +531,12 @@ export function runMigrations(): void {
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   );
 
+    CREATE TABLE IF NOT EXISTS license (
+      id INTEGER PRIMARY KEY,
+      license_key TEXT NOT NULL,
+      machine_id TEXT NOT NULL,
+      activated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 
   console.log('Migrations completed successfully!');

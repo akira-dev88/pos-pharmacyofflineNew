@@ -63,6 +63,34 @@ export class CategoryAttributeController {
     }
   };
 
+  // GET ALL CATEGORY ATTRIBUTE MAPPINGS
+
+  static index = (
+    req: Request,
+    res: Response
+  ): void => {
+
+    try {
+
+      const mappings =
+        CategoryAttributeModel.findAll();
+
+      res.json({
+        success: true,
+        data: mappings
+      });
+
+    } catch (error) {
+
+      console.error(error);
+
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error'
+      });
+    }
+  };
+
   // GET CATEGORY ATTRIBUTES
 
   static getByCategory = (

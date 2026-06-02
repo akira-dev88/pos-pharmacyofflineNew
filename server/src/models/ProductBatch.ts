@@ -68,6 +68,84 @@ export class ProductBatchModel {
   }
 
   // =========================
+  // FIND BY BATCH NUMBER
+  // =========================
+
+  static findByBatchNumber(
+    product_uuid: string,
+    batch_number: string
+  ): ProductBatch | undefined {
+
+    const stmt = db.prepare(`
+    SELECT *
+    FROM product_batches
+    WHERE product_uuid = ?
+    AND batch_number = ?
+    LIMIT 1
+  `);
+
+    return stmt.get(
+      product_uuid,
+      batch_number
+    ) as ProductBatch | undefined;
+  }
+
+  // =========================
+  // UPDATE
+  // =========================
+
+  static update(
+    batch_uuid: string,
+    updates: Partial<ProductBatchCreateInput>
+  ): ProductBatch | undefined {
+
+    const batch =
+      this.findById(batch_uuid);
+
+    if (!batch) {
+      return undefined;
+    }
+
+    const fields: string[] = [];
+    const values: any[] = [];
+
+    for (const [key, value] of Object.entries(updates)) {
+
+      if (value === undefined) {
+        continue;
+      }
+
+      fields.push(`${key} = ?`);
+      values.push(value);
+    }
+
+    if (!fields.length) {
+      return batch;
+    }
+
+    fields.push(
+      'updated_at = CURRENT_TIMESTAMP'
+    );
+
+    values.push(batch_uuid);
+
+    db.prepare(`
+    UPDATE product_batches
+    SET ${fields.join(', ')}
+    WHERE batch_uuid = ?
+  `).run(...values);
+
+    const updated =
+      this.findById(batch_uuid)!;
+
+    this.recalculateProductStock(
+      updated.product_uuid
+    );
+
+    return updated;
+  }
+
+  // =========================
   // GET BY PRODUCT
   // =========================
 

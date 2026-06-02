@@ -20,6 +20,12 @@ router.post(
   CategoryAttributeController.assign
 );
 
+// GET ALL MAPPINGS
+router.get(
+  '/',
+  CategoryAttributeController.index
+);
+
 // GET CATEGORY ATTRIBUTES
 router.get(
   '/:category_uuid',

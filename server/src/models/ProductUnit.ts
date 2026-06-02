@@ -76,6 +76,57 @@ export class ProductUnitModel {
     ) as ProductUnit | undefined;
   }
 
+  // FIND BY PRODUCT + UNIT NAME
+
+  static findByProductAndUnitName(
+    product_uuid: string,
+    unit_name: string
+  ): ProductUnit | undefined {
+
+    const stmt = db.prepare(`
+    SELECT *
+    FROM product_units
+    WHERE product_uuid = ?
+    AND unit_name = ?
+    LIMIT 1
+  `);
+
+    return stmt.get(
+      product_uuid,
+      unit_name
+    ) as ProductUnit | undefined;
+  }
+
+  // UPDATE
+
+  static update(
+    unit_uuid: string,
+    data: Partial<ProductUnitCreateInput>
+  ): ProductUnit | undefined {
+
+    const stmt = db.prepare(`
+    UPDATE product_units
+    SET
+      conversion_factor = ?,
+      barcode = ?,
+      price = ?,
+      purchase_price = ?,
+      is_base_unit = ?
+    WHERE unit_uuid = ?
+  `);
+
+    stmt.run(
+      data.conversion_factor,
+      data.barcode || null,
+      data.price || null,
+      data.purchase_price || null,
+      data.is_base_unit || 0,
+      unit_uuid
+    );
+
+    return this.findById(unit_uuid);
+  }
+
   // GET PRODUCT UNITS
 
   static getByProduct(

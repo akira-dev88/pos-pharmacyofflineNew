@@ -59,6 +59,24 @@ export class AttributeModel {
     return stmt.get(uuid) as Attribute | undefined;
   }
 
+  // FIND BY NAME
+
+  static findByName(
+    name: string
+  ): Attribute | undefined {
+
+    const stmt = db.prepare(`
+    SELECT *
+    FROM attributes
+    WHERE name = ?
+    LIMIT 1
+  `);
+
+    return stmt.get(name) as
+      Attribute | undefined;
+  }
+
+
   // FIND ALL
   static findAll(): Attribute[] {
 

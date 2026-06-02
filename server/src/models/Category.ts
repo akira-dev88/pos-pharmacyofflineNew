@@ -79,4 +79,18 @@ export class CategoryModel {
 
     return result.changes > 0;
   }
+
+  static findByName(
+    name: string
+  ): Category | undefined {
+
+    const stmt = db.prepare(`
+    SELECT *
+    FROM categories
+    WHERE name = ?
+    LIMIT 1
+  `);
+
+    return stmt.get(name) as Category | undefined;
+  }
 }

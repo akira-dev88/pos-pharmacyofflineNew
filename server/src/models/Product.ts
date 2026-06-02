@@ -180,6 +180,36 @@ export class ProductModel {
   }
 
   // =========================
+  // FIND BY NAME
+  // =========================
+
+  static findByName(
+    name: string
+  ): Product | undefined {
+
+    const stmt = db.prepare(`
+    SELECT *
+    FROM products
+    WHERE name = ?
+    LIMIT 1
+  `);
+
+    const product =
+      stmt.get(name) as Product | undefined;
+
+    if (!product) {
+      return undefined;
+    }
+
+    product.attributes =
+      this.getAttributes(
+        product.product_uuid
+      );
+
+    return product;
+  }
+
+  // =========================
   // LIST PRODUCTS
   // =========================
 

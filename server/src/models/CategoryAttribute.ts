@@ -32,6 +32,30 @@ export class CategoryAttributeModel {
     return true;
   }
 
+
+  // FIND EXISTING MAPPING
+
+  static exists(
+    category_uuid: string,
+    attribute_uuid: string
+  ): boolean {
+
+    const stmt = db.prepare(`
+    SELECT 1
+    FROM category_attributes
+    WHERE category_uuid = ?
+    AND attribute_uuid = ?
+    LIMIT 1
+  `);
+
+    const result = stmt.get(
+      category_uuid,
+      attribute_uuid
+    );
+
+    return !!result;
+  }
+
   // GET ATTRIBUTES FOR CATEGORY
 
   static getByCategory(
@@ -78,5 +102,38 @@ export class CategoryAttributeModel {
       category_uuid,
       attribute_uuid
     );
+  }
+
+  // GET ALL CATEGORY ATTRIBUTE MAPPINGS
+
+  static findAll() {
+
+    const stmt = db.prepare(`
+    SELECT
+      c.category_uuid,
+      c.name AS category_name,
+
+      a.attribute_uuid,
+      a.name AS attribute_name,
+      a.display_name,
+      a.data_type,
+
+      ca.is_required,
+      ca.sort_order
+
+    FROM category_attributes ca
+
+    INNER JOIN categories c
+    ON c.category_uuid = ca.category_uuid
+
+    INNER JOIN attributes a
+    ON a.attribute_uuid = ca.attribute_uuid
+
+    ORDER BY
+      c.name ASC,
+      ca.sort_order ASC
+  `);
+
+    return stmt.all();
   }
 }
