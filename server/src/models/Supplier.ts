@@ -95,6 +95,21 @@ export class SupplierModel {
     return result.changes > 0;
   }
 
+  // FIND BY NAME
+  
+  static findByName(
+  name: string
+): Supplier | undefined {
+
+  return db.prepare(`
+    SELECT *
+    FROM suppliers
+    WHERE name = ?
+    LIMIT 1
+  `).get(name) as
+    Supplier | undefined;
+}
+
   // Get supplier with purchase count
   static getWithPurchaseCount(uuid: string): (Supplier & { purchase_count: number }) | undefined {
     const supplier = db.prepare(`
