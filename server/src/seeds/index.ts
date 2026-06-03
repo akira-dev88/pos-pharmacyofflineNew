@@ -7,6 +7,7 @@ import { seedProducts } from './product.seed';
 import { seedProductUnits } from './productUnit.seed';
 import { seedProductBatches } from './productBatch.seed';
 import { seedStressData } from './stressTest.seed';
+import { seedCustomers } from './customer.seed';
 
 function runSeeds(): void {
 
@@ -21,6 +22,7 @@ function runSeeds(): void {
   seedProducts();
   seedProductUnits();
   seedProductBatches();
+  seedCustomers();
   seedStressData();
 
   console.log('🎉 All seeds completed');
