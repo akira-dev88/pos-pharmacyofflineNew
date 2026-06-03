@@ -8,6 +8,7 @@ import { seedProductUnits } from './productUnit.seed';
 import { seedProductBatches } from './productBatch.seed';
 import { seedStressData } from './stressTest.seed';
 import { seedCustomers } from './customer.seed';
+import { seedSuppliers } from './supplier.seed';
 
 function runSeeds(): void {
 
@@ -21,6 +22,7 @@ function runSeeds(): void {
   seedCategoryAttributes();
   seedProducts();
   seedProductUnits();
+  seedSuppliers();
   seedProductBatches();
   seedCustomers();
   seedStressData();
