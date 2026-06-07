@@ -22,13 +22,16 @@ import productBatchRoutes from './routes/productBatches';
 
 import { LicenseService } from './services/licenseService';
 
+import productTemplateRoutes
+  from './routes/productTemplateRoutes';
+
 import { scheduleAutoBackup, checkDbIntegrity } from './database/backup';
 
 import attributeRoutes
-from './routes/attributes';
+  from './routes/attributes';
 
 import categoryRoutes
-from './routes/categories';
+  from './routes/categories';
 
 import stockAdjustmentRoutes
   from './routes/stockAdjustmentRoutes';
@@ -37,10 +40,10 @@ import medicineReturnRoutes
   from './routes/medicineReturnRoutes';
 
 import h1RegisterRoutes
-from './routes/h1RegisterRoutes';
+  from './routes/h1RegisterRoutes';
 
 import auditLogRoutes
-from './routes/auditLogRoutes';
+  from './routes/auditLogRoutes';
 
 // Load environment variables - simplified for CommonJS
 dotenv.config();
@@ -134,6 +137,11 @@ app.use(
 app.use(
   '/api/audit-logs',
   auditLogRoutes
+);
+
+app.use(
+  '/api/product-templates',
+  productTemplateRoutes
 );
 
 // Health check
