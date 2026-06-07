@@ -537,6 +537,27 @@ export function runMigrations(): void {
       machine_id TEXT NOT NULL,
       activated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS product_templates (
+      template_uuid TEXT PRIMARY KEY,
+
+      name TEXT NOT NULL,
+
+      description TEXT,
+
+      category_uuid TEXT,
+
+      icon TEXT,
+
+      defaults_json TEXT,
+
+      packaging_json TEXT,
+
+      is_active INTEGER DEFAULT 1,
+
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 
   console.log('Migrations completed successfully!');
