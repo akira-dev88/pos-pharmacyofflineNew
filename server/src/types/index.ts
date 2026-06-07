@@ -345,6 +345,11 @@ export interface CustomerSummary {
   top_debtors: Array<{ name: string; credit_balance: number }>;
 }
 
+export interface CreditTrendItem {
+  month: string;
+  total: number;
+}
+
 export interface Sale {
   sale_uuid: string;
   invoice_number: string;
@@ -635,6 +640,14 @@ export interface InvoiceItem {
   total: number;
 
   schedule_type?: string | null;
+
+  prescription_required?: number;
+  prescription_number?: string | null;
+  doctor_name?: string | null;
+  doctor_license?: string | null;
+  patient_name?: string | null;
+  patient_age?: number | null;
+  patient_gender?: string | null;
 }
 
 export interface InvoiceSummary {
@@ -810,4 +823,45 @@ export interface CreateAuditLogInput {
   details?: string;
 
   ip_address?: string;
+}
+
+export interface ProductTemplate {
+  template_uuid: string;
+
+  name: string;
+
+  description?: string;
+
+  category_uuid?: string;
+
+  icon?: string;
+
+  defaults_json?: any;
+
+  packaging_json?: any;
+
+  is_active: number;
+
+  created_at: string;
+
+  updated_at: string;
+}
+
+export interface ProductTemplateCreateInput {
+  name: string;
+  description?: string;
+  category_uuid?: string;
+  icon?: string;
+  defaults_json?: any;
+  packaging_json?: any;
+}
+
+export interface ProductTemplateUpdateInput {
+  name?: string;
+  description?: string;
+  category_uuid?: string;
+  icon?: string;
+  defaults_json?: any;
+  packaging_json?: any;
+  is_active?: number;
 }
