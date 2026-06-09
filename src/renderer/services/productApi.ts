@@ -215,3 +215,41 @@ export async function confirmMigration(products: any[], onDuplicate: 'skip' | 'o
     return { success: false, error: 'Migration endpoint not available' };
   }
 }
+
+// ── Product Templates ─────────────────────────────────────────────────────
+
+export async function getProductTemplates() {
+  try {
+    const response = await apiGet("/product-templates");
+    if (response?.success && Array.isArray(response.data)) return response.data;
+    return [];
+  } catch (error) {
+    console.error("Failed to load product templates:", error);
+    return [];
+  }
+}
+
+export async function getProductTemplate(uuid: string) {
+  try {
+    const response = await apiGet(`/product-templates/${uuid}`);
+    return response?.data || response;
+  } catch (error) {
+    console.error("Failed to load product template:", error);
+    return null;
+  }
+}
+
+export async function createProductTemplate(data: any) {
+  const response = await apiPost("/product-templates", data);
+  return response.data || response;
+}
+
+export async function updateProductTemplate(uuid: string, data: any) {
+  const response = await apiPut(`/product-templates/${uuid}`, data);
+  return response.data || response;
+}
+
+export async function deleteProductTemplate(uuid: string) {
+  const response = await apiDelete(`/product-templates/${uuid}`);
+  return response.data || response;
+}

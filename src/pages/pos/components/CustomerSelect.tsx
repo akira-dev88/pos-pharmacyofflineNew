@@ -7,7 +7,7 @@ interface CustomerSelectProps {
   customers: any[];
   selectedCustomer: any | null;
   onSelectCustomer: (customer: any | null) => void;
-  onAddNew: () => void;
+  onAddNew: (phone?: string) => void;
 }
 
 export default function CustomerSelect({
@@ -48,7 +48,7 @@ export default function CustomerSelect({
         const query = searchQuery.replace(/\D/g, '');
         return query.length > 0 && digits.includes(query);
       })
-    : customers;
+    : customers.slice(0, 10);
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -160,7 +160,7 @@ export default function CustomerSelect({
             <button
               className="w-full text-center text-blue-400 text-sm hover:text-blue-300 transition-colors flex items-center justify-center gap-2 py-1"
               onClick={() => {
-                onAddNew();
+                onAddNew(searchQuery);
                 setIsOpen(false);
               }}
             >

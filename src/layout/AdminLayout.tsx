@@ -11,7 +11,6 @@ import {
   cartOutline,
   peopleCircleOutline,
   settingsOutline,
-  personCircleOutline,
   logOutOutline,
   checkmarkCircle,
   closeOutline,
@@ -37,13 +36,13 @@ function NavItem({ label, path, currentPath, icon, onClick }: NavItemProps) {
       onClick={onClick}
       className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${
         active
-          ? "bg-white text-green-700 shadow-md"
-          : "text-white/80 hover:bg-white/20 hover:text-white"
+          ? "bg-green-600 text-white shadow-lg shadow-green-600/30"
+          : "text-gray-300 hover:bg-white/10 hover:text-white"
       }`}
     >
-      <IonIcon icon={icon} className={`text-xl ${active ? "text-green-700" : "text-white/60"}`} />
+      <IonIcon icon={icon} className={`text-xl ${active ? "text-white" : "text-gray-400"}`} />
       <span className="text-sm font-medium">{label}</span>
-      {active && <IonIcon icon={checkmarkCircle} className="text-green-700 text-sm ml-auto" />}
+      {active && <IonIcon icon={checkmarkCircle} className="text-white text-sm ml-auto" />}
     </button>
   );
 }
@@ -59,7 +58,7 @@ interface NavSectionProps {
 function NavSection({ title, children }: NavSectionProps) {
   return (
     <div className="space-y-1">
-      <div className="px-3 pt-2 pb-1 text-xs font-semibold text-white/50 uppercase tracking-wider">
+      <div className="px-3 pt-2 pb-1 text-xs font-semibold text-green-400/70 uppercase tracking-wider">
         {title}
       </div>
       {children}
@@ -121,13 +120,6 @@ function SidebarContent({ user, currentPath, navigate, t, onMobileClose }: Sideb
               onClick={() => handleNavigate("/admin/reports")}
             />
             <NavItem
-              label={t('adminLayout.nav.dailyReport')}
-              path="/admin/daily-report"
-              currentPath={currentPath}
-              icon={documentTextOutline}
-              onClick={() => handleNavigate("/admin/daily-report")}
-            />
-            <NavItem
               label={t('adminLayout.nav.gstReport')}
               path="/admin/gst-report"
               currentPath={currentPath}
@@ -169,20 +161,13 @@ function SidebarContent({ user, currentPath, navigate, t, onMobileClose }: Sideb
               icon={documentTextOutline}
               onClick={() => handleNavigate("/admin/audit-logs")}
             />
-            <NavItem
+            {/* <NavItem
               label={t('adminLayout.nav.stockAdjustments')}
               path="/admin/stock-adjustments"
               currentPath={currentPath}
               icon={documentTextOutline}
               onClick={() => handleNavigate("/admin/stock-adjustments")}
-            />
-            <NavItem
-              label={t('adminLayout.nav.medicineReturns')}
-              path="/admin/medicine-returns"
-              currentPath={currentPath}
-              icon={documentTextOutline}
-              onClick={() => handleNavigate("/admin/medicine-returns")}
-            />
+            /> */}
           </NavSection>
         )}
 
@@ -226,22 +211,13 @@ function SidebarContent({ user, currentPath, navigate, t, onMobileClose }: Sideb
           </NavSection>
         )}
 
-        <NavSection title={t('adminLayout.sections.account')}>
-          <NavItem
-            label={t('adminLayout.nav.profile')}
-            path="/admin/profile"
-            currentPath={currentPath}
-            icon={personCircleOutline}
-            onClick={() => handleNavigate("/admin/profile")}
-          />
-          <NavItem
-            label={t('adminLayout.nav.settings')}
-            path="/admin/settings"
-            currentPath={currentPath}
-            icon={settingsOutline}
-            onClick={() => handleNavigate("/admin/settings")}
-          />
-        </NavSection>
+        <NavItem
+          label={t('adminLayout.nav.settings')}
+          path="/admin/settings"
+          currentPath={currentPath}
+          icon={settingsOutline}
+          onClick={() => handleNavigate("/admin/settings")}
+        />
       </div>
       </div>
 
@@ -258,7 +234,7 @@ function SidebarContent({ user, currentPath, navigate, t, onMobileClose }: Sideb
         </div>
         <button
           onClick={() => navigate("/pos")}
-          className="w-full bg-white text-green-700 hover:bg-green-50 p-2.5 rounded-xl font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2 shadow-md"
+          className="w-full bg-green-600 hover:bg-green-500 text-white p-2.5 rounded-xl font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-green-600/30"
         >
           <IonIcon icon={logOutOutline} className="text-lg" />
           <span>{t('adminLayout.goToPos')}</span>
@@ -291,7 +267,7 @@ export default function AdminLayout() {
   return (
     <div className="h-screen flex bg-[#F8F8F8]">
         {/* Desktop Sidebar */}
-        <aside className="hidden md:flex md:w-64 flex-col bg-[#0c391d] text-white shadow-xl rounded-2xl m-3">
+        <aside className="hidden md:flex md:w-64 flex-col bg-black text-white shadow-xl rounded-2xl m-3">
           <SidebarContent user={user} currentPath={currentPath} navigate={navigate} t={t} />
         </aside>
 
@@ -310,7 +286,7 @@ export default function AdminLayout() {
           />
           {/* Sidebar panel */}
           <aside
-            className={`absolute left-0 top-0 bottom-0 w-64 bg-[#0c391d] text-white shadow-2xl transition-transform duration-300 ease-out ${
+            className={`absolute left-0 top-0 bottom-0 w-64 bg-black text-white shadow-2xl transition-transform duration-300 ease-out ${
               mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
             }`}
           >
@@ -338,7 +314,7 @@ export default function AdminLayout() {
 
           {/* Main Content */}
           <main className="flex-1 flex flex-col overflow-hidden bg-[#F8F8F8] shadow-inner">
-            <div className="flex-1 overflow-y-auto p-1 scrollbar-thin scrollbar-track-slate-200 scrollbar-thumb-slate-300">
+            <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-track-slate-200 scrollbar-thumb-slate-300">
               <Outlet />
             </div>
           </main>

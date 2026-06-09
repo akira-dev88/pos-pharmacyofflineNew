@@ -1,33 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { getStock, updateStock } from "../../renderer/services/stockApi";
 import { IonIcon } from "@ionic/react";
 import {
-  refreshOutline,
   checkmarkCircleOutline,
   warningOutline,
   closeCircleOutline,
-  createOutline,
   closeOutline,
   cubeOutline,
-  trendingUpOutline,
   searchOutline,
-  saveOutline,
 } from "ionicons/icons";
 
 // shadcn/ui components
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Select,
   SelectContent,
@@ -52,15 +38,83 @@ export default function Stock() {
   const [newStock, setNewStock] = useState<number>(0);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterStatus, setFilterStatus] = useState<"all" | "low" | "ok">("all");
+  const [filterStatus, setFilterStatus] = useState<"all" | "low" | "ok" | "out">("all");
   const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
 
   // Dashboard stats
   const totalProducts = items.length;
   const lowStockCount = items.filter((item) => item.stock < 10 && item.stock > 0).length;
   const outOfStockCount = items.filter((item) => item.stock === 0).length;
   const totalStock = items.reduce((sum, item) => sum + (item.stock || 0), 0);
+
+  const [selectedStat, setSelectedStat] = useState<string | null>(null);
+
+  const trendData = useMemo(() => {
+    const gen = (peak: number) => {
+      const pts: number[] = [];
+      for (let i = 0; i < 20; i++) {
+        const base = (i / 19) * peak;
+        pts.push(Math.max(0, Math.round(base * (0.7 + ((i * 7 + 13) % 10) / 20))));
+      }
+      return pts;
+    };
+    return {
+      products: gen(totalProducts),
+      stock: gen(totalStock),
+      low: gen(lowStockCount),
+      out: gen(outOfStockCount),
+    };
+  }, [totalProducts, totalStock, lowStockCount, outOfStockCount]);
+
+  const Sparkline = ({ data: chartData, width = 320, height = 100, color = "#22c55e" }: { data: number[], width?: number, height?: number, color?: string }) => {
+    const [hovered, setHovered] = useState(false);
+    if (!chartData || chartData.length < 2) return null;
+    const values = chartData;
+    const max = Math.max(...values, 1);
+    const min = Math.min(...values, 0);
+    const range = max - min || 1;
+    const points = values.map((v: number, i: number) => ({
+      x: i / (values.length - 1) * width,
+      y: 4 + (height - 8) * (1 - (v - min) / range),
+    }));
+    const smoothPath = (pts: { x: number; y: number }[]) => {
+      if (pts.length < 2) return '';
+      let d = `M ${pts[0].x},${pts[0].y}`;
+      for (let i = 1; i < pts.length; i++) {
+        const p0 = pts[i - 1], p1 = pts[i], p_1 = pts[Math.max(0, i - 2)], p2 = pts[Math.min(pts.length - 1, i + 1)];
+        d += ` C ${p0.x + (p1.x - p_1.x) / 6},${p0.y + (p1.y - p_1.y) / 6} ${p1.x - (p2.x - p0.x) / 6},${p1.y - (p2.y - p0.y) / 6} ${p1.x},${p1.y}`;
+      }
+      return d;
+    };
+    const lineD = smoothPath(points);
+    const areaD = `${lineD} L ${width},${height} L 0,${height} Z`;
+    return (
+      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none"
+        onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+        style={{ cursor: 'pointer' }}>
+        <defs>
+          <linearGradient id={`sg-${color.replace('#','')}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity={hovered ? 0.55 : 0.38} />
+            <stop offset="100%" stopColor={color} stopOpacity={hovered ? 0.06 : 0.02} />
+          </linearGradient>
+        </defs>
+        <path d={areaD} fill={`url(#sg-${color.replace('#','')})`} />
+        <path d={lineD} fill="none" stroke={color} strokeWidth={hovered ? 3.5 : 2.5} strokeLinecap="round" strokeLinejoin="round" style={{ transition: 'stroke-width 0.15s' }} />
+      </svg>
+    );
+  };
+
+  const formatCompactNumber = (num: number): string => {
+    if (num === null || num === undefined) return "0";
+    const absNum = Math.abs(num);
+    if (absNum >= 10000000) return (num / 10000000).toFixed(2) + "cr";
+    if (absNum >= 100000) return (num / 100000).toFixed(2) + "L";
+    if (absNum >= 1000) return (num / 1000).toFixed(2) + "k";
+    return num.toString();
+  };
 
   // Load stock data
   const loadStock = async () => {
@@ -81,6 +135,10 @@ export default function Stock() {
   useEffect(() => {
     loadStock();
   }, []);
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm, filterStatus]);
 
   const handleUpdate = async () => {
     if (!editingItem) return;
@@ -106,48 +164,39 @@ export default function Stock() {
     const matchesStatus =
       filterStatus === "all" ? true :
         filterStatus === "low" ? (item.stock < 10 && item.stock > 0) :
-          item.stock >= 10;
+          filterStatus === "out" ? item.stock === 0 :
+            item.stock >= 10;
     return matchesSearch && matchesStatus;
   });
 
-  // Stat Card component
-  const StatCard = ({ label, value, delta, gradient, icon }: any) => (
-    <div className={`relative overflow-hidden rounded-2xl p-5 ${gradient} group cursor-default text-white`}>
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider opacity-80 mb-1">{label}</p>
-          <p className="text-3xl font-bold mt-0.5">{value}</p>
-          {delta && <p className="text-xs mt-1.5 opacity-80">{delta}</p>}
-        </div>
-        <div className="p-2.5 rounded-xl bg-white/15 backdrop-blur-sm">{icon}</div>
-      </div>
-      <div className="absolute -bottom-4 -right-4 w-24 h-24 rounded-full bg-white/5 group-hover:bg-white/10 transition-colors" />
-    </div>
-  );
+  const totalPages = Math.ceil(filteredItems.length / pageSize);
+  const paginatedItems = filteredItems.slice((page - 1) * pageSize, page * pageSize);
+
+
 
   // Helper to get status badge
   const getStatusBadge = (stock: number) => {
     if (stock === 0) {
       return (
-        <Badge variant="destructive" className="flex items-center justify-center gap-1 p-1 w-fit">
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 border border-red-200">
           <IonIcon icon={closeCircleOutline} className="text-xs" />
           {t('stock.outOfStockLabel')}
-        </Badge>
+        </span>
       );
     }
     if (stock < 10) {
       return (
-        <Badge variant="secondary" className="flex items-center justify-center gap-1 p-1 w-fit bg-amber-100 text-amber-700 hover:bg-amber-100 border-amber-200">
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 border border-amber-200">
           <IonIcon icon={warningOutline} className="text-xs" />
           {t('stock.lowStockLabel')}
-        </Badge>
+        </span>
       );
     }
     return (
-      <Badge variant="secondary" className="flex items-center justify-center gap-1 p-1 w-fit bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-emerald-200">
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 border border-emerald-200">
         <IonIcon icon={checkmarkCircleOutline} className="text-xs" />
         {t('stock.inStockLabel')}
-      </Badge>
+      </span>
     );
   };
 
@@ -157,92 +206,90 @@ export default function Stock() {
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">{t('stock.title')}</h1>
           <Button onClick={loadStock} className="gap-2">
-            <IonIcon icon={refreshOutline} className="text-lg" />
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
             {t('stock.retry')}
           </Button>
         </div>
-        <Card className="border-red-200 bg-red-50">
-          <CardContent className="p-8 text-center">
-            <IonIcon icon={warningOutline} className="text-5xl text-red-500 mx-auto mb-4" />
-            <p className="text-red-700 font-medium">{error}</p>
-            <p className="text-red-600 text-sm mt-2">{t('stock.checkConnection')}</p>
-          </CardContent>
-        </Card>
+        <div className="border border-red-200 bg-red-50 rounded-xl p-8 text-center">
+          <IonIcon icon={warningOutline} className="text-5xl text-red-500 mx-auto mb-4" />
+          <p className="text-red-700 font-medium">{error}</p>
+          <p className="text-red-600 text-sm mt-2">{t('stock.checkConnection')}</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-[#F8F9FC] p-6 space-y-5">
-      {/* Header */}
-      <div className="flex justify-between items-center flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight text-start">{t('stock.title')}</h1>
-          <p className="text-slate-500 text-sm mt-0.5">{t('stock.subtitle')}</p>
-        </div>
-        <Button onClick={loadStock} disabled={loading} variant="outline" className="gap-2">
-          <IonIcon icon={refreshOutline} className={`text-lg ${loading ? 'animate-spin' : ''}`} />
-          {t('stock.refresh')}
-        </Button>
-      </div>
-
       {/* Stats Cards */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 text-start">
-        <StatCard
-          label="Total Products"
-          value={totalProducts}
-          delta="In master database"
-          gradient="bg-gradient-to-br from-blue-500 to-blue-700"
-          icon={
-            <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-6 py-5 flex items-center gap-6 relative">
+          <button onClick={() => setSelectedStat('products')} className="absolute top-2 right-2 w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M7 17L17 7M7 7h10v10" />
             </svg>
-          }
-        />
-        <StatCard
-          label="Total Stock"
-          value={totalStock.toLocaleString()}
-          delta="Units across batches"
-          gradient="bg-gradient-to-br from-violet-500 to-violet-700"
-          icon={
-            <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          </button>
+          <div className="flex-shrink-0">
+            <p className="text-xs text-gray-400 mb-0.5">Statistics</p>
+            <p className="text-sm font-semibold text-gray-700 mb-3">Total Products</p>
+            <p className="text-5xl font-bold text-gray-900 leading-none">{formatCompactNumber(totalProducts)}</p>
+            <p className="text-xs text-gray-500 mt-1">In master database</p>
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-6 py-5 flex items-center gap-6 relative">
+          <button onClick={() => setSelectedStat('stock')} className="absolute top-2 right-2 w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M7 17L17 7M7 7h10v10" />
             </svg>
-          }
-        />
-        <StatCard
-          label="Low Stock"
-          value={lowStockCount}
-          delta="Below threshold"
-          gradient="bg-gradient-to-br from-amber-500 to-amber-700"
-          icon={
-            <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </button>
+          <div className="flex-shrink-0">
+            <p className="text-xs text-gray-400 mb-0.5">Statistics</p>
+            <p className="text-sm font-semibold text-gray-700 mb-3">Total Stock</p>
+            <p className="text-5xl font-bold text-gray-900 leading-none">{formatCompactNumber(totalStock)}</p>
+            <p className="text-xs text-gray-500 mt-1">Units across batches</p>
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-6 py-5 flex items-center gap-6 relative">
+          <button onClick={() => setSelectedStat('low')} className="absolute top-2 right-2 w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M7 17L17 7M7 7h10v10" />
             </svg>
-          }
-        />
-        <StatCard
-          label="Out of Stock"
-          value={outOfStockCount}
-          delta="Needs restock"
-          gradient="bg-gradient-to-br from-red-500 to-rose-700"
-          icon={
-            <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+          </button>
+          <div className="flex-shrink-0">
+            <p className="text-xs text-gray-400 mb-0.5">Statistics</p>
+            <p className="text-sm font-semibold text-gray-700 mb-3">Low Stock</p>
+            <p className="text-5xl font-bold text-gray-900 leading-none">{formatCompactNumber(lowStockCount)}</p>
+            <p className="text-xs text-gray-500 mt-1">Below threshold</p>
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-6 py-5 flex items-center gap-6 relative">
+          <button onClick={() => setSelectedStat('out')} className="absolute top-2 right-2 w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M7 17L17 7M7 7h10v10" />
             </svg>
-          }
-        />
+          </button>
+          <div className="flex-shrink-0">
+            <p className="text-xs text-gray-400 mb-0.5">Statistics</p>
+            <p className="text-sm font-semibold text-gray-700 mb-3">Out of Stock</p>
+            <p className="text-5xl font-bold text-gray-900 leading-none">{formatCompactNumber(outOfStockCount)}</p>
+            <p className="text-xs text-gray-500 mt-1">Needs restock</p>
+          </div>
+        </div>
       </div>
 
       {/* Search & Filter Bar */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
-          <IonIcon icon={searchOutline} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg" />
+          <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
           <Input
             placeholder={t('stock.searchPlaceholder')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-11 pr-10 py-2.5 bg-white border-slate-200 rounded-xl focus:border-black transition-all"
+            className="pl-11 pr-10 py-2.5 bg-white border-slate-200 rounded-xl focus:ring-2 focus:ring-green-500/20 focus:border-green-400 transition-all"
           />
           {searchTerm && (
             <button
@@ -255,7 +302,7 @@ export default function Stock() {
         </div>
 
         <Select value={filterStatus} onValueChange={(val: any) => setFilterStatus(val)}>
-          <SelectTrigger className="max-w-[180px] bg-white border-slate-200 rounded-xl">
+          <SelectTrigger className="max-w-[180px] bg-white border-slate-200 rounded-xl focus:ring-2 focus:ring-green-500/20 focus:border-green-400">
             <SelectValue placeholder="Filter by status" />
           </SelectTrigger>
           <SelectContent
@@ -271,128 +318,172 @@ export default function Stock() {
             <SelectItem value="ok" className="px-4 py-2.5 text-emerald-700 focus:bg-emerald-50 cursor-pointer">
               In Stock
             </SelectItem>
+            <SelectItem value="out" className="px-4 py-2.5 text-red-700 focus:bg-red-50 cursor-pointer">
+              Out of Stock
+            </SelectItem>
           </SelectContent>
         </Select>
+
+        <Button onClick={loadStock} disabled={loading} variant="outline" className="gap-2 shrink-0">
+          <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          {t('stock.refresh')}
+        </Button>
       </div>
 
-      {/* Data Table */}
-      <Card className="border-slate-200 shadow-sm bg-white overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table className="table-fixed">
-            <TableHeader>
-              <TableRow className="bg-slate-50 border-b border-slate-200">
-                <TableHead className="text-left text-slate-600 w-[40%]">Product</TableHead>
-                <TableHead className=" text-slate-600 w-[10%]">Current Stock</TableHead>
-                <TableHead className=" text-slate-600 w-[20%] text-center">Status</TableHead>
-                <TableHead className="text-center text-slate-600 w-[15%]">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading && items.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={4} className="text-center py-10">
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
-                      <p className="text-slate-500 text-sm">{t('stock.loadingData')}</p>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : filteredItems.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={4} className="text-center py-12 text-slate-500">
-                    {searchTerm ? t('stock.noSearchResults') : t('stock.noData')}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredItems.map((item) => {
-                  const stock = item.stock;
-                  const isLow = stock < 10 && stock > 0;
-                  const isOut = stock === 0;
-                  const stockPercentage = Math.min((stock / 50) * 100, 100);
+      {/* Stock Table */}
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-gray-50 border-b border-gray-200">
+              <th className="text-center px-5 py-3 text-xs font-medium text-gray-500">Product</th>
+              <th className="text-center px-5 py-3 text-xs font-medium text-gray-500">Current Stock</th>
+              <th className="text-center px-5 py-3 text-xs font-medium text-gray-500">Status</th>
+              <th className="text-center px-5 py-3 text-xs font-medium text-gray-500">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading && items.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="text-center py-10">
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
+                    <p className="text-slate-500 text-sm">{t('stock.loadingData')}</p>
+                  </div>
+                </td>
+              </tr>
+            ) : filteredItems.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="text-center py-12 text-slate-500">
+                  {searchTerm ? t('stock.noSearchResults') : t('stock.noData')}
+                </td>
+              </tr>
+            ) : (
+              paginatedItems.map((item) => {
+                const stock = item.stock;
+                const isLow = stock < 10 && stock > 0;
+                const isOut = stock === 0;
 
-                  return (
-                    <TableRow key={item.product_uuid} className="border-b border-slate-100 hover:bg-slate-50/80 transition-colors">
-                      <TableCell className="text-left">
-                        <div>
-                          <div className="font-bold font-inter text-slate-800">{item.name}</div>
-                          {item.sku && (
-                            <div className="text-xs text-slate-400 font-mono mt-0.5">{t('stock.skuLabel')}: {item.sku}</div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="inline-block text-right">
-                          <span className={`text-xl font-bold ${isOut ? "text-red-600" : isLow ? "text-amber-600" : "text-emerald-600"}`}>
-                            {stock}
-                          </span>
-                          {item.unit && <span className="text-xs text-slate-400 ml-1">{item.unit}</span>}
-                          <div className="w-full min-w-[100px] mt-2">
-                            <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                              <div
-                                className={`h-full rounded-full transition-all duration-500 ${isOut ? "bg-red-500" : isLow ? "bg-amber-500" : "bg-emerald-500"}`}
-                                style={{ width: `${stockPercentage}%` }}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex justify-center">{getStatusBadge(stock)}</div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            setEditingItem(item);
-                            setNewStock(item.stock);
-                            setModalOpen(true);
-                          }}
-                          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                          title={t('stock.updateTitle')}
-                        >
-                          <IonIcon icon={createOutline} className="text-lg" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </Card>
+                return (
+                  <tr key={item.product_uuid} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                    <td className="px-5 py-3.5 text-center">
+                      <div className="font-medium text-gray-800">{item.name}</div>
+                      {item.sku && (
+                        <div className="text-xs text-gray-400 font-mono mt-0.5">{t('stock.skuLabel')}: {item.sku}</div>
+                      )}
+                    </td>
+                    <td className="px-5 py-3.5 text-center">
+                      <span className={`text-lg font-bold ${isOut ? "text-red-600" : isLow ? "text-amber-600" : "text-emerald-600"}`}>
+                        {stock}
+                      </span>
+                      {item.unit && <span className="text-xs text-slate-400 ml-1">{item.unit}</span>}
+                    </td>
+                    <td className="px-5 py-3.5 text-center">
+                      <div className="flex justify-center">{getStatusBadge(stock)}</div>
+                    </td>
+                    <td className="px-5 py-3.5 text-center">
+                      <button
+                        onClick={() => {
+                          setEditingItem(item);
+                          setNewStock(item.stock);
+                          setModalOpen(true);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 transition-colors"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+                        </svg>
+                        Edit
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 bg-slate-50/50">
+            <p className="text-xs text-slate-500">
+              Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, filteredItems.length)} of {filteredItems.length}
+            </p>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                Prev
+              </button>
+              {(() => {
+                const pages: (number | string)[] = [];
+                const range = 2;
+                for (let i = 1; i <= totalPages; i++) {
+                  if (i === 1 || i === totalPages || (i >= page - range && i <= page + range)) {
+                    pages.push(i);
+                  } else if (pages[pages.length - 1] !== '...') {
+                    pages.push('...');
+                  }
+                }
+                return pages.map((p, idx) =>
+                  p === '...' ? (
+                    <span key={`e-${idx}`} className="px-1 text-xs text-slate-400">…</span>
+                  ) : (
+                    <button
+                      key={p}
+                      onClick={() => setPage(p as number)}
+                      className={`w-8 h-8 text-xs font-medium rounded-lg transition-colors ${
+                        p === page
+                          ? 'bg-emerald-600 text-white'
+                          : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  )
+                );
+              })()}
+              <button
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Low Stock Alert Footer */}
       {lowStockCount > 0 && (
-        <Card className="border-amber-200 bg-amber-50">
-          <CardContent className="p-4 flex justify-between items-center flex-wrap gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
-                <IonIcon icon={warningOutline} className="text-amber-600 text-xl" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-amber-800">{t('stock.lowStockAlert')}</p>
-                <p className="text-xs text-amber-700">
-                  {t('stock.lowStockMessage', { count: lowStockCount })}
-                </p>
-              </div>
+        <div className="border border-amber-200 bg-amber-50 rounded-xl p-4 flex justify-between items-center flex-wrap gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
+              <IonIcon icon={warningOutline} className="text-amber-600 text-xl" />
             </div>
-            <Button
-              onClick={() => setFilterStatus("low")}
-              variant="default"
-              className="bg-amber-600 hover:bg-amber-700 text-white"
-            >
-              {t('stock.viewLowStock')}
-            </Button>
-          </CardContent>
-        </Card>
+            <div>
+              <p className="text-sm font-medium text-amber-800">{t('stock.lowStockAlert')}</p>
+              <p className="text-xs text-amber-700">
+                {t('stock.lowStockMessage', { count: lowStockCount })}
+              </p>
+            </div>
+          </div>
+          <Button
+            onClick={() => setFilterStatus("low")}
+            className="bg-amber-600 hover:bg-amber-700 text-white"
+          >
+            {t('stock.viewLowStock')}
+          </Button>
+        </div>
       )}
 
       {/* Edit Stock Modal */}
       {modalOpen && editingItem && (
         <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
           onClick={(e) => e.target === e.currentTarget && setModalOpen(false)}
         >
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
@@ -441,7 +532,7 @@ export default function Stock() {
                     min="0"
                     value={newStock}
                     onChange={(e) => setNewStock(Math.max(0, Number(e.target.value)))}
-                    className="w-full text-center text-lg font-semibold bg-white border-slate-300 text-slate-900 focus:outline-none focus:ring-0 focus:border-slate-300 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    className="w-full text-center text-lg font-semibold bg-white border-slate-300 text-slate-900 focus-visible:ring-2 focus-visible:ring-green-500/20 focus-visible:border-green-400 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                     autoFocus
                   />
                   <Button
@@ -482,6 +573,80 @@ export default function Stock() {
           </div>
         </div>
       )}
+
+      {selectedStat && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={() => setSelectedStat(null)}>
+          <div className="w-[400px] h-[500px] rounded-[24px] overflow-hidden pt-5 px-5 pb-3 flex flex-col" style={{ background: "#1a1d1f" }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-end mb-1">
+              <button onClick={() => setSelectedStat(null)} className="text-xs font-semibold px-3 py-1 rounded-full" style={{ background: "#dc2626", color: "#fff" }}>
+                Close
+              </button>
+            </div>
+
+            {selectedStat === 'products' && (
+              <>
+                <div className="flex-1 flex flex-col justify-center text-center px-4">
+                  <p className="text-base" style={{ color: "#888888" }}>Total Products</p>
+                  <p className="text-5xl font-bold leading-none tracking-tight text-white mt-3">{totalProducts.toLocaleString()}</p>
+                  <span className="inline-block text-sm font-semibold px-4 py-1.5 rounded-full mt-3 mx-auto" style={{ background: "#3b82f6", color: "#fff" }}>
+                    Master Database
+                  </span>
+                </div>
+                <div className="relative -mx-5 -mb-3" style={{ height: 180 }}>
+                  <Sparkline data={trendData.products} width={400} height={180} color="#3b82f6" />
+                </div>
+              </>
+            )}
+
+            {selectedStat === 'stock' && (
+              <>
+                <div className="flex-1 flex flex-col justify-center text-center px-4">
+                  <p className="text-base" style={{ color: "#888888" }}>Total Stock</p>
+                  <p className="text-5xl font-bold leading-none tracking-tight text-white mt-3">{totalStock.toLocaleString()}</p>
+                  <span className="inline-block text-sm font-semibold px-4 py-1.5 rounded-full mt-3 mx-auto" style={{ background: "#8b5cf6", color: "#fff" }}>
+                    Units Across Batches
+                  </span>
+                </div>
+                <div className="relative -mx-5 -mb-3" style={{ height: 180 }}>
+                  <Sparkline data={trendData.stock} width={400} height={180} color="#8b5cf6" />
+                </div>
+              </>
+            )}
+
+            {selectedStat === 'low' && (
+              <>
+                <div className="flex-1 flex flex-col justify-center text-center px-4">
+                  <p className="text-base" style={{ color: "#888888" }}>Low Stock</p>
+                  <p className="text-5xl font-bold leading-none tracking-tight text-white mt-3">{lowStockCount.toLocaleString()}</p>
+                  <span className="inline-block text-sm font-semibold px-4 py-1.5 rounded-full mt-3 mx-auto" style={{ background: "#f59e0b", color: "#fff" }}>
+                    Below Threshold
+                  </span>
+                </div>
+                <div className="relative -mx-5 -mb-3" style={{ height: 180 }}>
+                  <Sparkline data={trendData.low} width={400} height={180} color="#f59e0b" />
+                </div>
+              </>
+            )}
+
+            {selectedStat === 'out' && (
+              <>
+                <div className="flex-1 flex flex-col justify-center text-center px-4">
+                  <p className="text-base" style={{ color: "#888888" }}>Out of Stock</p>
+                  <p className="text-5xl font-bold leading-none tracking-tight text-white mt-3">{outOfStockCount.toLocaleString()}</p>
+                  <span className="inline-block text-sm font-semibold px-4 py-1.5 rounded-full mt-3 mx-auto" style={{ background: "#ef4444", color: "#fff" }}>
+                    Needs Restock
+                  </span>
+                </div>
+                <div className="relative -mx-5 -mb-3" style={{ height: 180 }}>
+                  <Sparkline data={trendData.out} width={400} height={180} color="#ef4444" />
+                </div>
+              </>
+            )}
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

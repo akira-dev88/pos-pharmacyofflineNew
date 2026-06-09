@@ -21,6 +21,7 @@ router.get('/daily-sales', ReportController.dailySales);
 router.get('/product-sales', ReportController.productSales);
 router.get('/customer-purchases', ReportController.customerPurchases);
 router.get('/gst-report', authenticate, authorize('owner', 'manager', 'admin'), ReportController.getGSTReport);
+router.get('/gst-report-range', authenticate, authorize('owner', 'manager', 'admin'), ReportController.getGSTReportByRange);
 router.get('/daily-report', authenticate, authorize('owner', 'manager'), ReportController.dailyReport);
 
 export default router;

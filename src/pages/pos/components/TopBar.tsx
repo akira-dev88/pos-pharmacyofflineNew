@@ -64,12 +64,17 @@ export default function TopBar({ onShowSales }: TopBarProps) {
     }
   };
 
+  const handleClearNotifs = () => {
+    setLowStockItems([]);
+    setLowStockCount(0);
+  };
+
   const handleNavigate = (path: string) => {
     navigate(path);
   };
 
   return (
-    <div className="grid grid-cols-3 items-center pl-4 pr-9 py-1 bg-white border border-gray-200 rounded-full w-[95%] mx-auto mt-[1%]">
+    <div className="flex items-center justify-between pl-4 pr-1 py-1 bg-white border border-gray-200 rounded-full w-[95%] mx-auto mt-[1%] gap-1 sm:gap-3">
       <div className="flex items-center gap-4">
         {shopName && (
           <div className="flex flex-col items-start pl-3">
@@ -78,7 +83,7 @@ export default function TopBar({ onShowSales }: TopBarProps) {
           </div>
         )}
       </div>
-      <div className="flex justify-center">
+      <div className="flex">
         <div className="flex gap-2 bg-gray-100 p-1.5 rounded-full">
         <button
           onClick={() => navigate("/admin/dashboard")}
@@ -114,18 +119,18 @@ export default function TopBar({ onShowSales }: TopBarProps) {
 
         <button
           onClick={() => setShowEOD(true)}
-          className="flex items-center gap-3 px-4 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-full text-base font-medium transition-colors whitespace-nowrap"
+          className="flex items-center gap-3 px-2 sm:px-4 py-2 sm:py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-full text-base font-medium transition-colors whitespace-nowrap"
         >
           <IonIcon icon={moonOutline} className="text-xl" />
-          <span>End of Day</span>
+          <span className="hidden sm:inline">End of Day</span>
         </button>
 
         <button
-          className="px-5 py-3 bg-green-500 text-white rounded-full font-bold flex gap-2 justify-center items-center hover:bg-green-600 transition-colors text-base"
+          className="px-3 sm:px-5 py-2 sm:py-3 bg-green-500 text-white rounded-full font-bold flex gap-2 justify-center items-center hover:bg-green-600 transition-colors text-base"
           onClick={onShowSales}
         >
           <IonIcon icon={pricetagOutline} className="text-lg" />
-          <span>{t('common.sales')}</span>
+          <span className="hidden sm:inline">{t('common.sales')}</span>
         </button>
 
         {/* Notifications Bell */}
@@ -196,6 +201,19 @@ export default function TopBar({ onShowSales }: TopBarProps) {
                 </div>
               )}
             </ScrollArea>
+            {lowStockItems.length > 0 && (
+              <>
+                <DropdownMenuSeparator className="bg-gray-200" />
+                <div className="px-3 py-2">
+                  <button
+                    onClick={handleClearNotifs}
+                    className="w-full py-2 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                  >
+                    Clear All Notifications
+                  </button>
+                </div>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
 
@@ -218,7 +236,7 @@ export default function TopBar({ onShowSales }: TopBarProps) {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-64 bg-white text-black border border-gray-200 shadow-2xl p-2">
             <DropdownMenuLabel className="px-3 py-3">
-              <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 ml-auto">
                 <Avatar className="h-10 w-10">
                   <AvatarFallback className="bg-gradient-to-br from-green-500 to-green-600 text-white">
                     {user?.name?.charAt(0)?.toUpperCase() || 'U'}

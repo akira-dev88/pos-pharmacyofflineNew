@@ -1,5 +1,5 @@
 import { IonIcon } from '@ionic/react';
-import { personCircleOutline, settingsOutline, logOutOutline, notificationsOutline, closeCircleOutline, warningOutline, checkmarkCircle, menuOutline } from 'ionicons/icons';
+import { personCircleOutline, settingsOutline, logOutOutline, notificationsOutline, closeCircleOutline, warningOutline, checkmarkCircle, menuOutline, searchOutline } from 'ionicons/icons';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useState, useEffect } from "react";
@@ -59,12 +59,17 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
         }
     };
 
+    const handleClearNotifs = () => {
+        setLowStockItems([]);
+        setLowStockCount(0);
+    };
+
     const handleNavigate = (path: string) => {
         navigate(path);
     };
 
     return (
-        <div className="flex items-center justify-between pl-4 pr-2 py-1 bg-white border border-gray-200 rounded-full w-[98%] mx-auto my-[1%]">
+        <div className="flex items-center justify-between pl-4 pr-2 py-1 bg-white rounded-full w-[98%] mx-auto my-[1%]">
             <div className="flex items-center gap-4">
                 {shopName && (
                     <div className="flex flex-col items-start pl-3">
@@ -85,6 +90,16 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
                 >
                     <IonIcon icon={menuOutline} className="text-xl" />
                 </Button>
+
+                {/* Global Search */}
+                <div className="relative hidden sm:block">
+                    <IonIcon icon={searchOutline} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg" />
+                    <input
+                        type="text"
+                        placeholder={t('common.search') || "Search..."}
+                        className="pl-10 pr-4 py-2.5 bg-transparent border border-gray-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent w-56 lg:w-72"
+                    />
+                </div>
 
                 {/* Notifications Bell */}
                 <DropdownMenu>
@@ -154,6 +169,19 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
                                 </div>
                             )}
                         </ScrollArea>
+                        {lowStockItems.length > 0 && (
+                            <>
+                                <DropdownMenuSeparator className="bg-gray-200" />
+                                <div className="px-3 py-2">
+                                    <button
+                                        onClick={handleClearNotifs}
+                                        className="w-full py-2 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                                    >
+                                        Clear All Notifications
+                                    </button>
+                                </div>
+                            </>
+                        )}
                     </DropdownMenuContent>
                 </DropdownMenu>
 

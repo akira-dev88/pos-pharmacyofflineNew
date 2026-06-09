@@ -17,6 +17,7 @@ router.get('/search', CustomerController.search);
 router.get('/summary', CustomerController.summary);
 router.get('/aging', CustomerController.aging);
 router.get('/reminders', CustomerController.reminders);
+router.get('/credit-trend', CustomerController.creditTrend);
 
 // Parameterized routes
 router.get('/:customer_uuid', (req, res) => {

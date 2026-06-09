@@ -53,31 +53,66 @@ export default function LicenseGate({ children }: { children: React.ReactNode })
         </div>
     );
 
-    // Not licensed — show activation screen (no router needed here)
+    // Not licensed — show activation screen
     if (!licensed) return (
-        <div className="h-screen flex items-center justify-center bg-[#141414]">
-            <div className="bg-[#1a1a1a] rounded-2xl p-8 w-full max-w-md text-center">
-                <img src={logo} className="w-16 h-16 mx-auto rounded-2xl mb-4" alt="POS Hardware" />
-                <h1 className="text-2xl font-bold text-white mb-2">POS Hardware</h1>
-                <p className="text-gray-400 mb-6 text-sm">Enter your license key to activate</p>
-                <input
-                    className="w-full bg-[#212121] border border-gray-700 rounded-xl px-4 py-3 text-white text-center font-mono text-lg mb-3 outline-none focus:border-green-500 transition-colors"
-                    placeholder="IB-XXXXXXXX-XXXX"
-                    value={key}
-                    onChange={e => setKey(e.target.value.toUpperCase())}
-                    onKeyDown={e => e.key === 'Enter' && handleActivate()}
-                />
-                {error && <p className="text-red-400 text-sm mb-3">{error}</p>}
-                <button
-                    onClick={handleActivate}
-                    disabled={loading || key.length < 10}
-                    className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-bold disabled:opacity-50 transition-colors"
+        <div className="min-h-screen flex items-center justify-center p-6" style={{ background: "linear-gradient(180deg, #00e060 0%, #00b84a 15%, #007a30 35%, #003a16 55%, #000e05 75%, #000000 100%)" }}>
+            <div className="w-full max-w-3xl bg-white rounded-2xl overflow-hidden flex shadow-2xl">
+                {/* LEFT: Green gradient panel */}
+                <div
+                    className="w-[45%] hidden sm:flex flex-col justify-between p-8 relative min-h-[520px]"
+                    style={{
+                        background: "linear-gradient(to bottom, #00e060 0%, #00b84a 20%, #007a30 45%, #003a16 70%, #000e05 88%, #000000 100%)",
+                    }}
                 >
-                    {loading ? 'Activating...' : 'Activate License'}
-                </button>
-                <p className="text-gray-600 text-xs mt-4">
-                    Purchase at instantbill.in or contact us on WhatsApp
-                </p>
+                    <p className="text-white text-2xl font-bold leading-tight z-10 relative text-left">
+                        Manage your pharmacy<br />with ease &amp; precision.
+                    </p>
+                </div>
+
+                {/* RIGHT: Form */}
+                <div className="flex-1 flex flex-col justify-center px-10 py-10">
+                    {/* Logo */}
+                    <div className="mb-5">
+                        <img src={logo} alt="Pharmacy POS" className="w-[42px] h-[42px]" />
+                    </div>
+
+                    <h1 className="text-3xl font-bold text-gray-900 tracking-tight mb-1">Activate License</h1>
+                    <p className="text-sm text-gray-500 mb-6">Enter your license key to activate</p>
+
+                    <div className="h-px bg-gray-200 mb-6" />
+
+                    <div className="space-y-5">
+                        <div>
+                            <label className="block text-sm text-gray-600 mb-1.5">License Key</label>
+                            <input
+                                className="input-field w-full border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-800 bg-white text-center font-mono tracking-widest focus:outline-none focus:border-[#16a34a] focus:shadow-[0_0_0_3px_rgba(22,163,74,0.15)]"
+                                placeholder="IB-XXXXXXXX-XXXX"
+                                value={key}
+                                onChange={e => setKey(e.target.value.toUpperCase())}
+                                onKeyDown={e => e.key === 'Enter' && handleActivate()}
+                            />
+                        </div>
+
+                        {error && (
+                            <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+                                <span>{error}</span>
+                            </div>
+                        )}
+
+                        <button
+                            onClick={handleActivate}
+                            disabled={loading || key.length < 10}
+                            className="cta-btn w-full bg-[#16a34a] text-white font-semibold text-sm rounded-full py-3.5 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                            style={{ transition: "background-color 0.15s ease, transform 0.1s ease" }}
+                        >
+                            {loading ? 'Activating...' : 'Activate License'}
+                        </button>
+
+                        <p className="text-center text-xs text-gray-400 pt-1">
+                            Purchase at instantbill.in or contact us on WhatsApp
+                        </p>
+                    </div>
+                </div>
             </div>
         </div>
     );

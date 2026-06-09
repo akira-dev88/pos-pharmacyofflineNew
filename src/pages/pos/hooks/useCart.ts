@@ -277,8 +277,9 @@ export function useCart() {
 
   const findPrescriptionProduct = () => {
     const cartItems = getCartItems();
-    return cartItems.find((item: any) => 
-      item.product?.schedule_type && item.product.schedule_type !== 'NONE'
+    return cartItems.find((item: any) =>
+      item.product?.prescription_required ||
+      (item.product?.schedule_type && item.product.schedule_type !== 'NONE')
     );
   };
 
@@ -337,6 +338,24 @@ export function useCart() {
       return null;
     }
 
+    // Proactively check for prescription-required items before calling the backend
+    const prescriptionItem = findPrescriptionProduct();
+    if (prescriptionItem) {
+      console.log("🔴 Prescription required detected for:", prescriptionItem.product?.name);
+      setPendingCheckout({ paymentMethods, customerUUID, selectedCustomer });
+      setPrescriptionProduct({
+        name: prescriptionItem.product?.name,
+        schedule_type: prescriptionItem.product?.schedule_type,
+        product_uuid: prescriptionItem.product_uuid
+      });
+      setShowPrescriptionModal(true);
+      setLoading(false);
+
+      return new Promise<CheckoutResult | null>((resolve) => {
+        setPrescriptionResolver(() => resolve);
+      });
+    }
+
     setLoading(true);
     try {
       const res = await checkoutCart(cartUUID, normalizedPayments, customerUUID, null);
@@ -345,25 +364,22 @@ export function useCart() {
       if (!res.success) {
         const errorMessage = res.error || res.message || "";
         console.log("🔴 Error message:", errorMessage);
-        
+
         if (errorMessage.toLowerCase().includes('prescription')) {
-          console.log("🔴 Prescription required detected!");
-          const prescriptionItem = findPrescriptionProduct();
-          
-          if (prescriptionItem) {
-            console.log("🔴 Found prescription product:", prescriptionItem.product?.name);
-            
-            // Store checkout data for retry
+          console.log("🔴 Prescription required from backend!");
+          const backendItem = findPrescriptionProduct();
+
+          if (backendItem) {
+            console.log("🔴 Found prescription product:", backendItem.product?.name);
             setPendingCheckout({ paymentMethods, customerUUID, selectedCustomer });
             setPrescriptionProduct({
-              name: prescriptionItem.product?.name,
-              schedule_type: prescriptionItem.product?.schedule_type,
-              product_uuid: prescriptionItem.product_uuid
+              name: backendItem.product?.name,
+              schedule_type: backendItem.product?.schedule_type,
+              product_uuid: backendItem.product_uuid
             });
             setShowPrescriptionModal(true);
             setLoading(false);
-            
-            // Return a promise that will be resolved when prescription is submitted
+
             return new Promise<CheckoutResult | null>((resolve) => {
               setPrescriptionResolver(() => resolve);
             });

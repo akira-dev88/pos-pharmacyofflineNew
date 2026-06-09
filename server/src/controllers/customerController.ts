@@ -239,4 +239,22 @@ export class CustomerController {
       });
     }
   };
+
+  // Get monthly credit trend
+  static creditTrend = (req: AuthRequest, res: Response): void => {
+    try {
+      const trend = CustomerModel.getCreditTrend();
+
+      res.json({
+        success: true,
+        data: trend
+      });
+    } catch (error) {
+      console.error('Get credit trend error:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: 'Internal server error' 
+      });
+    }
+  };
 }

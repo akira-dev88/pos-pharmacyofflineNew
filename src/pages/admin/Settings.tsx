@@ -10,8 +10,9 @@ import {
   getLicenseStatus,
   activateLicense,
 } from "../../renderer/services/settingsApi";
-import { apiPost } from "../../renderer/services/api";
 import { IonIcon } from "@ionic/react";
+import { useAuth } from "../../context/AuthContext";
+import { getProfile, type UserProfile, type ShopProfile } from "../../renderer/services/profileApi";
 import {
   saveOutline,
   closeOutline,
@@ -30,15 +31,14 @@ import {
   shieldCheckmarkOutline,
   checkmarkCircle,
   closeCircleOutline,
+  mailOutline,
+  copyOutline,
+  checkmarkOutline,
+  calendarOutline,
+  timeOutline,
+  personCircleOutline,
+  logOutOutline,
 } from "ionicons/icons";
-
-// shadcn/ui components (except Dialog)
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
-import { ScrollArea } from "@/components/ui/scroll-area";
 
 const DEFAULT_SETTINGS = {
   shop_name: "",
@@ -63,6 +63,36 @@ export default function Settings() {
   const [licenseStatus, setLicenseStatus] = useState<any>(null);
   const [licenseKey, setLicenseKey] = useState("");
   const [activating, setActivating] = useState(false);
+  const { user: authUser, logout } = useAuth();
+  const [profileUser, setProfileUser] = useState<UserProfile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    loadProfile();
+  }, []);
+
+  const loadProfile = async () => {
+    setProfileLoading(true);
+    try {
+      const response = await getProfile();
+      setProfileUser(response.data.user);
+    } catch {
+      if (authUser) {
+        setProfileUser(authUser as UserProfile);
+      }
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {}
+  };
 
   const extractCleanSettings = (obj: any) => {
     if (!obj) return null;
@@ -236,368 +266,463 @@ export default function Settings() {
     await loadBackups();
   };
 
-  const handleTestPrint = async () => {
-    try {
-      const res = await apiPost("/settings/test-print", {});
-      if (res.success) setSuccess(t("settings.testPrintSuccess"));
-      else setError(`${t("settings.testPrintError")}: ${res.error}`);
-    } catch (err) {
-      setError(t("settings.testPrintError"));
-    }
-  };
-
   if (loading && !data) {
     return (
-      <div className="min-h-screen bg-[#F8F9FC] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500" />
+      <div style={{ background: "#ffffff" }} className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#2563eb]" />
       </div>
     );
   }
 
   if (!data) {
     return (
-      <div className="min-h-screen bg-[#F8F9FC] flex items-center justify-center p-6">
-        <Card className="max-w-md w-full border-red-200 bg-red-50">
-          <CardContent className="p-6 text-center">
-            <IonIcon icon={warningOutline} className="text-5xl text-red-500 mx-auto mb-3" />
-            <p className="text-red-700">{t("settings.loadFailed")}</p>
-            <Button onClick={handleRefresh} className="mt-4 bg-blue-600 hover:bg-blue-700">
-              {t("settings.retry")}
-            </Button>
-          </CardContent>
-        </Card>
+      <div style={{ background: "#ffffff" }} className="min-h-screen flex items-center justify-center p-6">
+        <div className="bg-white border border-gray-200 shadow-sm rounded-xl p-8 text-center max-w-md w-full">
+          <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-red-500/10 flex items-center justify-center">
+            <IonIcon icon={warningOutline} className="text-2xl text-red-400" />
+          </div>
+          <p style={{ color: "#374151" }} className="text-sm">{t("settings.loadFailed")}</p>
+          <button onClick={handleRefresh} className="mt-5 btn btn-primary">
+            {t("settings.retry")}
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#F8F9FC] p-6 space-y-5">
-      {/* Header */}
-      <div className="flex justify-between items-center flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight text-start">{t("settings.title")}</h1>
-          <p className="text-slate-500 text-sm mt-0.5">{t("settings.subtitle")}</p>
-        </div>
-        <div className="flex gap-2">
-          <LanguageToggle />
-          <Button variant="outline" onClick={handleRefresh} className="gap-2">
-            <IonIcon icon={refreshOutline} className="text-lg" />
-            {t("settings.refresh")}
-          </Button>
-          <Button variant="outline" onClick={handleTestPrint} className="gap-2">
-            <IonIcon icon={documentTextOutline} className="text-lg" />
-            Test Print
-          </Button>
-        </div>
-      </div>
+    <div style={{ background: "#f5f7fa", minHeight: "100vh" }}>
+
+      <style>{`
+        body {
+          background-color: #f5f7fa;
+          color: #374151;
+        }
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+      `}</style>
 
       {/* Success / Error Messages */}
       {(success || error) && (
-        <Card className={success ? "border-emerald-200 bg-emerald-50" : "border-red-200 bg-red-50"}>
-          <CardContent className="p-4 flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <IonIcon icon={success ? checkmarkCircleOutline : warningOutline} className="text-xl" />
-              <p className="text-sm">{success || error}</p>
+        <div style={{ maxWidth: 760, margin: "18px auto 0", padding: "0 32px" }}>
+          <div style={{
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+            padding: "10px 16px", borderRadius: 10, fontSize: "0.85rem",
+            background: success ? "rgba(34,197,94,0.08)" : "rgba(239,68,68,0.08)",
+            border: `1px solid ${success ? "rgba(34,197,94,0.2)" : "rgba(239,68,68,0.2)"}`,
+            color: success ? "#16a34a" : "#dc2626"
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <IonIcon icon={success ? checkmarkCircleOutline : warningOutline} className="text-2xl" />
+              <span>{success || error}</span>
             </div>
-            <button onClick={() => { setSuccess(null); setError(null); }}>
-              <IonIcon icon={closeOutline} className="text-lg text-slate-500" />
+            <button onClick={() => { setSuccess(null); setError(null); }} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", opacity: 0.6 }}>
+              <IonIcon icon={closeOutline} className="text-2xl" />
             </button>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
-      {/* Main editable section – button + quick toggle */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <Button onClick={openEditModal} className="gap-2 bg-blue-600 hover:bg-blue-700 text-white">
-          <IonIcon icon={createOutline} className="text-lg" />
-          Edit Store Settings
-        </Button>
+      {/* Content */}
+      <div style={{ padding: "28px 32px 48px" }}>
 
-        <Card className="bg-white border-slate-200 shadow-sm">
-          <CardContent className="p-4 flex items-center gap-3">
-            <Switch
-              checked={data.auto_print === 1}
-              className="border-2 border-gray-300 data-[state=checked]:border-green-500 data-[state=unchecked]:bg-black pb-[1px]"
-              thumbClassName="bg-gray-400 data-[state=checked]:bg-green-500"
-              onCheckedChange={(checked) => {
-                const newAutoPrint = checked ? 1 : 0;
-                setData({ ...data, auto_print: newAutoPrint });
-                localStorage.setItem("shop_settings", JSON.stringify({ ...data, auto_print: newAutoPrint }));
-                saveSettings({ ...data, auto_print: newAutoPrint }).catch(console.error);
-              }}
-            />
-            <div>
-              <p className={`text-sm font-medium transition-colors ${data.auto_print === 1 ? 'text-green-500' : 'text-gray-700'}`}>{t("settings.autoPrintBill")}</p>
-              <p className="text-xs text-gray-500">{t("settings.autoPrintDesc")}</p>
+        {/* Profile */}
+        <div className="settings-section" style={{ background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 14, overflow: "hidden", marginBottom: 18, boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+          <div className="section-header" style={{ padding: "16px 20px 15px", borderBottom: "1px solid #e5e7eb", display: "flex", alignItems: "center", gap: 10 }}>
+            <div className="section-icon green" style={{ width: 42, height: 42, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, background: "rgba(22,163,74,0.1)", color: "#16a34a" }}>
+              <IonIcon icon={personCircleOutline} className="text-xl" />
             </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Two‑column layout: Business Info + Backup & Restore */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Business Information Summary Card */}
-        <Card className="border-slate-200 shadow-sm bg-white">
-          <CardHeader className="bg-gradient-to-r from-slate-700 to-slate-800 rounded-t-2xl">
-            <CardTitle className="flex items-center gap-2 text-white">
-              <IonIcon icon={businessOutline} className="text-xl" />
-              {t("settings.businessInformation")}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <IonIcon icon={businessOutline} className="text-blue-600 text-lg" />
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500">{t("settings.businessName")}</p>
-                  <p className="text-sm font-medium text-slate-800">{data.shop_name || "—"}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <IonIcon icon={callOutline} className="text-green-600 text-lg" />
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500">{t("settings.contactNumber")}</p>
-                  <p className="text-sm font-medium text-slate-800">{data.mobile || "—"}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
-                <div className="p-2 bg-purple-100 rounded-lg">
-                  <IonIcon icon={locationOutline} className="text-purple-600 text-lg" />
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500">{t("settings.addressLabel")}</p>
-                  <p className="text-sm font-medium text-slate-800">{data.address || "—"}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
-                <div className="p-2 bg-amber-100 rounded-lg">
-                  <IonIcon icon={pricetagOutline} className="text-amber-600 text-lg" />
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500">{t("settings.invoicePrefixLabel")}</p>
-                  <p className="text-sm font-medium text-slate-800">{data.invoice_prefix || "INV"}</p>
-                </div>
-              </div>
+            <div style={{ flex: 1, textAlign: "left" }}>
+              <div style={{ fontSize: "1rem", fontWeight: 600, color: "#111827" }}>Profile</div>
+              <div style={{ fontSize: "0.8rem", color: "#6b7280", marginTop: 1 }}>Your account information</div>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Backup & Restore Card */}
-        <Card className="border-slate-200 shadow-sm bg-white">
-          <CardHeader className="bg-gradient-to-r from-slate-700 to-slate-800 rounded-t-2xl">
-            <div className="flex justify-between items-center">
-              <CardTitle className="flex items-center gap-2 text-white">
-                <IonIcon icon={cloudUploadOutline} className="text-xl" />
-                {t("settings.backupRestore")}
-              </CardTitle>
-              <Button
-                onClick={handleBackup}
-                disabled={backupLoading}
-                size="sm"
-                className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
-              >
-                <IonIcon icon={cloudUploadOutline} />
-                {backupLoading ? t("settings.creatingBackup") : t("settings.backupNow")}
-              </Button>
+            <button onClick={loadProfile} className="edit-inline" style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "5px 10px", background: "#f3f4f6", border: "1px solid #d1d5db", borderRadius: 6, fontSize: "0.8rem", fontWeight: 500, color: "#6b7280", cursor: "pointer", transition: "all 0.15s" }}>
+              <IonIcon icon={refreshOutline} className="text-base" />
+              Refresh
+            </button>
+          </div>
+          {profileLoading ? (
+            <div className="setting-row" style={{ padding: "20px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600" />
             </div>
-          </CardHeader>
-          <CardContent className="p-6">
-            {backups.length === 0 ? (
-              <div className="text-center py-8 text-slate-500">{t("settings.noBackups")}</div>
-            ) : (
-              <ScrollArea className="h-[250px] pr-2">
-                <div className="space-y-2">
-                  {backups.map((backup, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
-                      <div>
-                        <p className="text-sm font-mono text-slate-700">{backup.name}</p>
-                        <p className="text-xs text-slate-500">
-                          {new Date(backup.date).toLocaleString("en-IN")} · {(backup.size / 1024).toFixed(1)} KB
-                        </p>
-                      </div>
-                      <Button
-                        onClick={() => handleRestore(backup.name)}
-                        disabled={backupLoading}
-                        variant="outline"
-                        size="sm"
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-                      >
-                        <IonIcon icon={cloudDownloadOutline} className="mr-1" />
-                        {t("settings.restore")}
-                      </Button>
-                    </div>
-                  ))}
+          ) : profileUser ? (
+            <>
+              <div className="setting-row" style={{ padding: "15px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #e5e7eb" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center text-white font-bold text-sm">
+                    {profileUser.name?.charAt(0).toUpperCase() || "U"}
+                  </div>
+                  <div style={{ textAlign: "left" }}>
+                    <div style={{ fontSize: "0.9rem", fontWeight: 600, color: "#111827" }}>{profileUser.name}</div>
+                    <div style={{ fontSize: "0.85rem", color: "#6b7280" }}>{profileUser.email}</div>
+                  </div>
                 </div>
-              </ScrollArea>
-            )}
-            <div className="mt-4 p-3 bg-amber-50 rounded-xl border border-amber-200">
-              <p className="text-xs text-amber-800">
-                ⚡ {t("settings.autoBackupNote")}{" "}
-                <span className="font-mono">%APPDATA%\pos-app\backups\</span> {t("settings.onWindows")}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* License Management Card */}
-      <Card className="border-slate-200 shadow-sm bg-white">
-        <CardHeader className="bg-gradient-to-r from-slate-700 to-slate-800 rounded-t-2xl">
-          <CardTitle className="flex items-center gap-2 text-white">
-            <IonIcon icon={keyOutline} className="text-xl" />
-            License Management
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* License Status */}
-            <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-xl">
-              <div className={`p-3 rounded-xl ${licenseStatus?.licensed ? "bg-green-100" : "bg-red-100"}`}>
-                <IonIcon
-                  icon={licenseStatus?.licensed ? checkmarkCircle : closeCircleOutline}
-                  className={`text-2xl ${licenseStatus?.licensed ? "text-green-600" : "text-red-600"}`}
-                />
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border" style={{
+                  background: profileUser.role === "owner" ? "#fffbeb" : profileUser.role === "manager" ? "#f0f9ff" : "#ecfdf5",
+                  color: profileUser.role === "owner" ? "#b45309" : profileUser.role === "manager" ? "#0369a1" : "#047857",
+                  borderColor: profileUser.role === "owner" ? "#fde68a" : profileUser.role === "manager" ? "#bae6fd" : "#a7f3d0",
+                }}>
+                  {profileUser.role?.charAt(0).toUpperCase() + profileUser.role?.slice(1) || "User"}
+                </span>
               </div>
-              <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wide font-semibold">Status</p>
-                <p className={`text-lg font-bold ${licenseStatus?.licensed ? "text-green-600" : "text-red-600"}`}>
-                  {licenseStatus?.licensed ? "Licensed" : "Not Licensed"}
-                </p>
-                {licenseStatus?.machine_id && (
-                  <p className="text-xs font-mono text-slate-400 mt-1">Machine: {licenseStatus.machine_id.slice(0, 16)}...</p>
-                )}
-              </div>
-            </div>
-
-            {/* Activation Form */}
-            <div className="space-y-3">
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide">Activate License</label>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Enter license key"
-                  value={licenseKey}
-                  onChange={(e) => setLicenseKey(e.target.value)}
-                  className="flex-1 h-10"
-                  disabled={licenseStatus?.licensed}
-                />
-                <Button
-                  onClick={handleActivate}
-                  disabled={activating || licenseStatus?.licensed}
-                  className="bg-blue-600 hover:bg-blue-700 text-white gap-2 h-10"
-                >
-                  {activating ? (
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                  ) : (
-                    <IonIcon icon={shieldCheckmarkOutline} className="text-lg" />
-                  )}
-                  Activate
-                </Button>
-              </div>
-              {licenseStatus?.licensed && (
-                <p className="text-xs text-green-600 flex items-center gap-1">
-                  <IonIcon icon={checkmarkCircle} className="text-sm" />
-                  Already activated on this machine
-                </p>
+              {profileUser.user_uuid && (
+                <div className="setting-row" style={{ padding: "15px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #e5e7eb" }}>
+                  <span style={{ fontSize: "0.9rem", fontWeight: 500, color: "#374151" }}>User ID</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: "0.85rem", color: "#6b7280", fontFamily: "monospace" }}>{profileUser.user_uuid}</span>
+                    <button onClick={() => copyToClipboard(profileUser.user_uuid!)} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 transition" title="Copy User ID">
+                      <IonIcon icon={copied ? checkmarkOutline : copyOutline} className={`text-sm ${copied ? "text-green-600" : "text-gray-400"}`} />
+                    </button>
+                  </div>
+                </div>
               )}
+              <div className="setting-row" style={{ padding: "15px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <span style={{ fontSize: "0.9rem", fontWeight: 500, color: "#374151" }}>Account Dates</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 16, fontSize: "0.85rem", color: "#6b7280" }}>
+                  <span><IonIcon icon={calendarOutline} className="mr-1" /> Created: 01 Jan 2025</span>
+                  <span><IonIcon icon={timeOutline} className="mr-1" /> Last Login: 07 Jun 2026</span>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="setting-row" style={{ padding: "20px", textAlign: "center", color: "#9ca3af", fontSize: "0.85rem" }}>
+              Could not load profile data
+            </div>
+          )}
+        </div>
+
+        {/* Preferences */}
+        <div className="settings-section" style={{ background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 14, overflow: "hidden", marginBottom: 18, boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+          <div className="section-header" style={{ padding: "16px 20px 15px", borderBottom: "1px solid #e5e7eb", display: "flex", alignItems: "center", gap: 10 }}>
+            <div className="section-icon blue" style={{ width: 42, height: 42, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, background: "rgba(37,99,235,0.1)", color: "#2563eb" }}>
+              <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+              </svg>
+            </div>
+            <div style={{ textAlign: "left" }}>
+              <div style={{ fontSize: "1rem", fontWeight: 600, color: "#111827" }}>Preferences</div>
+              <div style={{ fontSize: "0.8rem", color: "#6b7280", marginTop: 1 }}>Behaviour and automation settings</div>
             </div>
           </div>
-        </CardContent>
-      </Card>
+          <div className="setting-row" style={{ padding: "15px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #e5e7eb" }}>
+            <div style={{ textAlign: "left" }}>
+              <div style={{ fontSize: "0.9rem", fontWeight: 500, color: "#374151" }}>{t("settings.autoPrintBill")}</div>
+              <div style={{ fontSize: "0.85rem", color: "#6b7280", marginTop: 2 }}>{t("settings.autoPrintDesc")}</div>
+            </div>
+            <label className="toggle" style={{ position: "relative", width: 40, height: 22, flexShrink: 0 }}>
+              <input
+                type="checkbox"
+                checked={data.auto_print === 1}
+                onChange={(e) => {
+                  const newAutoPrint = e.target.checked ? 1 : 0;
+                  setData({ ...data, auto_print: newAutoPrint });
+                  localStorage.setItem("shop_settings", JSON.stringify({ ...data, auto_print: newAutoPrint }));
+                  saveSettings({ ...data, auto_print: newAutoPrint }).catch(console.error);
+                }}
+                style={{ opacity: 0, width: 0, height: 0 }}
+              />
+              <span className="toggle-slider" style={{ position: "absolute", inset: 0, background: data.auto_print === 1 ? "#16a34a" : "#e5e7eb", borderRadius: 22, cursor: "pointer", transition: "0.2s" }}>
+                <span style={{ position: "absolute", width: 16, height: 16, left: 3, top: 3, background: "white", borderRadius: "50%", transition: "0.2s", transform: data.auto_print === 1 ? "translateX(18px)" : "none" }} />
+              </span>
+            </label>
+          </div>
+          <div className="setting-row" style={{ padding: "15px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ textAlign: "left" }}>
+              <div style={{ fontSize: "0.9rem", fontWeight: 500, color: "#374151" }}>Language</div>
+              <div style={{ fontSize: "0.85rem", color: "#6b7280", marginTop: 2 }}>Switch between English and Tamil</div>
+            </div>
+            <LanguageToggle />
+          </div>
+        </div>
 
-      {/* Custom Edit Modal (replaces shadcn Dialog) */}
+        {/* Business Information */}
+        <div className="settings-section" style={{ background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 14, overflow: "hidden", marginBottom: 18, boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+          <div className="section-header" style={{ padding: "16px 20px 15px", borderBottom: "1px solid #e5e7eb", display: "flex", alignItems: "center", gap: 10 }}>
+            <div className="section-icon purple" style={{ width: 42, height: 42, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, background: "rgba(139,92,246,0.1)", color: "#7c3aed" }}>
+              <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+              </svg>
+            </div>
+            <div style={{ flex: 1, textAlign: "left" }}>
+              <div style={{ fontSize: "1rem", fontWeight: 600, color: "#111827" }}>{t("settings.businessInformation")}</div>
+              <div style={{ fontSize: "0.8rem", color: "#6b7280", marginTop: 1 }}>Store name, contact, and invoice settings</div>
+            </div>
+            <button onClick={openEditModal} className="edit-inline" style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "5px 10px", background: "#f3f4f6", border: "1px solid #d1d5db", borderRadius: 6, fontSize: "0.8rem", fontWeight: 500, color: "#6b7280", cursor: "pointer", transition: "all 0.15s" }}>
+              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+              </svg>
+              Edit
+            </button>
+          </div>
+          <div className="setting-row" style={{ padding: "15px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #e5e7eb" }}>
+            <span style={{ fontSize: "0.9rem", fontWeight: 500, color: "#374151" }}>{t("settings.businessName")}</span>
+            <span style={{ fontSize: "0.85rem", color: "#6b7280", fontFamily: "inherit" }}>{data.shop_name || <span style={{ color: "#9ca3af", fontStyle: "italic" }}>— Not set</span>}</span>
+          </div>
+          <div className="setting-row" style={{ padding: "15px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #e5e7eb" }}>
+            <span style={{ fontSize: "0.9rem", fontWeight: 500, color: "#374151" }}>{t("settings.contactNumber")}</span>
+            <span style={{ fontSize: "0.85rem", color: "#6b7280", fontFamily: "inherit" }}>{data.mobile || <span style={{ color: "#9ca3af", fontStyle: "italic" }}>— Not set</span>}</span>
+          </div>
+          <div className="setting-row" style={{ padding: "15px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #e5e7eb" }}>
+            <span style={{ fontSize: "0.9rem", fontWeight: 500, color: "#374151" }}>{t("settings.addressLabel")}</span>
+            <span style={{ fontSize: "0.85rem", color: "#6b7280", fontFamily: "inherit" }}>{data.address || <span style={{ color: "#9ca3af", fontStyle: "italic" }}>— Not set</span>}</span>
+          </div>
+          <div className="setting-row" style={{ padding: "15px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ textAlign: "left" }}>
+              <div style={{ fontSize: "0.9rem", fontWeight: 500, color: "#374151" }}>{t("settings.invoicePrefixLabel")}</div>
+              <div style={{ fontSize: "0.85rem", color: "#6b7280", marginTop: 2 }}>Prepended to all invoice numbers</div>
+            </div>
+            <input
+              className="setting-input"
+              type="text"
+              value={data.invoice_prefix || "INV"}
+              onChange={(e) => {
+                const val = e.target.value.toUpperCase();
+                setData({ ...data, invoice_prefix: val });
+                localStorage.setItem("shop_settings", JSON.stringify({ ...data, invoice_prefix: val }));
+                saveSettings({ ...data, invoice_prefix: val }).catch(console.error);
+              }}
+              maxLength={6}
+              style={{ background: "#f9fafb", border: "1px solid #d1d5db", borderRadius: 7, padding: "7px 11px", fontSize: "0.85rem", fontFamily: "inherit", color: "#111827", width: 120, outline: "none" }}
+            />
+          </div>
+        </div>
+
+        {/* Backup & Restore */}
+        <div className="settings-section" style={{ background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 14, overflow: "hidden", marginBottom: 18, boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+          <div className="section-header" style={{ padding: "16px 20px 15px", borderBottom: "1px solid #e5e7eb", display: "flex", alignItems: "center", gap: 10 }}>
+            <div className="section-icon yellow" style={{ width: 42, height: 42, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, background: "rgba(245,158,11,0.1)", color: "#d97706" }}>
+              <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+              </svg>
+            </div>
+            <div style={{ flex: 1, textAlign: "left" }}>
+              <div style={{ fontSize: "1rem", fontWeight: 600, color: "#111827" }}>{t("settings.backupRestore")}</div>
+              <div style={{ fontSize: "0.8rem", color: "#6b7280", marginTop: 1 }}>Protect your data with regular backups</div>
+            </div>
+            <button onClick={handleBackup} disabled={backupLoading} className="btn btn-outline" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, fontSize: "0.85rem", fontWeight: 600, cursor: backupLoading ? "not-allowed" : "pointer", transition: "all 0.15s", border: "none", outline: "none", background: "transparent", color: "#2563eb", border: "1px solid rgba(37,99,235,0.25)", opacity: backupLoading ? 0.5 : 1 }}>
+            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+            </svg>
+            {backupLoading ? t("settings.creatingBackup") : t("settings.backupNow")}
+          </button>
+          </div>
+          {backups.length === 0 ? (
+            <div className="backup-empty" style={{ padding: "26px 20px", textAlign: "center", color: "#9ca3af", fontSize: "0.85rem" }}>
+              <svg width="36" height="36" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5" style={{ margin: "0 auto 9px", opacity: 0.28, display: "block" }}>
+                <path d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
+              </svg>
+              {t("settings.noBackups")}
+            </div>
+          ) : (
+            <div style={{ maxHeight: 250, overflowY: "auto" }}>
+              {backups.map((backup, index) => (
+                <div key={index} className="setting-row" style={{ padding: "15px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #e5e7eb" }}>
+                  <div>
+                    <p style={{ fontSize: "0.9rem", fontFamily: "inherit", color: "#374151" }}>{backup.name}</p>
+                    <p style={{ fontSize: "0.85rem", color: "#6b7280", marginTop: 2 }}>
+                      {new Date(backup.date).toLocaleString("en-IN")} · {(backup.size / 1024).toFixed(1)} KB
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleRestore(backup.name)}
+                    disabled={backupLoading}
+                    className="edit-inline"
+                    style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "5px 10px", background: "#f3f4f6", border: "1px solid #d1d5db", borderRadius: 6, fontSize: "0.8rem", fontWeight: 500, color: "#dc2626", cursor: backupLoading ? "not-allowed" : "pointer", transition: "all 0.15s", opacity: backupLoading ? 0.5 : 1 }}
+                  >
+                    <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                    </svg>
+                    {t("settings.restore")}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="info-note" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "rgba(37,99,235,0.04)", border: "1px solid rgba(37,99,235,0.12)", borderRadius: 8, padding: "10px 13px", fontSize: "0.8rem", color: "#6b7280", margin: "0 20px 18px", textAlign: "center" }}>
+            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0, marginTop: 0, color: "#2563eb" }}>
+              <path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <span style={{ textAlign: "center" }}>⚡ {t("settings.autoBackupNote")} <code style={{ fontFamily: "inherit", color: "#2563eb", fontSize: "0.75rem", background: "rgba(37,99,235,0.08)", padding: "1px 5px", borderRadius: 3 }}>%APPDATA%\pos-app\backups\</code> {t("settings.onWindows")}</span>
+          </div>
+        </div>
+
+        {/* License Management */}
+        <div className="settings-section" style={{ background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 14, overflow: "hidden", marginBottom: 18, boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+          <div className="section-header" style={{ padding: "16px 20px 15px", borderBottom: "1px solid #e5e7eb", display: "flex", alignItems: "center", gap: 10 }}>
+            <div className="section-icon green" style={{ width: 42, height: 42, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, background: "rgba(22,163,74,0.1)", color: "#16a34a" }}>
+              <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+              </svg>
+            </div>
+            <div style={{ textAlign: "left" }}>
+              <div style={{ fontSize: "1rem", fontWeight: 600, color: "#111827" }}>License Management</div>
+              <div style={{ fontSize: "0.8rem", color: "#6b7280", marginTop: 1 }}>Software activation and key management</div>
+            </div>
+          </div>
+          <div className="setting-row" style={{ padding: "15px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #e5e7eb" }}>
+            <div style={{ textAlign: "left" }}>
+              <div style={{ fontSize: "0.9rem", fontWeight: 500, color: "#374151" }}>Status</div>
+              <div style={{ fontSize: "0.85rem", color: "#6b7280", marginTop: 2 }}>Current activation state</div>
+            </div>
+            <span className="badge badge-green" style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 20, fontSize: "0.8rem", fontWeight: 600, background: "rgba(22,163,74,0.1)", color: "#16a34a" }}>
+              <span style={{ width: 6, height: 6, borderRadius: "50%", flexShrink: 0, background: "#16a34a", boxShadow: "0 0 5px #16a34a" }} />
+              {licenseStatus?.licensed ? "Licensed" : "Not Licensed"}
+            </span>
+          </div>
+          <div className="setting-row" style={{ padding: "15px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ textAlign: "left" }}>
+              <div style={{ fontSize: "0.9rem", fontWeight: 500, color: "#374151" }}>Activate License</div>
+              <div style={{ fontSize: "0.85rem", color: "#6b7280", marginTop: 3 }}>
+                {licenseStatus?.licensed ? "Already activated on this machine" : "Enter your license key to activate"}
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input
+                className="setting-input"
+                type="text"
+                placeholder="License key"
+                value={licenseKey}
+                onChange={(e) => setLicenseKey(e.target.value)}
+                disabled={licenseStatus?.licensed}
+                style={{ background: "#f9fafb", border: "1px solid #d1d5db", borderRadius: 7, padding: "7px 11px", fontSize: "0.85rem", fontFamily: "inherit", color: "#111827", width: 140, outline: "none", opacity: licenseStatus?.licensed ? 0.38 : 1 }}
+              />
+              <button
+                onClick={handleActivate}
+                disabled={activating || licenseStatus?.licensed}
+                className="btn btn-primary"
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, fontSize: "0.85rem", fontWeight: 600, cursor: (activating || licenseStatus?.licensed) ? "not-allowed" : "pointer", transition: "all 0.15s", border: "none", outline: "none", background: licenseStatus?.licensed ? "#d1d5db" : "#2563eb", color: licenseStatus?.licensed ? "#6b7280" : "#fff", opacity: (activating || licenseStatus?.licensed) ? 0.5 : 1 }}
+              >
+                {activating ? (
+                  <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" style={{ display: "inline-block" }} />
+                ) : (
+                  <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+                  </svg>
+                )}
+                Activate
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Logout */}
+        <div className="settings-section" style={{ background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 14, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+          <div className="section-header" style={{ padding: "16px 20px 15px", borderBottom: "1px solid #e5e7eb", display: "flex", alignItems: "center", gap: 10 }}>
+            <div className="section-icon" style={{ width: 42, height: 42, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, background: "rgba(220,38,38,0.1)", color: "#dc2626" }}>
+              <IonIcon icon={logOutOutline} className="text-xl" />
+            </div>
+            <div style={{ flex: 1, textAlign: "left" }}>
+              <div style={{ fontSize: "1rem", fontWeight: 600, color: "#111827" }}>Logout</div>
+              <div style={{ fontSize: "0.8rem", color: "#6b7280", marginTop: 1 }}>Sign out of your account</div>
+            </div>
+          </div>
+          <div className="setting-row" style={{ padding: "15px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={{ fontSize: "0.9rem", fontWeight: 500, color: "#374151" }}>Are you sure you want to logout?</span>
+            <button
+              onClick={logout}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 18px", borderRadius: 8, fontSize: "0.85rem", fontWeight: 600, color: "#fff", background: "#dc2626", border: "none", cursor: "pointer", transition: "all 0.15s" }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "#b91c1c"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "#dc2626"; }}
+            >
+              <IonIcon icon={logOutOutline} className="text-base" />
+              Logout
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      {/* Custom Edit Modal */}
       {dialogOpen && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#171717] rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-gray-700">
-            <div className="sticky top-0 bg-[#171717] backdrop-blur-sm border-b border-gray-700 px-6 py-4 flex justify-between items-center">
-              <h2 className="text-xl font-bold text-white">{t("settings.editSettings")}</h2>
-              <button onClick={() => setDialogOpen(false)} className="text-gray-400 hover:text-gray-200 transition-colors">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-slate-200">
+            <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center">
+              <h2 className="text-xl font-bold text-slate-800">{t("settings.editSettings")}</h2>
+              <button onClick={() => setDialogOpen(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
                 <IonIcon icon={closeOutline} className="text-2xl" />
               </button>
             </div>
 
             <div className="p-6 space-y-5">
               <div>
-                <label className="block text-sm text-start font-bold text-gray-300 mb-1.5">
+                <label className="block text-sm text-start font-semibold text-slate-700 mb-1.5">
                   {t("settings.shopName")} *
                 </label>
-                <Input
+                <input
                   placeholder={t("settings.shopNamePlaceholder")}
                   value={formData.shop_name || ""}
                   onChange={(e) => setFormData({ ...formData, shop_name: e.target.value })}
-                  className="h-10 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none file:inline-flex file:h-6 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:disabled:bg-input/80 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40"
+                  className="h-10 w-full rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-green-400 focus:ring-2 focus:ring-green-500/20 transition-all outline-none"
                 />
               </div>
               <div>
-                <label className="block text-sm text-start font-bold text-gray-300 mb-1.5">
+                <label className="block text-sm text-start font-semibold text-slate-700 mb-1.5">
                   {t("settings.mobileNumber")}
                 </label>
-                <Input
+                <input
                   placeholder="+91 98765 43210"
                   value={formData.mobile || ""}
                   onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
-                  className="h-10 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none file:inline-flex file:h-6 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:disabled:bg-input/80 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40"
+                  className="h-10 w-full rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-green-400 focus:ring-2 focus:ring-green-500/20 transition-all outline-none"
                 />
               </div>
               <div>
-                <label className="block text-sm text-start font-bold text-gray-300 mb-1.5">
+                <label className="block text-sm text-start font-semibold text-slate-700 mb-1.5">
                   {t("settings.address")}
                 </label>
-                <Textarea
+                <textarea
                   rows={3}
                   placeholder={t("settings.addressPlaceholder")}
                   value={formData.address || ""}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  className="w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none resize-vertical focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:disabled:bg-input/80 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40"
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-green-400 focus:ring-2 focus:ring-green-500/20 transition-all outline-none resize-none"
                 />
               </div>
               <div>
-                <label className="block text-sm text-start font-bold text-gray-300 mb-1.5">
+                <label className="block text-sm text-start font-semibold text-slate-700 mb-1.5">
                   {t("settings.gstinNumber")}
                 </label>
-                <Input
+                <input
                   placeholder="22AAAAA0000A1Z"
-                  className="uppercase h-10 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none file:inline-flex file:h-6 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:disabled:bg-input/80 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40"
+                  className="h-10 w-full rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-green-400 focus:ring-2 focus:ring-green-500/20 transition-all outline-none uppercase"
                   value={formData.gstin || ""}
                   onChange={(e) => setFormData({ ...formData, gstin: e.target.value.toUpperCase() })}
                 />
               </div>
               <div>
-                <label className="block text-sm text-start font-bold text-gray-300 mb-1.5">
+                <label className="block text-sm text-start font-semibold text-slate-700 mb-1.5">
                   {t("settings.invoicePrefix")}
                 </label>
-                <Input
+                <input
                   placeholder="INV"
-                  className="uppercase h-10 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none file:inline-flex file:h-6 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:disabled:bg-input/80 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40"
+                  className="h-10 w-full rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-green-400 focus:ring-2 focus:ring-green-500/20 transition-all outline-none uppercase"
                   value={formData.invoice_prefix || "INV"}
                   onChange={(e) => setFormData({ ...formData, invoice_prefix: e.target.value.toUpperCase() })}
                 />
-                <p className="text-xs text-gray-500 mt-1.5">
+                <p className="text-xs text-slate-400 mt-1.5">
                   {t("settings.exampleInvoice")} {formData.invoice_prefix || "INV"}-0001
                 </p>
               </div>
             </div>
 
-            <div className="sticky bottom-0 bg-[#171717] border-t border-gray-700 px-6 py-4 rounded-b-2xl flex justify-end gap-3">
-              <Button variant="outline" onClick={() => setDialogOpen(false)} className="border-gray-600 text-gray-300 hover:bg-gray-800">
+            <div className="border-t border-slate-200 px-6 py-4 flex justify-end gap-3 bg-white">
+              <button onClick={() => setDialogOpen(false)} className="px-4 py-2 text-sm font-semibold text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-100 transition-colors">
                 {t("common.cancel")}
-              </Button>
-              <Button onClick={handleSave} disabled={saving} className="bg-green-600 hover:bg-green-700 text-white">
+              </button>
+              <button onClick={handleSave} disabled={saving} className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-lg transition-all ${saving ? 'bg-green-500/50 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 cursor-pointer'}`}>
                 {saving ? (
                   <span className="flex items-center gap-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                    <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
                     {t("settings.saving")}
                   </span>
                 ) : (
                   <span className="flex items-center gap-2">
-                    <IonIcon icon={saveOutline} className="text-lg" />
-                    {t("settings.saveChanges")}
+                    <IonIcon icon={saveOutline} className="text-2xl" />
+                    Save Changes
                   </span>
                 )}
-              </Button>
+              </button>
             </div>
           </div>
         </div>

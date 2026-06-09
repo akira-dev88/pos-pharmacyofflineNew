@@ -1,5 +1,5 @@
 import db from '../database/connection';
-import type { Customer, CustomerLedger, CustomerLedgerWithBalance, CustomerAging, CustomerReminder, CustomerSummary } from '../types/index';
+import type { Customer, CustomerLedger, CustomerLedgerWithBalance, CustomerAging, CustomerReminder, CustomerSummary, CreditTrendItem } from '../types/index';
 import { v4 as uuidv4 } from 'uuid';
 
 export class CustomerModel {
@@ -230,6 +230,24 @@ export class CustomerModel {
     }
 
     return result;
+  }
+
+  // Get monthly credit trend
+  static getCreditTrend(): CreditTrendItem[] {
+    const rows = db.prepare(`
+      SELECT 
+        strftime('%Y-%m', created_at) as year_month,
+        SUM(amount) as total
+      FROM customer_ledgers
+      WHERE type IN ('debit', 'sale')
+      GROUP BY strftime('%Y-%m', created_at)
+      ORDER BY year_month ASC
+    `).all() as Array<{ year_month: string; total: number }>;
+
+    return rows.map(r => ({
+      month: r.year_month,
+      total: Math.round(r.total * 100) / 100
+    }));
   }
 
   // Record payment

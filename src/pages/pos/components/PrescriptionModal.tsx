@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { FileText, User, Stethoscope, IdCard, Calendar, ChevronDown, Plus } from "lucide-react";
 
 interface Doctor {
@@ -62,6 +63,7 @@ export default function PrescriptionModal({
 
   const [showDoctorDropdown, setShowDoctorDropdown] = useState(false);
   const [showPatientDropdown, setShowPatientDropdown] = useState(false);
+  const [showGenderDropdown, setShowGenderDropdown] = useState(false);
   const [doctorFilter, setDoctorFilter] = useState('');
   const [patientFilter, setPatientFilter] = useState('');
 
@@ -69,6 +71,7 @@ export default function PrescriptionModal({
   const patientInputRef = useRef<HTMLInputElement>(null);
   const doctorDropdownRef = useRef<HTMLDivElement>(null);
   const patientDropdownRef = useRef<HTMLDivElement>(null);
+  const genderDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const storedDoctors = localStorage.getItem(STORAGE_KEYS.DOCTORS);
@@ -276,15 +279,15 @@ export default function PrescriptionModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
-      <DialogContent className="bg-[#1a1a1a] border-[#333] text-white sm:max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent className="bg-white border border-gray-200 sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex items-center gap-2 mb-1">
-            <FileText className="h-5 w-5 text-green-500" />
-            <DialogTitle className="text-white text-lg">Prescription Required</DialogTitle>
+            <FileText className="h-5 w-5 text-green-600" />
+            <DialogTitle className="text-gray-900 text-lg">Prescription Required</DialogTitle>
           </div>
-          <p className="text-sm text-gray-400">{productName}</p>
+          <p className="text-sm text-gray-500">{productName}</p>
           <div className="mt-1">
-            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-900/50 text-yellow-400 border border-yellow-700">
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-300">
               Schedule {productSchedule}
             </span>
           </div>
@@ -293,14 +296,14 @@ export default function PrescriptionModal({
         <div className="space-y-4">
           {/* Prescription Number */}
           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1.5">
+            <label className="block text-sm font-medium text-gray-600 mb-1.5">
               Prescription Number <span className="text-red-500">*</span>
             </label>
             <div className="flex gap-2">
               <Input
                 value={prescriptionNumber}
                 onChange={(e) => setPrescriptionNumber(e.target.value)}
-                className="flex-1 bg-[#212121] border-gray-700 text-white"
+                className="flex-1 bg-white border-gray-300 text-gray-900"
                 placeholder="RX-XXXXXXXXXX"
               />
               <Button
@@ -308,7 +311,7 @@ export default function PrescriptionModal({
                 variant="outline"
                 size="icon"
                 onClick={generatePrescriptionNumber}
-                className="border-gray-700 text-gray-400 shrink-0"
+                className="border-gray-300 text-gray-500 shrink-0"
                 title="Generate new number"
               >
                 <FileText className="h-4 w-4" />
@@ -318,8 +321,8 @@ export default function PrescriptionModal({
 
           {/* Doctor's Name */}
           <div className="relative" ref={doctorDropdownRef}>
-            <label className="block text-sm font-medium text-gray-400 mb-1.5">
-              <Stethoscope className="inline h-3.5 w-3.5 mr-1 text-green-500" />
+            <label className="block text-sm font-medium text-gray-600 mb-1.5">
+              <Stethoscope className="inline h-3.5 w-3.5 mr-1 text-green-600" />
               Doctor's Name <span className="text-red-500">*</span>
             </label>
             <div className="relative">
@@ -335,33 +338,33 @@ export default function PrescriptionModal({
                   setDoctorFilter(doctorName);
                   setShowDoctorDropdown(true);
                 }}
-                className="w-full bg-[#212121] border-gray-700 text-white pr-10"
+                className="w-full bg-white border-gray-300 text-gray-900 pr-10"
                 placeholder="Type or select doctor"
                 autoComplete="off"
               />
               <button
                 type="button"
                 onClick={() => setShowDoctorDropdown(!showDoctorDropdown)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
               >
                 <ChevronDown className="h-4 w-4" />
               </button>
             </div>
             {showDoctorDropdown && (filteredDoctors.length > 0 || doctorName.trim()) && (
-              <div className="absolute z-20 w-full mt-1 bg-[#212121] border border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+              <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                 {filteredDoctors.map((doc) => (
                   <div
                     key={doc.name}
-                    className="px-3 py-2 hover:bg-gray-700 cursor-pointer text-sm text-white"
+                    className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm text-gray-900"
                     onClick={() => handleSelectDoctor(doc)}
                   >
                     <div className="font-medium">{doc.name}</div>
-                    {doc.license && <div className="text-xs text-gray-400">License: {doc.license}</div>}
+                    {doc.license && <div className="text-xs text-gray-500">License: {doc.license}</div>}
                   </div>
                 ))}
                 {doctorName.trim() && !filteredDoctors.some(d => d.name.toLowerCase() === doctorName.toLowerCase()) && (
                   <div
-                    className="px-3 py-2 border-t border-gray-700 text-sm text-green-500 hover:bg-gray-700 cursor-pointer flex items-center gap-2"
+                    className="px-3 py-2 border-t border-gray-200 text-sm text-green-600 hover:bg-gray-100 cursor-pointer flex items-center gap-2"
                     onClick={addNewDoctor}
                   >
                     <Plus className="h-3.5 w-3.5" />
@@ -374,22 +377,22 @@ export default function PrescriptionModal({
 
           {/* Doctor License */}
           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1.5">
-              <IdCard className="inline h-3.5 w-3.5 mr-1 text-green-500" />
+            <label className="block text-sm font-medium text-gray-600 mb-1.5">
+              <IdCard className="inline h-3.5 w-3.5 mr-1 text-green-600" />
               Doctor's License Number
             </label>
             <Input
               value={doctorLicense}
               onChange={(e) => setDoctorLicense(e.target.value)}
-              className="w-full bg-[#212121] border-gray-700 text-white"
+              className="w-full bg-white border-gray-300 text-gray-900"
               placeholder="Medical Council Registration (Optional)"
             />
           </div>
 
           {/* Patient Name */}
           <div className="relative" ref={patientDropdownRef}>
-            <label className="block text-sm font-medium text-gray-400 mb-1.5">
-              <User className="inline h-3.5 w-3.5 mr-1 text-green-500" />
+            <label className="block text-sm font-medium text-gray-600 mb-1.5">
+              <User className="inline h-3.5 w-3.5 mr-1 text-green-600" />
               Patient Name <span className="text-red-500">*</span>
             </label>
             <div className="relative">
@@ -405,33 +408,33 @@ export default function PrescriptionModal({
                   setPatientFilter(patientName);
                   setShowPatientDropdown(true);
                 }}
-                className="w-full bg-[#212121] border-gray-700 text-white pr-10"
+                className="w-full bg-white border-gray-300 text-gray-900 pr-10"
                 placeholder="Type or select patient"
                 autoComplete="off"
               />
               <button
                 type="button"
                 onClick={() => setShowPatientDropdown(!showPatientDropdown)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
               >
                 <ChevronDown className="h-4 w-4" />
               </button>
             </div>
             {showPatientDropdown && (filteredPatients.length > 0 || patientName.trim()) && (
-              <div className="absolute z-20 w-full mt-1 bg-[#212121] border border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+              <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                 {filteredPatients.map((pat) => (
                   <div
                     key={pat.name}
-                    className="px-3 py-2 hover:bg-gray-700 cursor-pointer text-sm text-white"
+                    className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm text-gray-900"
                     onClick={() => handleSelectPatient(pat)}
                   >
                     <div className="font-medium">{pat.name}</div>
-                    <div className="text-xs text-gray-400">Age: {pat.age || '?'} | Gender: {pat.gender || '?'}</div>
+                    <div className="text-xs text-gray-500">Age: {pat.age || '?'} | Gender: {pat.gender || '?'}</div>
                   </div>
                 ))}
                 {patientName.trim() && !filteredPatients.some(p => p.name.toLowerCase() === patientName.toLowerCase()) && (
                   <div
-                    className="px-3 py-2 border-t border-gray-700 text-sm text-green-500 hover:bg-gray-700 cursor-pointer flex items-center gap-2"
+                    className="px-3 py-2 border-t border-gray-200 text-sm text-green-600 hover:bg-gray-100 cursor-pointer flex items-center gap-2"
                     onClick={addNewPatient}
                   >
                     <Plus className="h-3.5 w-3.5" />
@@ -445,34 +448,57 @@ export default function PrescriptionModal({
           {/* Age & Gender */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-1.5">
-                <Calendar className="inline h-3.5 w-3.5 mr-1 text-green-500" />
+              <label className="block text-sm font-medium text-gray-600 mb-1.5">
+                <Calendar className="inline h-3.5 w-3.5 mr-1 text-green-600" />
                 Patient Age
               </label>
               <Input
                 type="number"
                 value={patientAge}
                 onChange={(e) => setPatientAge(e.target.value)}
-                className="w-full bg-[#212121] border-gray-700 text-white"
+                className="w-full bg-white border-gray-300 text-gray-900"
                 placeholder="Years"
                 min="0"
                 max="150"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-400 mb-1.5">
+            <div ref={genderDropdownRef} className="relative">
+              <label className="block text-sm font-medium text-gray-600 mb-1.5">
                 Gender
               </label>
-              <select
-                className="w-full h-10 bg-[#212121] text-white border border-gray-700 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
-                value={patientGender}
-                onChange={(e) => setPatientGender(e.target.value)}
-              >
-                <option value="">Select</option>
-                <option value="M">Male</option>
-                <option value="F">Female</option>
-                <option value="O">Other</option>
-              </select>
+              <Popover open={showGenderDropdown} onOpenChange={setShowGenderDropdown}>
+                <PopoverTrigger asChild>
+                  <div className="relative cursor-pointer">
+                    <Input
+                      value={patientGender === 'M' ? 'Male' : patientGender === 'F' ? 'Female' : patientGender === 'O' ? 'Other' : ''}
+                      onChange={() => {}}
+                      className="w-full bg-white border-gray-300 text-gray-900 pr-10 cursor-pointer"
+                      placeholder="Select"
+                      readOnly
+                    />
+                    <button
+                      type="button"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      <ChevronDown className="h-4 w-4" />
+                    </button>
+                  </div>
+                </PopoverTrigger>
+                <PopoverContent className="w-full min-w-[180px] p-0 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden" align="start">
+                  {['Male', 'Female', 'Other'].map((g) => (
+                    <div
+                      key={g}
+                      className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm text-gray-900"
+                      onClick={() => {
+                        setPatientGender(g === 'Male' ? 'M' : g === 'Female' ? 'F' : 'O');
+                        setShowGenderDropdown(false);
+                      }}
+                    >
+                      {g}
+                    </div>
+                  ))}
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
 
@@ -482,7 +508,7 @@ export default function PrescriptionModal({
               type="button"
               variant="outline"
               onClick={handleClose}
-              className="flex-1 border-gray-700 text-white hover:bg-gray-800"
+              className="flex-1 border-gray-300 text-gray-700 hover:bg-gray-50"
             >
               Cancel
             </Button>

@@ -5,33 +5,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { apiPost } from "../renderer/services/api";
 import { useAuth } from "../context/AuthContext";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Store,
-  User,
-  Mail,
-  Lock,
-  Eye,
-  EyeOff,
-  Loader2,
-  UserPlus,
-  Pill,
-} from "lucide-react";
+import { Loader2, Eye, EyeOff } from "lucide-react";
+import logo from "../../assets/icon.png";
 
 const signupSchema = z
   .object({
@@ -103,195 +78,155 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center p-4">
-      <Card className="w-full max-w-sm bg-[#111111] border border-[#2a2a2a] shadow-xl">
-        <CardHeader className="pb-6 pt-8">
-          <div className="mb-6 flex flex-col items-center gap-3 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary shadow-lg shadow-primary/20">
-              <Pill className="h-6 w-6 text-white" />
-            </div>
-            <div className="space-y-1">
-              <CardTitle className="text-xl text-white">Pharmacy POS</CardTitle>
-              <p className="text-sm text-[#8a8a8a]">
-                Create your account
-              </p>
-            </div>
-            <div className="h-0.5 w-8 rounded-full bg-primary/40" />
+    <div className="min-h-screen flex items-center justify-center p-6" style={{ background: "linear-gradient(180deg, #00e060 0%, #00b84a 15%, #007a30 35%, #003a16 55%, #000e05 75%, #000000 100%)" }}>
+      <div className="w-full max-w-6xl bg-white rounded-2xl overflow-hidden flex shadow-2xl">
+        {/* LEFT: Green gradient panel */}
+        <div
+          className="w-[45%] hidden sm:flex flex-col justify-between p-8 relative min-h-[560px]"
+          style={{
+            background: "linear-gradient(to bottom, #00e060 0%, #00b84a 20%, #007a30 45%, #003a16 70%, #000e05 88%, #000000 100%)",
+          }}
+        >
+          <p className="text-white text-4xl font-bold leading-tight z-10 relative text-left">
+            Manage your pharmacy<br />with ease &amp; precision.
+          </p>
+        </div>
+
+        {/* RIGHT: Form */}
+        <div className="flex-1 flex flex-col justify-center px-10 py-10">
+          {/* Logo */}
+          <div className="mb-5">
+            <img src={logo} alt="Pharmacy POS" className="w-[42px] h-[42px]" />
           </div>
-        </CardHeader>
-        <CardContent className="pb-8">
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 text-left">
-              <FormField
-                control={form.control}
-                name="shop_name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm text-white">Shop Name</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <Store className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#555555]" />
-                        <Input
-                          placeholder="Your pharmacy name"
-                          autoComplete="organization"
-                          autoFocus
-                          className="h-10 bg-[#1a1a1a] border-[#2e2e2e] text-white placeholder:text-[#555555] pl-10 focus-visible:ring-primary focus-visible:ring-offset-0"
-                          {...field}
-                        />
-                      </div>
-                    </FormControl>
-                    <FormMessage className="text-xs" />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm text-white">Your Name</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#555555]" />
-                        <Input
-                          placeholder="Admin name"
-                          autoComplete="name"
-                          className="h-10 bg-[#1a1a1a] border-[#2e2e2e] text-white placeholder:text-[#555555] pl-10 focus-visible:ring-primary focus-visible:ring-offset-0"
-                          {...field}
-                        />
-                      </div>
-                    </FormControl>
-                    <FormMessage className="text-xs" />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm text-white">Email</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#555555]" />
-                        <Input
-                          placeholder="name@pharmacy.com"
-                          autoComplete="email"
-                          className="h-10 bg-[#1a1a1a] border-[#2e2e2e] text-white placeholder:text-[#555555] pl-10 focus-visible:ring-primary focus-visible:ring-offset-0"
-                          {...field}
-                        />
-                      </div>
-                    </FormControl>
-                    <FormMessage className="text-xs" />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm text-white">Password</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#555555]" />
-                        <Input
-                          type={showPassword ? "text" : "password"}
-                          placeholder="At least 6 characters"
-                          autoComplete="new-password"
-                          className="h-10 bg-[#1a1a1a] border-[#2e2e2e] text-white placeholder:text-[#555555] pl-10 pr-10 focus-visible:ring-primary focus-visible:ring-offset-0"
-                          {...field}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#555555] hover:text-white transition-colors"
-                          tabIndex={-1}
-                        >
-                          {showPassword ? (
-                            <EyeOff className="h-4 w-4" />
-                          ) : (
-                            <Eye className="h-4 w-4" />
-                          )}
-                        </button>
-                      </div>
-                    </FormControl>
-                    <FormMessage className="text-xs" />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="confirmPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm text-white">Confirm Password</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#555555]" />
-                        <Input
-                          type={showConfirmPassword ? "text" : "password"}
-                          placeholder="Confirm your password"
-                          autoComplete="new-password"
-                          className="h-10 bg-[#1a1a1a] border-[#2e2e2e] text-white placeholder:text-[#555555] pl-10 pr-10 focus-visible:ring-primary focus-visible:ring-offset-0"
-                          {...field}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#555555] hover:text-white transition-colors"
-                          tabIndex={-1}
-                        >
-                          {showConfirmPassword ? (
-                            <EyeOff className="h-4 w-4" />
-                          ) : (
-                            <Eye className="h-4 w-4" />
-                          )}
-                        </button>
-                      </div>
-                    </FormControl>
-                    <FormMessage className="text-xs" />
-                  </FormItem>
-                )}
-              />
 
-              {error && (
-                <div className="flex items-center gap-2 rounded-lg border border-[#3e1f1f] bg-[#1c1010] px-4 py-3 text-sm text-[#f87171]">
-                  <Lock className="h-4 w-4 shrink-0" />
-                  <span>{error}</span>
-                </div>
-              )}
+          <h1 className="text-3xl font-bold text-gray-900 tracking-tight mb-1">Get Started</h1>
+          <p className="text-sm text-gray-500 mb-6">Welcome to Pharmacy POS — Let's get started</p>
 
-              <Button
-                type="submit"
-                className="w-full h-10 text-sm font-medium gap-2 bg-green-600 text-white hover:bg-green-700"
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Creating account...
-                  </>
-                ) : (
-                  <>
-                    Create account
-                    <UserPlus className="h-4 w-4" />
-                  </>
+          <div className="h-px bg-gray-200 mb-6" />
+
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm text-gray-600 mb-1.5" htmlFor="shop_name">Shop Name</label>
+                <input
+                  id="shop_name"
+                  type="text"
+                  {...form.register("shop_name")}
+                  className="input-field w-full border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-800 bg-white focus:outline-none focus:border-[#16a34a] focus:shadow-[0_0_0_3px_rgba(22,163,74,0.15)]"
+                  placeholder="Your pharmacy name"
+                />
+                {form.formState.errors.shop_name && (
+                  <p className="text-xs text-red-500 mt-1">{form.formState.errors.shop_name.message}</p>
                 )}
-              </Button>
-
-              <div className="text-center">
-                <p className="text-sm text-[#8a8a8a]">
-                  Already have an account?{" "}
-                  <Link to="/login" className="text-primary hover:underline font-medium">
-                    Sign in
-                  </Link>
-                </p>
               </div>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
+              <div>
+                <label className="block text-sm text-gray-600 mb-1.5" htmlFor="name">Your Name</label>
+                <input
+                  id="name"
+                  type="text"
+                  {...form.register("name")}
+                  className="input-field w-full border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-800 bg-white focus:outline-none focus:border-[#16a34a] focus:shadow-[0_0_0_3px_rgba(22,163,74,0.15)]"
+                  placeholder="Admin name"
+                />
+                {form.formState.errors.name && (
+                  <p className="text-xs text-red-500 mt-1">{form.formState.errors.name.message}</p>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm text-gray-600 mb-1.5" htmlFor="email">Your email</label>
+              <input
+                id="email"
+                type="email"
+                {...form.register("email")}
+                className="input-field w-full border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-800 bg-white focus:outline-none focus:border-[#16a34a] focus:shadow-[0_0_0_3px_rgba(22,163,74,0.15)]"
+                placeholder="name@pharmacy.com"
+              />
+              {form.formState.errors.email && (
+                <p className="text-xs text-red-500 mt-1">{form.formState.errors.email.message}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm text-gray-600 mb-1.5" htmlFor="password">Create new password</label>
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  {...form.register("password")}
+                  className="input-field w-full border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-800 bg-white pr-10 focus:outline-none focus:border-[#16a34a] focus:shadow-[0_0_0_3px_rgba(22,163,74,0.15)]"
+                  placeholder="At least 6 characters"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              {form.formState.errors.password && (
+                <p className="text-xs text-red-500 mt-1">{form.formState.errors.password.message}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm text-gray-600 mb-1.5" htmlFor="confirmPassword">Confirm password</label>
+              <div className="relative">
+                <input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  {...form.register("confirmPassword")}
+                  className="input-field w-full border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-800 bg-white pr-10 focus:outline-none focus:border-[#16a34a] focus:shadow-[0_0_0_3px_rgba(22,163,74,0.15)]"
+                  placeholder="Confirm your password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  tabIndex={-1}
+                >
+                  {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              {form.formState.errors.confirmPassword && (
+                <p className="text-xs text-red-500 mt-1">{form.formState.errors.confirmPassword.message}</p>
+              )}
+            </div>
+
+            {error && (
+              <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+                <span>{error}</span>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="cta-btn w-full bg-[#16a34a] text-white font-semibold text-sm rounded-full py-3.5 mt-1 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+              style={{ transition: "background-color 0.15s ease, transform 0.1s ease" }}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Creating account...
+                </>
+              ) : (
+                "Create new account"
+              )}
+            </button>
+
+            <p className="text-center text-sm text-gray-500 pt-1">
+              Already have an account?{" "}
+              <Link to="/login" className="text-gray-800 font-medium underline underline-offset-2 hover:text-[#16a34a] transition-colors">
+                Sign in
+              </Link>
+            </p>
+          </form>
+        </div>
+      </div>
     </div>
   );
 }

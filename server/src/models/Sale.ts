@@ -891,6 +891,14 @@ export class SaleModel {
 
       si.schedule_type,
 
+      si.prescription_required,
+      si.prescription_number,
+      si.doctor_name,
+      si.doctor_license,
+      si.patient_name,
+      si.patient_age,
+      si.patient_gender,
+
       p.name as product_name,
 
       p.hsn_code,
@@ -941,6 +949,14 @@ export class SaleModel {
       gst_amount: number;
 
       schedule_type: string;
+
+      prescription_required: number;
+      prescription_number: string | null;
+      doctor_name: string | null;
+      doctor_license: string | null;
+      patient_name: string | null;
+      patient_age: number | null;
+      patient_gender: string | null;
 
       product_name: string;
 
@@ -1054,7 +1070,22 @@ export class SaleModel {
             ),
 
           schedule_type:
-            item.schedule_type
+            item.schedule_type,
+
+          prescription_required:
+            item.prescription_required,
+          prescription_number:
+            item.prescription_number,
+          doctor_name:
+            item.doctor_name,
+          doctor_license:
+            item.doctor_license,
+          patient_name:
+            item.patient_name,
+          patient_age:
+            item.patient_age,
+          patient_gender:
+            item.patient_gender
         };
       });
 
@@ -1295,11 +1326,15 @@ export class SaleModel {
       params.push(filters.status);
     }
 
-    // Main query with customer join
+    // Main query with customer join and refund_total subquery
     const sales = db.prepare(`
     SELECT s.*, 
            c.name as customer_name, 
-           c.mobile as customer_mobile
+           c.mobile as customer_mobile,
+           (SELECT COALESCE(SUM(refund_amount), 0) 
+            FROM medicine_returns 
+            WHERE sale_uuid = s.sale_uuid AND return_type = 'customer_return'
+           ) as refund_total
     FROM sales s
     LEFT JOIN customers c ON s.customer_uuid = c.customer_uuid
     ${whereClause}

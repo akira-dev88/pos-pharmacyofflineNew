@@ -23,6 +23,7 @@ function POSpage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [showCustomerModal, setShowCustomerModal] = useState(false);
+  const [newCustomerPhone, setNewCustomerPhone] = useState("");
   const [showSalesModal, setShowSalesModal] = useState(false);
   const [invoiceData, setInvoiceData] = useState<any>(null);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -474,7 +475,7 @@ function POSpage() {
               customers={customers}
               selectedCustomer={selectedCustomer}
               onSelectCustomer={setSelectedCustomer}
-              onAddNew={() => setShowCustomerModal(true)}
+              onAddNew={(phone) => { setNewCustomerPhone(phone || ""); setShowCustomerModal(true); }}
             />
 
             <DiscountSection
@@ -533,11 +534,13 @@ function POSpage() {
       {/* Modals */}
       {showCustomerModal && (
         <CustomerModal
-          onClose={() => setShowCustomerModal(false)}
+          initialMobile={newCustomerPhone}
+          onClose={() => { setShowCustomerModal(false); setNewCustomerPhone(""); }}
           onCreateCustomer={async (customerData) => {
             const newCustomer = await createNewCustomer(customerData);
             setSelectedCustomer(newCustomer);
             setShowCustomerModal(false);
+            setNewCustomerPhone("");
           }}
         />
       )}
@@ -546,6 +549,7 @@ function POSpage() {
         <SalesModal
           sales={sales}
           onClose={() => setShowSalesModal(false)}
+          onRefresh={loadSales}
           onViewInvoice={async (saleUUID) => {
             const sale = sales.find(s => s.sale_uuid === saleUUID);
 

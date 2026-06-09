@@ -11,6 +11,7 @@ import {
 } from 'ionicons/icons';
 
 interface CustomerModalProps {
+  initialMobile?: string;
   onClose: () => void;
   onCreateCustomer: (data: {
     name: string;
@@ -21,9 +22,9 @@ interface CustomerModalProps {
   }) => Promise<void>;
 }
 
-export default function CustomerModal({ onClose, onCreateCustomer }: CustomerModalProps) {
+export default function CustomerModal({ initialMobile, onClose, onCreateCustomer }: CustomerModalProps) {
   const [name, setName] = useState("");
-  const [mobile, setMobile] = useState("");
+  const [mobile, setMobile] = useState(initialMobile?.replace(/\D/g, '').slice(0, 10) ?? "");
   const [address, setAddress] = useState("");
   const [gstin, setGstin] = useState("");
   const [creditLimit, setCreditLimit] = useState<number>(0);

@@ -3,7 +3,7 @@ import { apiGet, apiPut } from "./api";
 
 export async function getStock() {
   try {
-    const response: any = await apiGet("/products?limit=1000");
+    const response: any = await apiGet("/products?limit=5000");
     // New backend returns { success, products, total }
     if (response?.success && Array.isArray(response.products)) {
       return response.products.map((p: any) => ({

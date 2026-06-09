@@ -10,13 +10,13 @@ export default function LanguageToggle() {
   };
 
   return (
-    <div className="flex gap-1 bg-[#212121] p-1 rounded-full">
+    <div className="flex gap-1 bg-green-700 p-1 rounded-full">
       <button
         onClick={() => toggle('en')}
         className={`px-3 py-1 rounded-full text-sm font-medium transition-all ${
           i18n.language === 'en'
-            ? 'bg-white text-black'
-            : 'text-gray-400 hover:text-white'
+            ? 'bg-white text-green-700'
+            : 'text-white/70 hover:text-white'
         }`}
       >
         EN
@@ -25,8 +25,8 @@ export default function LanguageToggle() {
         onClick={() => toggle('ta')}
         className={`px-3 py-1 rounded-full text-sm font-medium transition-all ${
           i18n.language === 'ta'
-            ? 'bg-white text-black'
-            : 'text-gray-400 hover:text-white'
+            ? 'bg-white text-green-700'
+            : 'text-white/70 hover:text-white'
         }`}
       >
         த

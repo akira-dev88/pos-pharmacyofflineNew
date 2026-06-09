@@ -114,14 +114,15 @@ export class H1RegisterModel {
 
   static findAll(): H1Register[] {
 
-    return db.prepare(`
+    const rows = db.prepare(`
+    SELECT *
+    FROM h1_register
+    ORDER BY created_at DESC
+  `).all();
 
-      SELECT *
+    console.log('H1 rows:', rows);
 
-      FROM h1_register
-
-      ORDER BY created_at DESC
-    `).all() as H1Register[];
+    return rows as H1Register[];
   }
 
   // =========================

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   getTopProducts,
@@ -12,61 +12,30 @@ import {
 } from "../../renderer/services/reportApi";
 import { IonIcon } from "@ionic/react";
 import {
-  trendingUpOutline,
-  cashOutline,
-  cartOutline,
-  cubeOutline,
   warningOutline,
-  refreshOutline,
-  trophyOutline,
-  checkmarkCircleOutline,
   closeCircleOutline,
-  calendarOutline,
-  peopleOutline,
-  walletOutline,
-  barChartOutline,
-  pulseOutline,
 } from "ionicons/icons";
 import {
-  LineChart,
-  Line,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
-  CartesianGrid,
   Tooltip,
-  Legend,
-  PieChart,
-  Pie,
-  Cell,
 } from "recharts";
 
 // shadcn/ui components
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Button } from "@/components/ui/button";
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { ChartContainer } from "@/components/ui/chart";
 
-const COLORS = ['#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
-
-// ── Reusable StatCard (same as other pages)
-const StatCard = ({ label, value, delta, gradient, icon }: any) => (
-  <div className={`relative overflow-hidden rounded-2xl p-5 ${gradient} group cursor-default text-white min-w-0`}>
-    <div className="flex items-start justify-between gap-2">
-      <div className="min-w-0">
-        <p className="text-xs font-semibold uppercase tracking-wider opacity-80 mb-1 truncate">
-          {label}
-        </p>
-        <p className="text-2xl sm:text-3xl font-bold mt-0.5 truncate">{value}</p>
-        {delta && <p className="text-xs mt-1.5 opacity-80">{delta}</p>}
-      </div>
-      <div className="p-2.5 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center shrink-0">
-        {icon}
-      </div>
-    </div>
-    <div className="absolute -bottom-4 -right-4 w-24 h-24 rounded-full bg-white/5 group-hover:bg-white/10 transition-colors" />
-  </div>
-);
+// ── formatCompactNumber
+const formatCompactNumber = (num: number): string => {
+  if (num === null || num === undefined) return "0";
+  const absNum = Math.abs(num);
+  if (absNum >= 10000000) return (num / 10000000).toFixed(2) + "cr";
+  if (absNum >= 100000) return (num / 100000).toFixed(2) + "L";
+  if (absNum >= 1000) return (num / 1000).toFixed(2) + "k";
+  return num.toFixed(2);
+};
 
 export default function Reports() {
   const { t } = useTranslation();
@@ -74,6 +43,7 @@ export default function Reports() {
   const [stock, setStock] = useState<any[]>([]);
   const [profit, setProfit] = useState<any>({
     revenue: 0,
+    refunds: 0,
     cost: 0,
     profit: 0,
   });
@@ -91,19 +61,19 @@ export default function Reports() {
   const [profitTrend, setProfitTrend] = useState<any[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   const [customerReport, setCustomerReport] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState("overview");
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Refs for sliding tabs (must be declared before any useEffect that uses them)
-  const tabRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
-  const sliderRef = useRef<HTMLDivElement>(null);
+  const [trendDays, setTrendDays] = useState(7);
+  const [showRangeMenu, setShowRangeMenu] = useState(false);
+  const [hoveredSegment, setHoveredSegment] = useState<string | null>(null);
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
+  const [hoveredPaymentIdx, setHoveredPaymentIdx] = useState<number | null>(null);
+  const [selectedStat, setSelectedStat] = useState<string | null>(null);
 
   const loadReports = async () => {
     try {
       setError(null);
-      setRefreshing(true);
+
 
       const [
         dashboardRes,
@@ -119,8 +89,8 @@ export default function Reports() {
         getTopProducts(),
         getStockReport(),
         getProfitReport(),
-        getSalesTrend(),
-        getProfitTrend(),
+        getSalesTrend(trendDays),
+        getProfitTrend(trendDays),
         getSalesByPayment(),
         getCustomerPurchaseReport(),
       ]);
@@ -140,38 +110,12 @@ export default function Reports() {
       setError(t('reports.loadError'));
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   };
 
   useEffect(() => {
     loadReports();
-  }, []);
-
-  useEffect(() => {
-    const updateSlider = () => {
-      const activeButton = tabRefs.current[activeTab];
-      const slider = sliderRef.current;
-      if (activeButton && slider) {
-        const container = activeButton.parentElement;
-        if (container) {
-          const containerRect = container.getBoundingClientRect();
-          const activeRect = activeButton.getBoundingClientRect();
-          slider.style.left = `${activeRect.left - containerRect.left}px`;
-          slider.style.width = `${activeRect.width}px`;
-        }
-      }
-    };
-    // Use requestAnimationFrame to wait for the next paint
-    const frameId = requestAnimationFrame(updateSlider);
-    window.addEventListener("resize", updateSlider);
-    return () => {
-      cancelAnimationFrame(frameId);
-      window.removeEventListener("resize", updateSlider);
-    };
-  }, [activeTab, loading]);
-
-  const handleRefresh = () => loadReports();
+  }, [trendDays]);
 
   if (loading) {
     return (
@@ -182,53 +126,101 @@ export default function Reports() {
   }
 
   const profitMargin = profit.revenue > 0 ? (profit.profit / profit.revenue) * 100 : 0;
-  const lowStockCount = stock.filter((s: any) => s.stock <= 10 && s.stock > 0).length;
-  const outOfStockCount = stock.filter((s: any) => s.stock === 0).length;
+
+
+  const revenueDelta = (() => {
+    if (profitTrend.length < 2) return null;
+    const vals = profitTrend.map((d: any) => Number(d.revenue || 0));
+    const mid = Math.floor(vals.length / 2);
+    const prevSum = vals.slice(0, mid).reduce((a: number, b: number) => a + b, 0);
+    const currSum = vals.slice(mid).reduce((a: number, b: number) => a + b, 0);
+    if (prevSum === 0) return { pct: 0, up: true };
+    const pct = ((currSum - prevSum) / prevSum) * 100;
+    return { pct: Math.round(pct * 100) / 100, up: pct >= 0 };
+  })();
+
+  const costDelta = (() => {
+    if (profitTrend.length < 2) return null;
+    const vals = profitTrend.map((d: any) => Number(d.cost || 0));
+    const mid = Math.floor(vals.length / 2);
+    const prevSum = vals.slice(0, mid).reduce((a: number, b: number) => a + b, 0);
+    const currSum = vals.slice(mid).reduce((a: number, b: number) => a + b, 0);
+    if (prevSum === 0) return { pct: 0, up: true };
+    const pct = ((currSum - prevSum) / prevSum) * 100;
+    return { pct: Math.round(pct * 100) / 100, up: pct >= 0 };
+  })();
+
+  const profitDelta = (() => {
+    if (profitTrend.length < 2) return null;
+    const vals = profitTrend.map((d: any) => Number(d.profit || 0));
+    const mid = Math.floor(vals.length / 2);
+    const prevSum = vals.slice(0, mid).reduce((a: number, b: number) => a + b, 0);
+    const currSum = vals.slice(mid).reduce((a: number, b: number) => a + b, 0);
+    if (prevSum === 0) return { pct: 0, up: true };
+    const pct = ((currSum - prevSum) / prevSum) * 100;
+    return { pct: Math.round(pct * 100) / 100, up: pct >= 0 };
+  })();
+
+  const profitMarginDelta = (() => {
+    if (profitTrend.length < 2) return null;
+    const margins = profitTrend.map((d: any) => {
+      const rev = Number(d.revenue || 0);
+      const cost = Number(d.cost || 0);
+      return rev > 0 ? ((rev - cost) / rev) * 100 : 0;
+    });
+    const mid = Math.floor(margins.length / 2);
+    const prevAvg = margins.slice(0, mid).reduce((a, b) => a + b, 0) / mid;
+    const currAvg = margins.slice(mid).reduce((a, b) => a + b, 0) / (margins.length - mid);
+    if (prevAvg === 0) return { pct: 0, up: true };
+    const pct = ((currAvg - prevAvg) / prevAvg) * 100;
+    return { pct: Math.round(pct * 100) / 100, up: pct >= 0 };
+  })();
+
+  const totalCreditBalance = customerReport.reduce((sum: number, c: any) => sum + (c.credit_balance || 0), 0);
+  const inventoryValue = stock.reduce((sum: number, s: any) => sum + ((s.stock || 0) * (s.price || 0)), 0);
+  const gaugeTotal = totalCreditBalance + inventoryValue;
+  const creditsPct = gaugeTotal > 0 ? totalCreditBalance / gaugeTotal : 0.5;
+  const invPct = gaugeTotal > 0 ? inventoryValue / gaugeTotal : 0.5;
+
+  const Sparkline = ({ data: chartData, dataKey, width = 400, height = 280, color = "#22c55e" }: { data: any[], dataKey: string, width?: number, height?: number, color?: string }) => {
+    const [hovered, setHovered] = useState(false);
+    if (!chartData || chartData.length === 0) return null;
+    const values = chartData.map((d: any) => Number(d[dataKey]) || 0);
+    const max = Math.max(...values, 1);
+    const min = Math.min(...values, 0);
+    const range = max - min || 1;
+    const points = values.map((v: number, i: number) => ({
+      x: i / (values.length - 1) * width,
+      y: 4 + (height - 8) * (1 - (v - min) / range),
+    }));
+    const smoothPath = (pts: { x: number; y: number }[]) => {
+      if (pts.length < 2) return '';
+      let d = `M ${pts[0].x},${pts[0].y}`;
+      for (let i = 1; i < pts.length; i++) {
+        const p0 = pts[i - 1], p1 = pts[i], p_1 = pts[Math.max(0, i - 2)], p2 = pts[Math.min(pts.length - 1, i + 1)];
+        d += ` C ${p0.x + (p1.x - p_1.x) / 6},${p0.y + (p1.y - p_1.y) / 6} ${p1.x - (p2.x - p0.x) / 6},${p1.y - (p2.y - p0.y) / 6} ${p1.x},${p1.y}`;
+      }
+      return d;
+    };
+    const lineD = smoothPath(points);
+    return (
+      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none"
+        onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+        style={{ cursor: 'pointer' }}>
+        <defs>
+          <linearGradient id={`sg-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity={hovered ? 0.55 : 0.38} />
+            <stop offset="100%" stopColor={color} stopOpacity={hovered ? 0.06 : 0.02} />
+          </linearGradient>
+        </defs>
+        <path d={`${lineD} L ${width},${height} L 0,${height} Z`} fill={`url(#sg-${dataKey})`} />
+        <path d={lineD} fill="none" stroke={color} strokeWidth={hovered ? 3.5 : 2.5} strokeLinecap="round" strokeLinejoin="round" style={{ transition: 'stroke-width 0.15s' }} />
+      </svg>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-[#F8F9FC] p-6 space-y-5">
-      {/* Header */}
-      <div className="flex justify-between items-center flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight text-start">{t('reports.title')}</h1>
-          <p className="text-slate-500 text-sm mt-0.5">{t('reports.subtitle')}</p>
-        </div>
-        <Button onClick={handleRefresh} disabled={refreshing} variant="outline" className="gap-2">
-          <IonIcon icon={refreshOutline} className={`text-lg ${refreshing ? 'animate-spin' : ''}`} />
-          {refreshing ? t('reports.refreshing') : t('reports.refresh')}
-        </Button>
-      </div>
-
-      {/* Animated Sliding Tabs */}
-      <div className="flex justify-center ">
-        <div className="relative inline-flex gap-1 rounded-full bg-slate-100 p-1 border-black border-[1px]">
-          {[
-            { value: "overview", label: "Overview", icon: barChartOutline },
-            { value: "sales", label: "Sales", icon: cartOutline },
-            { value: "inventory", label: "Inventory", icon: cubeOutline },
-            { value: "customers", label: "Customers", icon: peopleOutline },
-          ].map((tab) => (
-            <button
-              key={tab.value}
-              ref={(el) => { tabRefs.current[tab.value] = el; }}
-              onClick={() => setActiveTab(tab.value)}
-              className="relative z-10 rounded-full px-6 py-2 text-sm font-medium transition-colors duration-200"
-              style={{
-                color: activeTab === tab.value ? "white" : "#475569",
-              }}
-            >
-              <IonIcon icon={tab.icon} className="mr-2 h-4 w-4" />
-              {tab.label}
-            </button>
-          ))}
-          <div
-            ref={sliderRef}
-            className="absolute top-1 bottom-1 z-0 rounded-full bg-green-600 transition-all duration-300 ease-out"
-            style={{ left: 0, width: 0 }}
-          />
-        </div>
-      </div>
-
       {/* Error Message */}
       {error && (
         <Card className="border-red-200 bg-red-50">
@@ -244,451 +236,644 @@ export default function Reports() {
         </Card>
       )}
 
-      {/* ========== OVERVIEW TAB ========== */}
-      {activeTab === "overview" && (
-        <div className="space-y-5">
-          {/* KPI Cards */}
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-            <StatCard
-              label="Today's Sales"
-              value={`₹${(dashboard.today_sales || 0).toLocaleString()}`}
-              delta="Last 24 hours"
-              gradient="bg-gradient-to-br from-emerald-500 to-emerald-700"
-              icon={<IonIcon icon={cashOutline} className="w-5 h-5 text-white" />}
-            />
-            <StatCard
-              label="Monthly Sales"
-              value={`₹${(dashboard.month_sales || 0).toLocaleString()}`}
-              delta="This month"
-              gradient="bg-gradient-to-br from-blue-500 to-blue-700"
-              icon={<IonIcon icon={calendarOutline} className="w-5 h-5 text-white" />}
-            />
-            <StatCard
-              label="Total Sales"
-              value={`₹${(dashboard.total_sales || 0).toLocaleString()}`}
-              delta="Lifetime revenue"
-              gradient="bg-gradient-to-br from-violet-500 to-violet-700"
-              icon={<IonIcon icon={trendingUpOutline} className="w-5 h-5 text-white" />}
-            />
-            <StatCard
-              label="Total Orders"
-              value={(dashboard.total_orders || 0).toLocaleString()}
-              delta="Invoices processed"
-              gradient="bg-gradient-to-br from-amber-500 to-amber-700"
-              icon={<IonIcon icon={cartOutline} className="w-5 h-5 text-white" />}
-            />
-          </div>
+      {/* ========== OVERVIEW ========== */}
+      <div className="space-y-5">
 
-          {/* Profit Section */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <StatCard
-              label="Revenue"
-              value={`₹${(profit.revenue || 0).toLocaleString()}`}
-              gradient="bg-gradient-to-br from-emerald-500 to-emerald-700"
-              icon={<IonIcon icon={cashOutline} className="w-5 h-5 text-white" />}
-            />
-            <StatCard
-              label="Cost"
-              value={`₹${(profit.cost || 0).toLocaleString()}`}
-              gradient="bg-gradient-to-br from-red-500 to-red-600"
-              icon={<IonIcon icon={cartOutline} className="w-5 h-5 text-white" />}
-            />
-            <StatCard
-              label="Net Profit"
-              value={`₹${(profit.profit || 0).toLocaleString()}`}
-              gradient="bg-gradient-to-br from-blue-500 to-blue-700"
-              icon={<IonIcon icon={trendingUpOutline} className="w-5 h-5 text-white" />}
-            />
-          </div>
-
-          {/* Profit Margin Bar */}
-          {profit.revenue > 0 && (
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="text-sm text-slate-500">Profit Margin</p>
-                    <p className="text-3xl font-bold text-blue-600">{profitMargin.toFixed(1)}%</p>
-                  </div>
-                  <div className="w-64">
-                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-emerald-500 rounded-full transition-all"
-                        style={{ width: `${Math.min(profitMargin, 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Sales Trend Chart */}
-          {salesTrend.length > 0 && (
-            <Card className="shadow-sm border-slate-200">
-              <CardHeader>
-                <CardTitle className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-                  <IonIcon icon={pulseOutline} className="text-blue-500 text-xl" />
-                  Sales Trend (Last 7 Days)
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ChartContainer
-                  config={{
-                    total: {
-                      label: "Sales",
-                      color: "#10b981",
-                    },
-                  }}
-                  className="h-[300px] w-full"
-                >
-                  <LineChart
-                    data={salesTrend}
-                    margin={{ top: 20, right: 20, left: 12, bottom: 10 }}
-                  >
-                    <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis
-                      dataKey="date"
-                      tickLine={false}
-                      axisLine={false}
-                      tickMargin={10}
-                      stroke="#94a3b8"
-                      fontSize={12}
-                    />
-                    <YAxis
-                      tickLine={false}
-                      axisLine={false}
-                      stroke="#94a3b8"
-                      fontSize={12}
-                      tickFormatter={(v) => `₹${v.toLocaleString()}`}
-                    />
-                    <ChartTooltip
-                      content={
-                        <ChartTooltipContent
-                          className="rounded-xl border-slate-200 bg-white text-slate-800 shadow-xl p-2"
-                          formatter={(value) => (
-                            <>
-                              <div className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: "#10b981" }} />
-                              <span className="text-slate-500">Sales</span>
-                              <span className="ml-auto font-semibold text-slate-800">
-                                ₹{Number(value).toLocaleString()}
-                              </span>
-                            </>
-                          )}
-                        />
-                      }
-                    />
-                    <Line
-                      dataKey="total"
-                      type="monotone"
-                      stroke="var(--color-total)"
-                      strokeWidth={2}
-                      dot={{ fill: "#10b981", strokeWidth: 2, r: 4, stroke: "white" }}
-                      activeDot={{ r: 6 }}
-                    />
-                  </LineChart>
-                </ChartContainer>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      )}
-
-      {/* ========== SALES TAB ========== */}
-      {activeTab === "sales" && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {/* Top Selling Products - 2 cols */}
-          <Card className="md:col-span-2 shadow-sm border-slate-200 flex flex-col">
-            <CardHeader className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-t-2xl">
-              <CardTitle className="flex items-center gap-2 text-white text-lg">
-                <IonIcon icon={trophyOutline} className="text-xl" />
-                Top Selling Products
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0 flex-1">
-              <ScrollArea className="h-[400px]">
-                {top.length === 0 ? (
-                  <div className="text-center py-12 text-slate-400">
-                    <IonIcon icon={cubeOutline} className="text-5xl mx-auto mb-3" />
-                    <p>No sales data yet</p>
-                  </div>
-                ) : (
-                  <div className="divide-y divide-slate-100">
-                    {top.map((p, idx) => (
-                      <div key={p.product_uuid || idx} className="flex justify-between items-center px-6 py-4 hover:bg-slate-50 transition-colors">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${idx === 0 ? "bg-yellow-100 text-yellow-600" :
-                            idx === 1 ? "bg-slate-100 text-slate-600" :
-                              idx === 2 ? "bg-orange-100 text-orange-600" :
-                                "bg-blue-100 text-blue-600"
-                            }`}>
-                            {idx + 1}
-                          </div>
-                          <div>
-                            <p className="font-medium text-slate-800">{p.name || 'Unknown'}</p>
-                            {p.sku && <p className="text-xs text-slate-400">SKU: {p.sku}</p>}
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-semibold text-blue-600">{p.total_qty || 0} units</p>
-                          {p.total_revenue && <p className="text-xs text-emerald-600">₹{p.total_revenue.toLocaleString()}</p>}
-                        </div>
-                      </div>
-                    ))}
+          {/* Finance Stats Row */}
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 text-start">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-6 py-5 flex items-center gap-6 relative">
+              <button onClick={() => setSelectedStat('revenue')} className="absolute top-2 right-2 w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M7 17L17 7M7 7h10v10" />
+                </svg>
+              </button>
+              <div className="flex-shrink-0">
+                <p className="text-xs text-gray-400 mb-0.5">Statistics</p>
+                <p className="text-sm font-semibold text-gray-700 mb-3">Revenue</p>
+                <p className="text-5xl font-bold text-gray-900 leading-none mb-2">₹{formatCompactNumber(profit.revenue || 0)}</p>
+                {(profit.refunds ?? 0) > 0 && (
+                  <p className="text-xs text-red-500 mt-1">
+                    Refunds: -₹{formatCompactNumber(profit.refunds ?? 0)}
+                  </p>
+                )}
+                {revenueDelta && (
+                  <div className="flex items-center gap-1">
+                    <span className={`text-sm font-medium ${revenueDelta.up ? 'text-green-500' : 'text-red-500'}`}>
+                      {revenueDelta.up ? '+' : ''}{Math.abs(revenueDelta.pct)}%
+                    </span>
+                    <svg className={revenueDelta.up ? 'text-green-500' : 'text-red-500'} width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ transform: revenueDelta.up ? 'none' : 'rotate(180deg)' }}>
+                      <path d="M3 10L7 5L11 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
                   </div>
                 )}
-              </ScrollArea>
-            </CardContent>
-          </Card>
+              </div>
+              <div className="flex-1 min-w-0">
+                <svg viewBox="0 0 160 80" preserveAspectRatio="none" className="w-full h-16">
+                  <polyline fill="none" stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points="0,60 20,50 35,65 45,20 60,55 75,45 90,58 110,35 130,50 160,42" />
+                </svg>
+              </div>
+            </div>
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-6 py-5 flex items-center gap-6 relative">
+              <button onClick={() => setSelectedStat('cost')} className="absolute top-2 right-2 w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M7 17L17 7M7 7h10v10" />
+                </svg>
+              </button>
+              <div className="flex-shrink-0">
+                <p className="text-xs text-gray-400 mb-0.5">Statistics</p>
+                <p className="text-sm font-semibold text-gray-700 mb-3">Cost</p>
+                <p className="text-5xl font-bold text-gray-900 leading-none mb-2">₹{formatCompactNumber(profit.cost || 0)}</p>
+                {costDelta && (
+                  <div className="flex items-center gap-1">
+                    <span className={`text-sm font-medium ${costDelta.up ? 'text-green-500' : 'text-red-500'}`}>
+                      {costDelta.up ? '+' : ''}{Math.abs(costDelta.pct)}%
+                    </span>
+                    <svg className={costDelta.up ? 'text-green-500' : 'text-red-500'} width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ transform: costDelta.up ? 'none' : 'rotate(180deg)' }}>
+                      <path d="M3 10L7 5L11 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <svg viewBox="0 0 160 80" preserveAspectRatio="none" className="w-full h-16">
+                  <polyline fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points="0,60 20,45 35,55 45,30 60,50 75,40 90,52 110,25 130,45 160,38" />
+                </svg>
+              </div>
+            </div>
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-6 py-5 flex items-center gap-6 relative">
+              <button onClick={() => setSelectedStat('profit')} className="absolute top-2 right-2 w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M7 17L17 7M7 7h10v10" />
+                </svg>
+              </button>
+              <div className="flex-shrink-0">
+                <p className="text-xs text-gray-400 mb-0.5">Statistics</p>
+                <p className="text-sm font-semibold text-gray-700 mb-3">Net Profit</p>
+                <p className="text-5xl font-bold text-gray-900 leading-none mb-2">₹{formatCompactNumber(profit.profit || 0)}</p>
+                {profitDelta && (
+                  <div className="flex items-center gap-1">
+                    <span className={`text-sm font-medium ${profitDelta.up ? 'text-green-500' : 'text-red-500'}`}>
+                      {profitDelta.up ? '+' : ''}{Math.abs(profitDelta.pct)}%
+                    </span>
+                    <svg className={profitDelta.up ? 'text-green-500' : 'text-red-500'} width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ transform: profitDelta.up ? 'none' : 'rotate(180deg)' }}>
+                      <path d="M3 10L7 5L11 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <svg viewBox="0 0 160 80" preserveAspectRatio="none" className="w-full h-16">
+                  <polyline fill="none" stroke="#a855f7" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points="0,55 20,40 35,50 45,25 60,45 75,35 90,48 110,20 130,40 160,32" />
+                </svg>
+              </div>
+            </div>
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-6 py-5 flex items-center gap-6 relative">
+              <button onClick={() => setSelectedStat('margin')} className="absolute top-2 right-2 w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M7 17L17 7M7 7h10v10" />
+                </svg>
+              </button>
+              <div className="flex-shrink-0">
+                <p className="text-xs text-gray-400 mb-0.5">Statistics</p>
+                <p className="text-sm font-semibold text-gray-700 mb-3">Profit Margin</p>
+                <p className="text-5xl font-bold text-gray-900 leading-none mb-2">{profitMargin.toFixed(1)}%</p>
+                {profitMarginDelta && (
+                  <div className="flex items-center gap-1">
+                    <span className={`text-sm font-medium ${profitMarginDelta.up ? 'text-green-500' : 'text-red-500'}`}>
+                      {profitMarginDelta.up ? '+' : ''}{Math.abs(profitMarginDelta.pct)}%
+                    </span>
+                    <svg className={profitMarginDelta.up ? 'text-green-500' : 'text-red-500'} width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ transform: profitMarginDelta.up ? 'none' : 'rotate(180deg)' }}>
+                      <path d="M3 10L7 5L11 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <svg viewBox="0 0 160 80" preserveAspectRatio="none" className="w-full h-16">
+                  <polyline fill="none" stroke="#f97316" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points="0,50 20,35 35,45 45,20 60,40 75,30 90,42 110,15 130,35 160,28" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          {/* Bento: Sales Trend + Customer Stats */}
+          <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-5">
+            {salesTrend.length > 0 && (
+              <Card className="shadow-sm border-slate-200 flex flex-col h-full">
+                <CardHeader className="pb-1 shrink-0">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-sm font-medium" style={{ color: '#a0aabf' }}>Statistics</p>
+                      <p className="text-xl font-bold mt-0.5" style={{ color: '#1e2535' }}>Sales Trend</p>
+                    </div>
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowRangeMenu(!showRangeMenu)}
+                        className="px-3 py-1 text-xs font-medium rounded-full border border-slate-300 text-slate-600 bg-white hover:bg-slate-50 transition-colors"
+                      >
+                        Last {trendDays === 365 ? "1 year" : `${trendDays} days`}
+                      </button>
+                      {showRangeMenu && (
+                        <>
+                          <div className="fixed inset-0 z-10" onClick={() => setShowRangeMenu(false)} />
+                          <div className="absolute right-0 top-full mt-1 z-20 bg-white border border-slate-200 rounded-xl shadow-xl py-1 min-w-[140px]">
+                            {[7, 14, 30, 60, 90, 180, 365].map((d) => (
+                              <button
+                                key={d}
+                                onClick={() => { setTrendDays(d); setShowRangeMenu(false); }}
+                                className={`block w-full text-left px-4 py-2 text-sm hover:bg-slate-50 transition-colors ${trendDays === d ? "text-blue-600 font-semibold" : "text-slate-700"}`}
+                              >
+                                Last {d === 365 ? "1 year" : `${d} days`}
+                              </button>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 flex flex-col">
+                  {(() => {
+                    const data = salesTrend.slice(0, 7);
+                    const maxVal = Math.max(...data.map((d: any) => Number(d.total || 0)), 1);
+                    const activeIdx = Math.min(3, data.length - 1);
+                    return (
+                      <div className="chart-area relative flex flex-col flex-1" style={{ background: '#f4f5fb', borderRadius: 14, padding: '16px 12px 12px' }}>
+                        <style>{`
+                          @keyframes growUp { from { transform: scaleY(0); transform-origin: bottom; } to { transform: scaleY(1); transform-origin: bottom; } }
+                          .bar-anim { animation: growUp 0.7s cubic-bezier(0.34,1.56,0.64,1) both; }
+                          .bar-col:hover .bar-inner { opacity: 1 !important; }
+                          .bar-col:hover .bar-tip { display: block !important; }
+                          .bar-col:hover .bar-marker { display: block !important; }
+                        `}</style>
+                        <div style={{ display: 'flex', alignItems: 'stretch', flex: 1, minHeight: 0 }}>
+                          <div style={{ display: 'flex', flexDirection: 'column-reverse', justifyContent: 'space-between', marginRight: 8, paddingBottom: 0 }}>
+                            {[0, 0.25, 0.5, 0.75, 1].map((f) => (
+                              <span key={f} style={{ fontSize: 11, color: '#9aa5bf', fontWeight: 500, lineHeight: 1, width: 28, textAlign: 'right' }}>
+                                ₹{maxVal < 1000 ? Math.round(maxVal * f).toLocaleString() : (maxVal * f / 1000).toFixed(0) + 'k'}
+                              </span>
+                            ))}
+                          </div>
+                          <div style={{ flex: 1, display: 'flex', alignItems: 'flex-end', gap: 10, position: 'relative' }}>
+                            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column-reverse', justifyContent: 'space-between', pointerEvents: 'none' }}>
+                              {[0, 1, 2, 3, 4].map((i) => (
+                                <div key={i} style={{ width: '100%', borderTop: '1px dashed #e0e3ef' }} />
+                              ))}
+                            </div>
+                            {data.map((d: any, i: number) => {
+                              const pct = (Number(d.total || 0) / maxVal) * 100;
+                              const isActive = i === activeIdx;
+                              return (
+                                <div key={i} className="bar-col" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%', position: 'relative', cursor: 'pointer' }}>
+                                  <div className="bar-tip" style={{ display: isActive ? 'block' : 'none', position: 'absolute', bottom: pct + 22, left: '50%', transform: 'translateX(-60%)', background: '#fff', border: '1.5px solid #e8eaf2', borderRadius: 10, padding: '6px 12px', fontSize: 13, fontWeight: 700, color: '#1e2535', whiteSpace: 'nowrap', boxShadow: '0 4px 16px rgba(0,0,0,0.10)', zIndex: 10, pointerEvents: 'none' }}>
+                                    ₹{Number(d.total || 0).toLocaleString()}
+                                  </div>
+                                  <div className="bar-marker" style={{ display: isActive ? 'block' : 'none', position: 'absolute', left: '50%', transform: 'translateX(-50%)', width: 2, borderLeft: '2px dashed #22c55e', height: pct, pointerEvents: 'none', zIndex: 5 }}>
+                                    <div style={{ position: 'absolute', bottom: -6, left: '50%', transform: 'translateX(-50%)', width: 12, height: 12, borderRadius: '50%', background: '#fff', border: '2.5px solid #22c55e', zIndex: 6 }} />
+                                  </div>
+                                  <div className="bar-inner bar-anim" style={{ width: '100%', borderRadius: '10px 10px 0 0', height: `${pct}%`, background: 'linear-gradient(180deg, #22c55e 0%, #16a34a 100%)', opacity: isActive ? 1 : 0.55, position: 'relative', overflow: 'hidden', animationDelay: `${i * 0.07}s` }}>
+                                    <div style={{ position: 'absolute', top: 6, left: '10%', width: '38%', height: '45%', background: 'rgba(255,255,255,0.22)', borderRadius: '8px 8px 60% 60%', pointerEvents: 'none' }} />
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 10, padding: '8px 0 0', marginLeft: 36, flexShrink: 0 }}>
+                          {data.map((d: any, i: number) => (
+                            <div key={i} style={{ flex: 1, textAlign: 'center', fontSize: 12, color: '#9aa5bf', fontWeight: 500 }}>
+                              {d.date || ''}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+            )}
+            <div className="flex flex-col gap-5">
+              <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+                <div className="flex items-start justify-between mb-1">
+                  <div>
+                    <p className="text-sm text-slate-400 font-medium leading-none mb-1">Customers</p>
+                    <p className="text-3xl font-bold text-slate-800 leading-tight">{customerReport.length.toLocaleString()}</p>
+                  </div>
+                  <div className="flex items-center gap-1.5 bg-emerald-50 rounded-xl px-3 py-1.5 mt-1">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                      <circle cx="7" cy="7" r="7" fill="#10b981"/>
+                      <path d="M4.5 8.5L7 5.5L9.5 8.5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <div className="text-right">
+                      <p className="text-xs font-bold text-slate-700 leading-none">1.3%</p>
+                      <p className="text-[10px] text-slate-400 font-medium leading-none mt-0.5">VS LAST WEEK</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="relative mt-4" style={{ height: 140 }}>
+                  <ChartContainer
+                    config={{
+                      customers: {
+                        label: "Customers",
+                        color: "#22c55e",
+                      },
+                    }}
+                    className="h-full w-full"
+                  >
+                  <AreaChart
+                    data={[
+                      { day: 'MON', val: 3800 },
+                      { day: 'TUE', val: 450 },
+                      { day: 'WED', val: 1150 },
+                      { day: 'THU', val: 300 },
+                      { day: 'FRI', val: 2100 },
+                      { day: 'SAT', val: 2900 },
+                      { day: 'SUN', val: 2400 },
+                    ]}
+                    margin={{ top: 4, right: 4, left: 4, bottom: 4 }}
+                  >
+                    <defs>
+                      <linearGradient id="customerFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#22c55e" stopOpacity={0.45} />
+                        <stop offset="100%" stopColor="#22c55e" stopOpacity={0.02} />
+                      </linearGradient>
+                    </defs>
+                    <XAxis dataKey="day" hide />
+                    <YAxis hide domain={[0, 4000]} />
+                    <Area
+                      type="monotone"
+                      dataKey="val"
+                      stroke="#22c55e"
+                      strokeWidth={2.2}
+                      fill="url(#customerFill)"
+                      dot={{ fill: '#22c55e', stroke: '#fff', strokeWidth: 2, r: 3 }}
+                      activeDot={{ r: 4 }}
+                    />
+                    <Tooltip
+                      contentStyle={{ background: '#1e293b', border: 'none', borderRadius: 8, color: '#fff', fontSize: 13, fontWeight: 600 }}
+                      formatter={(value: any) => [value.toLocaleString(), 'Customers']}
+                      labelStyle={{ display: 'none' }}
+                    />
+                  </AreaChart>
+                  </ChartContainer>
+                </div>
+              </div>
+              <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+                <p className="text-sm font-medium" style={{ color: '#a0aabf' }}>Statistics</p>
+                <p className="text-lg font-semibold mt-0.5" style={{ color: '#1e2535' }}>Yearly Credit</p>
+                <hr className="my-4" style={{ border: 'none', borderTop: '1.5px solid #f0f2f7' }} />
+                <div className="flex items-center justify-center mb-6" style={{ height: 200 }}>
+                  <div style={{ position: 'relative', width: 200, height: 200 }}>
+                    <svg width="200" height="200" viewBox="0 0 200 200">
+                      {(() => {
+                        const cx = 100, cy = 100, r = 80, lw = 16;
+                        const gapDeg = 54;
+                        const startDeg = 90 + gapDeg / 2;
+                        const endDeg = 90 - gapDeg / 2 + 360;
+                        const totalArcDeg = 360 - gapDeg;
+                        const toRad = (d: number) => d * Math.PI / 180;
+                        const startRad = toRad(startDeg);
+                        const splitRad = toRad(startDeg + totalArcDeg * creditsPct);
+                        const endRad = toRad(startDeg + totalArcDeg);
+                        const arcPath = (cx: number, cy: number, r: number, sa: number, ea: number) => {
+                          const x1 = cx + r * Math.cos(sa), y1 = cy + r * Math.sin(sa);
+                          const x2 = cx + r * Math.cos(ea), y2 = cy + r * Math.sin(ea);
+                          const large = ea - sa > Math.PI ? 1 : 0;
+                          return `M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2}`;
+                        };
+                        const handleMouseMove = (e: React.MouseEvent, seg: string) => {
+                          setTooltipPos({ x: e.clientX, y: e.clientY });
+                          setHoveredSegment(seg);
+                        };
+                        const handleMouseLeave = () => {
+                          setHoveredSegment(null);
+                          setTooltipPos(null);
+                        };
+                        return (
+                          <>
+                            <path d={arcPath(cx, cy, r, startRad, endRad)} fill="none" stroke="#d1fae5" strokeWidth={lw} strokeLinecap="round" style={{ cursor: 'pointer' }} />
+                            <path d={arcPath(cx, cy, r, startRad, endRad)} fill="none" stroke="transparent" strokeWidth={lw + 12} strokeLinecap="round" style={{ cursor: 'pointer' }} onMouseMove={(e) => handleMouseMove(e, 'inventory')} onMouseLeave={handleMouseLeave} />
+                            <path d={arcPath(cx, cy, r, startRad, splitRad)} fill="none" stroke="#10b981" strokeWidth={lw} strokeLinecap="round" style={{ cursor: 'pointer' }} />
+                            <path d={arcPath(cx, cy, r, startRad, splitRad)} fill="none" stroke="transparent" strokeWidth={lw + 12} strokeLinecap="round" style={{ cursor: 'pointer' }} onMouseMove={(e) => handleMouseMove(e, 'credits')} onMouseLeave={handleMouseLeave} />
+                          </>
+                        );
+                      })()}
+                    </svg>
+                    <div style={{ position: 'absolute', top: '44%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', pointerEvents: 'none' }}>
+                      <p style={{ fontSize: 12, color: '#9ca3af', margin: '0 0 2px' }}>Total Credits</p>
+                      <p style={{ fontSize: 17, fontWeight: 700, color: '#1f2937', margin: 0 }}>₹{totalCreditBalance.toLocaleString()}</p>
+                    </div>
+                    {hoveredSegment && tooltipPos && (
+                      <div style={{
+                        position: 'fixed',
+                        left: tooltipPos.x + 12,
+                        top: tooltipPos.y - 10,
+                        background: '#1e293b',
+                        color: '#fff',
+                        fontSize: 13,
+                        fontWeight: 600,
+                        padding: '6px 12px',
+                        borderRadius: 8,
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+                        pointerEvents: 'none',
+                        zIndex: 9999,
+                        whiteSpace: 'nowrap',
+                      }}>
+                        {hoveredSegment === 'credits'
+                          ? `Total Credits: ₹${totalCreditBalance.toLocaleString()} (${(creditsPct * 100).toFixed(0)}%)`
+                          : `Inventory: ₹${inventoryValue.toLocaleString()} (${(invPct * 100).toFixed(0)}%)`}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center justify-center gap-6 text-sm" style={{ color: '#6b7280' }}>
+                  <span className="flex items-center gap-2">
+                    <span style={{ width: 11, height: 11, borderRadius: '50%', background: '#10b981', display: 'inline-block', flexShrink: 0 }} />
+                    Total Credits <span className="font-medium ml-1" style={{ color: '#374151' }}>{(creditsPct * 100).toFixed(0)}%</span>
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <span style={{ width: 11, height: 11, borderRadius: '50%', background: '#a7f3d0', display: 'inline-block', flexShrink: 0 }} />
+                    Inventory <span className="font-medium ml-1" style={{ color: '#374151' }}>{(invPct * 100).toFixed(0)}%</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+      </div>
+
+      {/* ========== SALES ========== */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-8">
+          {/* Top Selling Products - 1 col */}
+          <div className="md:col-span-1 bg-white border border-gray-200 rounded-2xl p-5 shadow-sm flex flex-col text-left">
+            <div className="mb-4">
+              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-0.5">Statistics</p>
+              <h2 className="text-lg font-bold text-gray-800">Top Selling Products</h2>
+            </div>
+            {top.length === 0 ? (
+              <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">No sales data yet</div>
+            ) : (
+              <>
+                <div className="flex-1 flex flex-col gap-3 min-h-0">
+                  {(() => {
+                    const maxQty = Math.max(...top.map((p: any) => Number(p.total_qty || 0)), 1);
+                    return top.map((p: any, idx: number) => {
+                      const pct = (Number(p.total_qty || 0) / maxQty) * 100;
+                      const isFirst = idx === 0;
+                      return (
+                        <div key={p.product_uuid || idx}>
+                          <div className="flex justify-between items-center mb-1">
+                            <div className="min-w-0 flex-1">
+                              <span className="text-sm font-medium text-gray-700 truncate block">{p.name || 'Unknown'}</span>
+                              {p.manufacturerName && <span className="text-xs text-gray-400">{p.manufacturerName}</span>}
+                            </div>
+                            <span className={`text-sm font-semibold shrink-0 ml-2 ${isFirst ? 'text-green-600' : 'text-gray-400'}`}>
+                              {p.total_qty || 0} units
+                            </span>
+                          </div>
+                          <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div
+                              className="h-full rounded-full transition-all duration-1000"
+                              style={{
+                                width: `${pct}%`,
+                                background: isFirst
+                                  ? 'linear-gradient(90deg, #22c55e 0%, #16a34a 100%)'
+                                  : '#d1d5db'
+                              }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+                <div className="flex justify-between mt-3">
+                  <span className="text-[11px] text-gray-400 font-medium">0%</span>
+                  <span className="text-[11px] text-gray-400 font-medium">50%</span>
+                  <span className="text-[11px] text-gray-400 font-medium">100%</span>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Recent Purchases - 1 col */}
+          {dashboard.recent_purchases?.length > 0 && (() => {
+            const purchases = dashboard.recent_purchases;
+            const maxTotal = Math.max(...purchases.map((p: any) => Number(p.total || 0)), 1);
+            return (
+              <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-200 flex flex-col text-left">
+                <div className="mb-4">
+                  <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-0.5">Statistics</p>
+                  <h2 className="text-lg font-bold text-gray-800">Recent Purchases</h2>
+                </div>
+                <div className="flex flex-col gap-3">
+                  {purchases.map((purchase: any, idx: number) => {
+                    const pct = (Number(purchase.total || 0) / maxTotal) * 100;
+                    const isFirst = idx === 0;
+                    return (
+                      <div key={idx}>
+                        <div className="flex justify-between items-center mb-1">
+                          <div className="min-w-0 flex-1">
+                            <span className="text-sm font-medium text-gray-700 truncate block">{purchase.supplier_name || 'Unknown Supplier'}</span>
+                            <span className="text-xs text-gray-400">{new Date(purchase.created_at).toLocaleDateString()}</span>
+                          </div>
+                          <span className={`text-sm font-semibold shrink-0 ml-2 ${isFirst ? 'text-green-600' : 'text-gray-400'}`}>
+                            ₹{Number(purchase.total || 0).toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all duration-1000"
+                            style={{
+                              width: `${pct}%`,
+                              background: isFirst
+                                ? 'linear-gradient(90deg, #22c55e 0%, #16a34a 100%)'
+                                : '#d1d5db'
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="flex justify-between mt-3">
+                  <span className="text-[11px] text-gray-400 font-medium">0</span>
+                  <span className="text-[11px] text-gray-400 font-medium">₹{Math.round(maxTotal / 2).toLocaleString()}</span>
+                  <span className="text-[11px] text-gray-400 font-medium">₹{maxTotal.toLocaleString()}</span>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Payment Methods - 1 col */}
-          <Card className="shadow-sm border-slate-200 flex flex-col">
-            <CardHeader className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-t-2xl">
-              <CardTitle className="flex items-center gap-2 text-white text-lg">
-                <IonIcon icon={walletOutline} className="text-xl" />
-                Payment Methods
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0 flex-1">
+          <Card className="shadow-sm border-slate-200 flex flex-col rounded-3xl" style={{ background: '#000' }}>
+            <CardContent className="p-5 flex-1 flex flex-col text-white select-none">
               {paymentMethods.length === 0 ? (
-                <div className="text-center py-12 text-slate-400">
-                  <p className="text-sm">No payment data</p>
-                </div>
+                <div className="flex-1 flex items-center justify-center text-neutral-400 text-sm">No payment data</div>
               ) : (
-                <div className="divide-y divide-slate-100">
-                  {paymentMethods.map((method, idx) => (
-                    <div key={idx} className="px-6 py-4">
-                      <span className="capitalize font-medium text-slate-700">{method.method}</span>
-                      <div className="mt-1">
-                        <p className="font-semibold text-blue-600">₹{(method.total || 0).toLocaleString()}</p>
-                        <p className="text-xs text-slate-400">{method.count} transactions</p>
+                <>
+                  {/* Header */}
+                  <div className="mb-4 text-left">
+                    <span className="text-base font-medium tracking-tight">Donut chart</span>
+                  </div>
+
+                  {/* Total Activity */}
+                  {(() => {
+                    const avgPct = paymentMethods.length > 0
+                      ? (100 / paymentMethods.length).toFixed(0)
+                      : '0';
+                    return (
+                      <div className="flex items-start gap-2 mb-5 text-left">
+                        <span className="text-5xl font-bold leading-none">{avgPct}%</span>
+                        <span className="text-sm text-neutral-400 leading-tight pt-1">Avg<br />share</span>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    );
+                  })()}
+
+                  {/* Half Donut */}
+                  <div className="flex flex-col items-center mt-6">
+                    <svg viewBox="0 0 260 160" className="w-full" style={{ maxWidth: '100%', display: 'block' }}>
+                      {(() => {
+                        const total = paymentMethods.reduce((s: number, m: any) => s + Number(m.total || 0), 0);
+                        const segColors = ['#e0552a', '#c03ab0', '#a060f0', '#9055e8', '#8050e0', '#e08010'];
+                        const r = 92;
+                        const cx = 130, cy = 105;
+                        const sw = 22;
+                        const n = paymentMethods.length;
+                        const gap = 0.015;
+                        const totalGaps = gap * n;
+                        const scale = 1 - totalGaps;
+                        let cumulative = 0;
+                        return paymentMethods.map((m: any, i: number) => {
+                          const val = Number(m.total || 0);
+                          const pct = total > 0 ? (val / total) * scale : 0;
+                          const segStart = cumulative;
+                          const segEnd = cumulative + pct;
+                          cumulative = segEnd + gap;
+                          const startAngle = segStart * 180 - 180;
+                          const endAngle = segEnd * 180 - 180;
+                          const large = (endAngle - startAngle) > 180 ? 1 : 0;
+                          const toRad = (deg: number) => (deg * Math.PI) / 180;
+                          const sr = toRad(startAngle), er = toRad(endAngle);
+                          const x1 = cx + r * Math.cos(sr), y1 = cy + r * Math.sin(sr);
+                          const x2 = cx + r * Math.cos(er), y2 = cy + r * Math.sin(er);
+                          const path = `M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2}`;
+                          const isHovered = hoveredPaymentIdx === i;
+                          return (
+                            <path
+                              key={i}
+                              d={path}
+                              fill="none"
+                              stroke={segColors[i % segColors.length]}
+                              strokeWidth={sw}
+                              opacity={isHovered ? 0.85 : 1}
+                              style={{ cursor: 'pointer', transition: 'opacity 0.15s' }}
+                              onMouseEnter={() => setHoveredPaymentIdx(i)}
+                              onMouseLeave={() => setHoveredPaymentIdx(null)}
+                            />
+                          );
+                        });
+                      })()}
+                    </svg>
+                    {(() => {
+                      const total = paymentMethods.reduce((s: number, m: any) => s + Number(m.total || 0), 0);
+                      const idx = hoveredPaymentIdx !== null ? hoveredPaymentIdx : 0;
+                      const method = paymentMethods[idx];
+                      const pct = total > 0 ? ((Number(method?.total || 0) / total) * 100).toFixed(0) : '0';
+                      return (
+                        <div className="text-center -mt-20">
+                          <div className="text-2xl font-bold leading-none">{pct}%</div>
+                          <div className="text-sm text-neutral-400 capitalize">{method?.method || ''}</div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>
 
-          {/* Recent Sales - full width */}
-          {dashboard.recent_sales?.length > 0 && (
-            <Card className="md:col-span-3 shadow-sm border-slate-200">
-              <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-t-2xl">
-                <CardTitle className="flex items-center gap-2 text-white text-lg">
-                  <IonIcon icon={cashOutline} className="text-xl" />
-                  Recent Sales
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <ScrollArea className="h-[280px]">
-                  <div className="divide-y divide-slate-100">
-                    {dashboard.recent_sales.map((sale: any, idx: number) => (
-                      <div key={idx} className="px-6 py-4 hover:bg-slate-50 transition-colors">
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <p className="font-medium text-slate-800">{sale.invoice_number || sale.sale_uuid?.slice(0, 8)}</p>
-                            <p className="text-xs text-slate-400">
-                              {sale.customer_name || 'Walk-in Customer'} • {new Date(sale.created_at).toLocaleDateString()}
-                            </p>
-                          </div>
-                          <span className="font-bold text-emerald-600">₹{(sale.grand_total || 0).toLocaleString()}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      )}
+      </div>
 
-      {/* ========== INVENTORY TAB ========== */}
-      {activeTab === "inventory" && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {/* Stat cards row */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 md:col-span-3">
-            <StatCard
-              label="Total Products"
-              value={stock.length.toLocaleString()}
-              gradient="bg-gradient-to-br from-emerald-500 to-emerald-700"
-              icon={<IonIcon icon={cubeOutline} className="w-5 h-5 text-white" />}
-            />
-            <StatCard
-              label="Low Stock"
-              value={lowStockCount}
-              gradient="bg-gradient-to-br from-amber-500 to-amber-700"
-              icon={<IonIcon icon={warningOutline} className="w-5 h-5 text-white" />}
-            />
-            <StatCard
-              label="Out of Stock"
-              value={outOfStockCount}
-              gradient="bg-gradient-to-br from-red-500 to-red-600"
-              icon={<IonIcon icon={closeCircleOutline} className="w-5 h-5 text-white" />}
-            />
-          </div>
+      {selectedStat && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={() => setSelectedStat(null)}>
+          <div className="w-[400px] h-[500px] rounded-[24px] overflow-hidden pt-5 px-5 pb-3 flex flex-col" style={{ background: "#1a1d1f" }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-end mb-1">
+              <button onClick={() => setSelectedStat(null)} className="text-xs font-semibold px-3 py-1 rounded-full" style={{ background: "#dc2626", color: "#fff" }}>
+                Close
+              </button>
+            </div>
 
-          {/* Inventory Status - 2 cols */}
-          <Card className="md:col-span-2 shadow-sm border-slate-200">
-            <CardHeader className="bg-gradient-to-r from-green-500 to-green-600 rounded-t-2xl">
-              <CardTitle className="flex items-center gap-2 text-white text-lg">
-                <IonIcon icon={cubeOutline} className="text-xl" />
-                Inventory Status
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <ScrollArea className="h-[500px]">
-                {stock.length === 0 ? (
-                  <div className="text-center py-12 text-slate-400">
-                    <IonIcon icon={cubeOutline} className="text-5xl mx-auto mb-3" />
-                    <p>No products found</p>
-                  </div>
-                ) : (
-                  <div className="divide-y divide-slate-100">
-                    {stock.map((s, i) => {
-                      const stockLevel = s.stock || 0;
-                      const isLow = stockLevel <= 10 && stockLevel > 0;
-                      const isOut = stockLevel === 0;
-                      const stockPercentage = Math.min((stockLevel / 100) * 100, 100);
-                      return (
-                        <div key={s.product_uuid || i} className="px-6 py-4 hover:bg-slate-50 transition-colors">
-                          <div className="flex justify-between items-center mb-2">
-                            <div>
-                              <p className="font-medium text-slate-800">{s.name || 'Unknown'}</p>
-                              {s.sku && <p className="text-xs text-slate-400">SKU: {s.sku}</p>}
-                            </div>
-                            <div className="text-right">
-                              <span className={`font-semibold ${isOut ? "text-red-600" : isLow ? "text-amber-600" : "text-emerald-600"}`}>
-                                {stockLevel} units
-                              </span>
-                              <div className="mt-1">
-                                {isOut ? (
-                                  <Badge variant="destructive" className="text-xs">Out of Stock</Badge>
-                                ) : isLow ? (
-                                  <Badge variant="secondary" className="bg-amber-100 text-amber-700 text-xs">Low Stock</Badge>
-                                ) : (
-                                  <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 text-xs">In Stock</Badge>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                          {!isOut && (
-                            <div className="w-full mt-2">
-                              <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                <div
-                                  className={`h-full rounded-full transition-all duration-500 ${isLow ? "bg-amber-500" : "bg-emerald-500"}`}
-                                  style={{ width: `${stockPercentage}%` }}
-                                />
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </ScrollArea>
-            </CardContent>
-          </Card>
+            {selectedStat === 'revenue' && (
+              <>
+                <div className="flex-1 flex flex-col justify-center text-center px-4">
+                  <p className="text-base" style={{ color: "#888888" }}>Revenue</p>
+                  <p className="text-5xl font-bold leading-none tracking-tight text-white mt-3">
+                    ₹{Math.round(profit.revenue || 0).toLocaleString('en-IN')}
+                  </p>
+                  <span className="inline-block text-sm font-semibold px-4 py-1.5 rounded-full mt-3 mx-auto" style={{ background: "#22c55e", color: "#fff" }}>
+                    {revenueDelta ? `${revenueDelta.up ? '+' : ''}${Math.abs(revenueDelta.pct)}%` : 'N/A'}
+                  </span>
+                </div>
+                <div className="relative -mx-5 -mb-3" style={{ height: 180 }}>
+                  <Sparkline data={profitTrend} dataKey="revenue" width={400} height={180} color="#22c55e" />
+                </div>
+              </>
+            )}
 
-          {/* Recent Purchases - 1 col */}
-          {dashboard.recent_purchases?.length > 0 && (
-            <Card className="shadow-sm border-slate-200">
-              <CardHeader className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-t-2xl">
-                <CardTitle className="flex items-center gap-2 text-white text-lg">
-                  <IonIcon icon={cartOutline} className="text-xl" />
-                  Recent Purchases
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <ScrollArea className="h-[500px]">
-                  <div className="divide-y divide-slate-100">
-                    {dashboard.recent_purchases.map((purchase: any, idx: number) => (
-                      <div key={idx} className="px-6 py-4 hover:bg-slate-50 transition-colors">
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <p className="font-medium text-slate-800">Purchase #{purchase.purchase_uuid?.slice(0, 8)}</p>
-                            <p className="text-xs text-slate-400">
-                              {purchase.supplier_name || 'Unknown Supplier'} • {new Date(purchase.created_at).toLocaleDateString()}
-                            </p>
-                          </div>
-                          <span className="font-bold text-purple-600">₹{(purchase.total || 0).toLocaleString()}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      )}
+            {selectedStat === 'cost' && (
+              <>
+                <div className="flex-1 flex flex-col justify-center text-center px-4">
+                  <p className="text-base" style={{ color: "#888888" }}>Cost</p>
+                  <p className="text-5xl font-bold leading-none tracking-tight text-white mt-3">
+                    ₹{Math.round(profit.cost || 0).toLocaleString('en-IN')}
+                  </p>
+                  <span className="inline-block text-sm font-semibold px-4 py-1.5 rounded-full mt-3 mx-auto" style={{ background: "#3b82f6", color: "#fff" }}>
+                    {costDelta ? `${costDelta.up ? '+' : ''}${Math.abs(costDelta.pct)}%` : 'N/A'}
+                  </span>
+                </div>
+                <div className="relative -mx-5 -mb-3" style={{ height: 180 }}>
+                  <Sparkline data={profitTrend} dataKey="cost" width={400} height={180} color="#3b82f6" />
+                </div>
+              </>
+            )}
 
-      {/* ========== CUSTOMERS TAB ========== */}
-      {activeTab === "customers" && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {/* Top Customers - 2 cols */}
-          <Card className="md:col-span-2 shadow-sm border-slate-200">
-            <CardHeader className="bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-t-2xl">
-              <CardTitle className="flex items-center gap-2 text-white text-lg">
-                <IonIcon icon={peopleOutline} className="text-xl" />
-                Top Customers
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <ScrollArea className="h-[500px]">
-                {customerReport.length === 0 ? (
-                  <div className="text-center py-12 text-slate-400">
-                    <IonIcon icon={peopleOutline} className="text-5xl mx-auto mb-3" />
-                    <p>No customers yet</p>
-                  </div>
-                ) : (
-                  <div className="divide-y divide-slate-100">
-                    {customerReport.slice(0, 10).map((customer, idx) => (
-                      <div key={customer.customer_uuid || idx} className="px-6 py-4 hover:bg-slate-50 transition-colors">
-                        <div className="flex justify-between items-center">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold">
-                              {idx + 1}
-                            </div>
-                            <div>
-                              <p className="font-medium text-slate-800">{customer.name}</p>
-                              {customer.mobile && <p className="text-xs text-slate-400">{customer.mobile}</p>}
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-semibold text-emerald-600">₹{(customer.total_spent || 0).toLocaleString()}</p>
-                            <p className="text-xs text-slate-400">{customer.purchase_count || 0} purchases</p>
-                            {customer.credit_balance > 0 && (
-                              <p className="text-xs text-amber-600">Due: ₹{customer.credit_balance}</p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </ScrollArea>
-            </CardContent>
-          </Card>
+            {selectedStat === 'profit' && (
+              <>
+                <div className="flex-1 flex flex-col justify-center text-center px-4">
+                  <p className="text-base" style={{ color: "#888888" }}>Net Profit</p>
+                  <p className="text-5xl font-bold leading-none tracking-tight text-white mt-3">
+                    ₹{Math.round(profit.profit || 0).toLocaleString('en-IN')}
+                  </p>
+                  <span className="inline-block text-sm font-semibold px-4 py-1.5 rounded-full mt-3 mx-auto" style={{ background: "#a855f7", color: "#fff" }}>
+                    {profitDelta ? `${profitDelta.up ? '+' : ''}${Math.abs(profitDelta.pct)}%` : 'N/A'}
+                  </span>
+                </div>
+                <div className="relative -mx-5 -mb-3" style={{ height: 180 }}>
+                  <Sparkline data={profitTrend} dataKey="profit" width={400} height={180} color="#a855f7" />
+                </div>
+              </>
+            )}
 
-          {/* Stat cards - 1 col */}
-          <div className="space-y-5">
-            <StatCard
-              label="Total Customers"
-              value={customerReport.length.toLocaleString()}
-              gradient="bg-gradient-to-br from-blue-500 to-blue-700"
-              icon={<IonIcon icon={peopleOutline} className="w-5 h-5 text-white" />}
-            />
-            <StatCard
-              label="Total Credit Balance"
-              value={`₹${customerReport.reduce((sum, c) => sum + (c.credit_balance || 0), 0).toLocaleString()}`}
-              gradient="bg-gradient-to-br from-emerald-500 to-emerald-700"
-              icon={<IonIcon icon={walletOutline} className="w-5 h-5 text-white" />}
-            />
+            {selectedStat === 'margin' && (
+              <>
+                <div className="flex-1 flex flex-col justify-center text-center px-4">
+                  <p className="text-base" style={{ color: "#888888" }}>Profit Margin</p>
+                  <p className="text-5xl font-bold leading-none tracking-tight text-white mt-3">
+                    {profitMargin.toFixed(1)}%
+                  </p>
+                  <span className="inline-block text-sm font-semibold px-4 py-1.5 rounded-full mt-3 mx-auto" style={{ background: "#f97316", color: "#fff" }}>
+                    {profitMarginDelta ? `${profitMarginDelta.up ? '+' : ''}${Math.abs(profitMarginDelta.pct)}%` : 'N/A'}
+                  </span>
+                </div>
+                <div className="relative -mx-5 -mb-3" style={{ height: 180 }}>
+                  <Sparkline data={profitTrend.map((d: any) => { const rev = Number(d.revenue || 0); return { ...d, margin: rev > 0 ? ((Number(d.revenue || 0) - Number(d.cost || 0)) / rev) * 100 : 0 }; })} dataKey="margin" width={400} height={180} color="#f97316" />
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
+
     </div>
   );
 }

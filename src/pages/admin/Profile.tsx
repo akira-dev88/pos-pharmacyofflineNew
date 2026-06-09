@@ -4,24 +4,27 @@ import { getProfile, type UserProfile, type ShopProfile } from "../../renderer/s
 import { useAuth } from "../../context/AuthContext";
 import { IonIcon } from "@ionic/react";
 import {
-  personOutline,
   mailOutline,
   keyOutline,
   businessOutline,
   cardOutline,
   calendarOutline,
-  checkmarkCircleOutline,
   warningOutline,
-  closeOutline,
   timeOutline,
-  diamondOutline,
+  callOutline,
+  locationOutline,
+  lockClosedOutline,
+  logOutOutline,
+  globeOutline,
+  cashOutline,
+  alertCircleOutline,
+  documentTextOutline,
+  medkitOutline,
+  copyOutline,
+  checkmarkOutline,
+  shieldCheckmarkOutline,
+  refreshOutline,
 } from "ionicons/icons";
-
-// shadcn/ui components
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 
 export default function Profile() {
   const { t } = useTranslation();
@@ -30,6 +33,8 @@ export default function Profile() {
   const [tenant, setTenant] = useState<ShopProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [slogan, setSlogan] = useState(() => localStorage.getItem("shop_slogan") || "Keeping Your Pharmacy Running Smoothly.");
 
   useEffect(() => {
     loadProfile();
@@ -62,26 +67,39 @@ export default function Profile() {
     }
   };
 
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // fallback
+    }
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500" />
+      <div className="min-h-screen  flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-6">
-        <Card className="max-w-md w-full border-rose-200 shadow-xl">
-          <CardContent className="p-6 text-center">
-            <IonIcon icon={warningOutline} className="text-5xl text-rose-500 mx-auto mb-3" />
-            <p className="text-rose-700">{error}</p>
-            <Button onClick={loadProfile} className="mt-4 bg-indigo-600 hover:bg-indigo-700">
-              {t('profile.tryAgain')}
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <div className=" rounded-3xl shadow-2xl w-[480px] p-8 text-center">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-50 flex items-center justify-center">
+            <IonIcon icon={warningOutline} className="text-2xl text-red-500" />
+          </div>
+          <p className="text-sm text-gray-600">{error}</p>
+          <button
+            onClick={loadProfile}
+            className="mt-5 text-sm font-semibold text-white px-5 py-2.5 rounded-lg bg-black hover:bg-gray-800 transition-colors"
+          >
+            {t('profile.tryAgain')}
+          </button>
+        </div>
       </div>
     );
   }
@@ -93,138 +111,228 @@ export default function Profile() {
   const daysRemaining = tenant?.expiry_date
     ? Math.max(0, Math.ceil((new Date(tenant.expiry_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))
     : 365;
-  const expiryProgress = tenant?.expiry_date
-    ? Math.min(100, (daysRemaining / 365) * 100)
-    : 100;
 
-  // Role badge styling
   const getRoleBadge = (role: string) => {
-    const styles = {
-      owner: "bg-amber-100 text-amber-800 border-amber-200",
-      manager: "bg-sky-100 text-sky-800 border-sky-200",
-      cashier: "bg-emerald-100 text-emerald-800 border-emerald-200",
+    const styles: Record<string, string> = {
+      owner: "bg-amber-50 text-amber-700 border-amber-200",
+      manager: "bg-sky-50 text-sky-700 border-sky-200",
+      cashier: "bg-emerald-50 text-emerald-700 border-emerald-200",
     };
     const roleKey = role === "owner" ? "owner" : role === "manager" ? "manager" : "cashier";
     return (
-      <Badge variant="secondary" className={`${styles[roleKey]} font-medium px-3 py-1`}>
+      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border ${styles[roleKey]}`}>
         {t(`profile.roles.${roleKey}`)}
-      </Badge>
+      </span>
     );
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 p-6">
-      <div className="max-w-6xl mx-auto space-y-6">
-        {/* Header – simple and elegant */}
-        <div className="flex justify-between items-center flex-wrap gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-800 tracking-tight">{t('profile.title')}</h1>
-            <p className="text-slate-500 text-sm mt-1">{t('profile.subtitle')}</p>
+    <div className="h-[calc(95dvh-3rem)] p-6">
+      <div className="h-full w-full">
+
+        {/* ── BENTO GRID ── */}
+        <div className="h-full grid grid-cols-[1.5fr_1fr_1fr] gap-3" style={{ gridTemplateRows: "3fr 2fr" }}>
+
+          {/* ── LEFT BIG CARD: Shop Information ── */}
+          <div
+            className="bg-gray-100 rounded-2xl p-6 flex flex-col relative overflow-hidden"
+            style={{ gridRow: "span 2" }}
+          >
+            <div className="flex items-start justify-between">
+              <p className="text-gray-500 text-xs font-semibold tracking-[0.2em] uppercase">Shop</p>
+            </div>
+
+            <div className="flex-1 flex items-center justify-center">
+              <textarea
+                value={slogan}
+                onChange={(e) => { setSlogan(e.target.value); localStorage.setItem("shop_slogan", e.target.value); }}
+                rows={3}
+                className="w-full bg-transparent border-0 text-gray-700 text-5xl font-semibold italic text-center focus:outline-none focus:text-gray-900 placeholder-gray-300 leading-tight resize-none"
+              />
+            </div>
+
+            <div className="mt-auto space-y-3">
+              <div className="flex gap-2">
+                <div className="flex-1 bg-white/70 backdrop-blur-sm rounded-xl px-3.5 py-3 min-h-[140px] flex items-end">
+                  <div className="flex flex-col gap-2 w-full">
+                    <div className="text-left">
+                      <p className="text-gray-400 text-xs font-semibold tracking-widest uppercase">Name</p>
+                      <p className="text-gray-900 text-base font-semibold mt-0.5">{tenant?.shop_name || "N/A"}</p>
+                    </div>
+                    <div className="text-left">
+                      <p className="text-gray-400 text-xs font-semibold tracking-widest uppercase">Prefix</p>
+                      <p className="text-gray-900 text-base font-semibold mt-0.5">{tenant?.invoice_prefix || "INV"}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex-1 bg-white/70 backdrop-blur-sm rounded-xl px-3.5 py-3 min-h-[140px] flex items-end">
+                  <div className="flex flex-col gap-2 w-full">
+                    <div className="text-left">
+                      <p className="text-gray-400 text-xs font-semibold tracking-widest uppercase">GST</p>
+                      <p className="text-gray-900 text-base font-semibold mt-0.5">29ABCDE1234F1Z5</p>
+                    </div>
+                    <div className="text-left">
+                      <p className="text-gray-400 text-xs font-semibold tracking-widest uppercase">License</p>
+                      <p className="text-amber-700 text-base font-bold mt-0.5">DL-1234-5678-2025</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white/70 backdrop-blur-sm rounded-xl px-3.5 py-2.5">
+                <div className="flex items-center gap-2">
+                  <IonIcon icon={locationOutline} className="text-gray-400 text-sm shrink-0" />
+                  <p className="text-gray-600 text-sm truncate">123, Green Avenue, Pharma City, Tamil Nadu 600001</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 bg-white/70 backdrop-blur-sm rounded-lg px-2.5 py-1">
+                  <IonIcon icon={callOutline} className="text-gray-400 text-xs" />
+                  <span className="text-gray-700 text-sm font-medium">+91 98765 43210</span>
+                </div>
+                <div className="flex items-center gap-1.5 bg-white/70 backdrop-blur-sm rounded-lg px-2.5 py-1">
+                  <IonIcon icon={mailOutline} className="text-gray-400 text-xs" />
+                  <span className="text-gray-700 text-sm font-medium">contact@mypharma.com</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Decorative dots */}
+            <div className="absolute -right-6 -top-6 w-28 h-28 bg-gradient-to-br from-gray-200 to-gray-300 rounded-full opacity-60" />
           </div>
-          <Button onClick={loadProfile} variant="outline" className="gap-2">
-            <IonIcon icon={timeOutline} className="text-lg" />
-            Refresh
-          </Button>
-        </div>
 
-        {/* Two‑column layout with distinct styling */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* User Profile Card – modern, with large avatar */}
-          <Card className="border-0 shadow-xl overflow-hidden bg-white">
-            <div className="h-28 bg-gradient-to-r from-indigo-500 to-indigo-600" />
-            <CardContent className="relative pt-0 pb-6 px-6">
-              <div className="flex flex-col items-center -mt-14">
-                <div className="w-28 h-28 rounded-full border-4 border-white bg-gradient-to-br from-indigo-400 to-indigo-600 flex items-center justify-center text-white text-4xl font-bold shadow-lg">
+          {/* ── RIGHT TOP CARD: Account Information ── */}
+          <div
+            className="bg-green-700 rounded-2xl p-7 flex flex-col justify-between relative overflow-hidden"
+          >
+            {/* Refresh button */}
+            <div className="flex items-start justify-between z-10">
+              <p className="text-green-300/70 text-xs font-semibold tracking-[0.2em] uppercase">Account</p>
+              <button
+                onClick={loadProfile}
+                className="w-8 h-8 flex items-center justify-center rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition"
+                title="Refresh"
+              >
+                <IonIcon icon={refreshOutline} className="text-base" />
+              </button>
+            </div>
+
+            {/* Avatar + Name */}
+            <div className="flex flex-col items-center z-10">
+              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center relative shadow-lg ring-2 ring-white/20">
+                <span className="text-3xl font-bold text-white select-none">
                   {user?.name?.charAt(0).toUpperCase() || "U"}
+                </span>
+                <div className="absolute bottom-1 right-1 w-5 h-5 bg-white rounded-full flex items-center justify-center cursor-pointer shadow-md border-2 border-green-700 hover:bg-green-50 transition">
+                  <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                    <path d="M6 1v10M1 6h10" stroke="#16a34a" strokeWidth="1.8" strokeLinecap="round"/>
+                  </svg>
                 </div>
-                <h2 className="text-2xl font-bold text-slate-800 mt-4">{user?.name}</h2>
-                <div className="mt-2">{getRoleBadge(user?.role || "cashier")}</div>
               </div>
+              <p className="text-white text-xl font-bold mt-3">{user?.name}</p>
+              <p className="mt-1.5">{getRoleBadge(user?.role || "cashier")}</p>
+            </div>
 
-              <div className="mt-6 space-y-4">
-                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
-                  <IonIcon icon={mailOutline} className="text-indigo-500 text-xl shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-slate-500 uppercase tracking-wide">Email</p>
-                    <p className="text-sm font-medium text-slate-800 truncate">{user?.email || "N/A"}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
-                  <IonIcon icon={keyOutline} className="text-indigo-500 text-xl shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-slate-500 uppercase tracking-wide">Role</p>
-                    <div>{getRoleBadge(user?.role || "cashier")}</div>
-                  </div>
-                </div>
-                {user?.user_uuid && (
-                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-slate-500 uppercase tracking-wide">User ID</p>
-                      <p className="text-xs font-mono text-slate-600 break-all">{user.user_uuid}</p>
-                    </div>
-                  </div>
-                )}
+            {/* Email + User ID */}
+            <div className="space-y-2 z-10">
+              <div className="bg-white/10 backdrop-blur-sm border border-white/10 rounded-xl px-3.5 py-2 flex items-center gap-2.5">
+                <IonIcon icon={mailOutline} className="text-green-400 text-sm shrink-0" />
+                <span className="text-white/90 text-sm truncate">{user?.email || "N/A"}</span>
               </div>
-            </CardContent>
-          </Card>
+              {user?.user_uuid && (
+                <div className="bg-white/10 backdrop-blur-sm border border-white/10 rounded-xl px-3.5 py-2 flex items-center gap-2.5">
+                  <IonIcon icon={keyOutline} className="text-green-400 text-sm shrink-0" />
+                  <span className="text-white/70 text-xs font-mono truncate flex-1">{user.user_uuid}</span>
+                  <button
+                    onClick={() => copyToClipboard(user.user_uuid!)}
+                    className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 transition"
+                    title="Copy User ID"
+                  >
+                    <IonIcon icon={copied ? checkmarkOutline : copyOutline} className={`text-xs ${copied ? "text-green-400" : "text-white/60"}`} />
+                  </button>
+                </div>
+              )}
+            </div>
 
-          {/* Shop & Subscription Card – with progress bar */}
-          <Card className="border-0 shadow-xl overflow-hidden bg-white">
-            <div className="h-28 bg-gradient-to-r from-rose-500 to-rose-600" />
-            <CardContent className="pt-6 px-6 pb-6">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 bg-rose-100 rounded-xl">
-                  <IonIcon icon={businessOutline} className="text-rose-600 text-2xl" />
-                </div>
-                <h2 className="text-xl font-bold text-slate-800">Shop Details</h2>
+            {/* Dates row */}
+            <div className="grid grid-cols-2 gap-2 z-10">
+              <div className="bg-white/5 backdrop-blur-sm border border-white/5 rounded-xl px-3 py-2">
+                <p className="text-green-300/60 text-[10px] font-semibold tracking-widest uppercase">Created</p>
+                <p className="text-white/80 text-sm font-medium mt-0.5">01 Jan 2025</p>
               </div>
+              <div className="bg-white/5 backdrop-blur-sm border border-white/5 rounded-xl px-3 py-2">
+                <p className="text-green-300/60 text-[10px] font-semibold tracking-widest uppercase">Last Login</p>
+                <p className="text-white/80 text-sm font-medium mt-0.5">07 Jun 2026</p>
+              </div>
+            </div>
+          </div>
 
-              <div className="space-y-4">
-                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
-                  <IonIcon icon={businessOutline} className="text-rose-500 text-xl shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-slate-500 uppercase tracking-wide">Shop Name</p>
-                    <p className="text-sm font-medium text-slate-800">{tenant?.shop_name || "N/A"}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
-                  <IonIcon icon={cardOutline} className="text-rose-500 text-xl shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-slate-500 uppercase tracking-wide">Invoice Prefix</p>
-                    <p className="text-sm font-medium text-slate-800">{tenant?.invoice_prefix || "INV"}</p>
-                  </div>
-                </div>
-                {/* Subscription expiry with progress bar */}
-                {tenant?.expiry_date && (
-                  <div className="p-4 rounded-xl bg-gradient-to-r from-slate-50 to-slate-100">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <IonIcon icon={calendarOutline} className={`text-lg ${isExpiringSoon ? "text-amber-500" : "text-emerald-500"}`} />
-                        <span className="text-sm font-semibold text-slate-700">Subscription Expiry</span>
-                      </div>
-                      <span className={`text-sm font-bold ${isExpiringSoon ? "text-amber-600" : "text-emerald-600"}`}>
-                        {daysRemaining} days left
-                      </span>
-                    </div>
-                    <Progress value={expiryProgress} className="h-2" />
-                    <p className="text-xs text-slate-500 mt-2">
-                      {new Date(tenant.expiry_date).toLocaleDateString('en-IN', {
-                        day: 'numeric',
-                        month: 'long',
-                        year: 'numeric',
-                      })}
-                    </p>
-                    {isExpiringSoon && (
-                      <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
-                        <IonIcon icon={warningOutline} className="text-xs" />
-                        Renewal recommended soon
-                      </p>
-                    )}
-                  </div>
-                )}
+          {/* ── BOTTOM LEFT CARD: Preferences ── */}
+          <div className="rounded-2xl p-5 flex flex-col justify-between relative overflow-hidden" style={{ background: "#c084fc" }}>
+            <div className="flex items-start justify-between">
+              <p className="text-purple-900 text-xs font-bold tracking-[0.2em] uppercase leading-tight">Preferences</p>
+              <button className="text-purple-900 hover:translate-x-0.5 hover:-translate-y-0.5 transition-transform">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M7 17L17 7M17 7H7M17 7v10"/>
+                </svg>
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-2 mt-2 text-left">
+              <div>
+                <p className="text-purple-900/70 text-xs font-bold tracking-widest uppercase">Currency</p>
+                <p className="text-purple-950 text-base font-bold mt-0.5">INR (₹)</p>
               </div>
-            </CardContent>
-          </Card>
+              <div>
+                <p className="text-purple-900/70 text-xs font-bold tracking-widest uppercase">Timezone</p>
+                <p className="text-purple-950 text-base font-bold mt-0.5">Asia/Kolkata</p>
+              </div>
+              <div>
+                <p className="text-purple-900/70 text-xs font-bold tracking-widest uppercase">Date Format</p>
+                <p className="text-purple-950 text-base font-bold mt-0.5">DD/MM/YYYY</p>
+              </div>
+              <div>
+                <p className="text-purple-900/70 text-xs font-bold tracking-widest uppercase">Low Stock</p>
+                <p className="text-purple-950 text-base font-bold mt-0.5">{`< 10 units`}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* ── BOTTOM RIGHT CARD: Security ── */}
+          <div className="rounded-2xl p-5 flex flex-col relative overflow-hidden" style={{ background: "#b0f000", gridColumn: "span 2" }}>
+            <div className="flex items-start justify-between mb-2">
+              <p className="text-lime-900 text-xs font-bold tracking-[0.2em] uppercase leading-tight">Security</p>
+              <button className="text-lime-900 hover:translate-x-0.5 hover:-translate-y-0.5 transition-transform">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z"/>
+                </svg>
+              </button>
+            </div>
+            <div className="mt-auto">
+              <div className="flex items-stretch gap-4 w-full h-full">
+                <button className="flex-1 flex flex-col items-center h-40 justify-center gap-3 bg-white/80 backdrop-blur-sm rounded-xl p-2 hover:bg-white transition shadow-sm">
+                  <div className="w-12 h-12 rounded-full bg-lime-100 flex items-center justify-center">
+                    <IonIcon icon={lockClosedOutline} className="text-lime-700 text-xl" />
+                  </div>
+                  <span className="text-lime-950 text-sm font-semibold">Change Password</span>
+                </button>
+                <div className="flex-1 flex flex-col items-center justify-center gap-3 bg-white/40 backdrop-blur-sm rounded-xl p-2 opacity-60 cursor-not-allowed relative">
+                  <div className="w-12 h-12 rounded-full bg-lime-100/50 flex items-center justify-center">
+                    <IonIcon icon={shieldCheckmarkOutline} className="text-lime-700 text-xl" />
+                  </div>
+                  <span className="text-lime-950 text-sm font-semibold">Two-Factor Auth</span>
+                  <span className="absolute -top-2 -right-2 text-[10px] font-bold text-white bg-lime-700 px-2 py-0.5 rounded-full shadow-sm">Soon</span>
+                </div>
+                <button className="flex-1 flex flex-col items-center justify-center gap-3 bg-white/80 backdrop-blur-sm rounded-xl p-2 hover:bg-white transition shadow-sm">
+                  <div className="w-12 h-12 rounded-full bg-lime-100 flex items-center justify-center">
+                    <IonIcon icon={logOutOutline} className="text-lime-700 text-xl" />
+                  </div>
+                  <span className="text-lime-950 text-sm font-semibold">Logout All</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>

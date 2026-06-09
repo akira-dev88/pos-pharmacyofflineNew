@@ -34,18 +34,17 @@ export default function ProfitLineChart({ data }: ProfitLineChartProps) {
     const ctx = canvasRef.current.getContext("2d");
     if (!ctx) return;
 
-    // Destroy previous instance to avoid canvas reuse error
     if (chartRef.current) {
       chartRef.current.destroy();
       chartRef.current = null;
     }
 
-    const makeGradient = (color: string) => {
-      const g = ctx.createLinearGradient(0, 0, 0, 280);
-      g.addColorStop(0, color + "33");
-      g.addColorStop(1, color + "00");
-      return g;
-    };
+    const lineColor = "#22c55e";
+    const fillGradient = ctx.createLinearGradient(0, 0, 0, 300);
+    fillGradient.addColorStop(0, "rgba(34,197,94,0.18)");
+    fillGradient.addColorStop(1, "rgba(34,197,94,0.02)");
+    const gridColor = "rgba(0,0,0,0.06)";
+    const labelColor = "rgba(0,0,0,0.4)";
 
     chartRef.current = new Chart(ctx, {
       type: "line",
@@ -55,45 +54,16 @@ export default function ProfitLineChart({ data }: ProfitLineChartProps) {
           {
             label: "Revenue",
             data: data.map((d) => d.revenue),
-            borderColor: "#10b981",
-            backgroundColor: makeGradient("#10b981"),
+            borderColor: lineColor,
             borderWidth: 2.5,
-            pointRadius: 0,
-            pointHoverRadius: 5,
-            pointHoverBackgroundColor: "#10b981",
-            pointHoverBorderColor: "#0f1117",
-            pointHoverBorderWidth: 2,
+            backgroundColor: fillGradient,
             fill: true,
             tension: 0.45,
-          },
-          {
-            label: "Cost",
-            data: data.map((d) => d.cost),
-            borderColor: "#f87171",
-            backgroundColor: makeGradient("#f87171"),
-            borderWidth: 2.5,
             pointRadius: 0,
-            pointHoverRadius: 5,
-            pointHoverBackgroundColor: "#f87171",
-            pointHoverBorderColor: "#0f1117",
-            pointHoverBorderWidth: 2,
-            fill: true,
-            tension: 0.45,
-            borderDash: [6, 3],
-          },
-          {
-            label: "Profit",
-            data: data.map((d) => d.profit),
-            borderColor: "#a78bfa",
-            backgroundColor: makeGradient("#a78bfa"),
-            borderWidth: 3,
-            pointRadius: 0,
-            pointHoverRadius: 6,
-            pointHoverBackgroundColor: "#a78bfa",
-            pointHoverBorderColor: "#0f1117",
+            pointHoverRadius: 7,
+            pointHoverBackgroundColor: lineColor,
+            pointHoverBorderColor: "#fff",
             pointHoverBorderWidth: 2.5,
-            fill: true,
-            tension: 0.45,
           },
         ],
       },
@@ -104,35 +74,52 @@ export default function ProfitLineChart({ data }: ProfitLineChartProps) {
         plugins: {
           legend: { display: false },
           tooltip: {
-            backgroundColor: "#1a1f2e",
-            borderColor: "#2d3347",
-            borderWidth: 1,
-            padding: { x: 14, y: 12 },
-            titleColor: "#e2e8f0",
-            titleFont: { size: 13},
-            bodyColor: "#94a3b8",
-            bodyFont: { size: 12 },
-            usePointStyle: true,
+            enabled: true,
+            backgroundColor: "#1c1c1e",
+            titleColor: "rgba(255,255,255,0.7)",
+            bodyColor: "#ffffff",
+            padding: { top: 10, bottom: 10, left: 14, right: 14 },
+            cornerRadius: 10,
+            displayColors: false,
+            titleFont: { size: 12, weight: "400" as any },
+            bodyFont: { size: 16, weight: "500" as any },
             callbacks: {
-              label: (ctx) =>
-                `  ${ctx.dataset.label}    ₹${Number(ctx.parsed.y).toLocaleString()}`,
+              title: function (items) {
+                const idx = items[0].dataIndex;
+                return (data[idx]?.revenue || 0).toLocaleString() + " sales";
+              },
+              label: function (item: any) {
+                return "₹" + Number(item.raw).toLocaleString();
+              },
             },
           },
         },
         scales: {
           x: {
-            grid: { color: "#1e2330" },
-            ticks: { color: "#4b5563", font: { size: 11 }, maxRotation: 0 },
+            grid: { display: false },
             border: { display: false },
+            ticks: {
+              color: labelColor,
+              font: { size: 11 },
+              maxRotation: 0,
+              autoSkip: data.length > 30,
+              maxTicksLimit: data.length > 30 ? 12 : data.length,
+            },
           },
           y: {
-            grid: { color: "#1e2330" },
+            position: "right",
+            grid: { color: gridColor, drawTicks: false },
+            border: { display: false, dash: [4, 4] },
             ticks: {
-              color: "#4b5563",
+              color: labelColor,
               font: { size: 11 },
-              callback: (v) => `₹${(Number(v) / 1000).toFixed(0)}k`,
+              padding: 10,
+              callback: (v) =>
+                Number(v) >= 1000
+                  ? (Number(v) / 1000).toFixed(0) + "k"
+                  : v,
             },
-            border: { display: false },
+            min: 0,
           },
         },
       },
@@ -144,9 +131,5 @@ export default function ProfitLineChart({ data }: ProfitLineChartProps) {
     };
   }, [data]);
 
-  return (
-    <div style={{ position: "relative", width: "100%", height: "320px" }}>
-      <canvas ref={canvasRef} />
-    </div>
-  );
+  return <canvas ref={canvasRef} />;
 }

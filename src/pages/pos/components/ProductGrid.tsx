@@ -37,6 +37,8 @@ interface ProductUnit {
   is_base_unit: boolean;
 }
 
+import { searchProducts } from "../../../renderer/services/productApi";
+
 // Calculate days until expiry
 const getDaysUntilExpiry = (expiryDate: string): number => {
   const today = new Date();
@@ -86,25 +88,25 @@ function UnitSelectionModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="bg-[#1a1a1a] border-[#333] text-white sm:max-w-md">
+      <DialogContent className="bg-white border border-gray-200 sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-white text-lg">Add to Cart</DialogTitle>
+          <DialogTitle className="text-gray-900 text-lg">Add to Cart</DialogTitle>
           {product && (
-            <p className="text-sm text-gray-400 mt-1">{product.name}</p>
+            <p className="text-sm text-gray-500 mt-1">{product.name}</p>
           )}
         </DialogHeader>
 
         <div className="space-y-5">
           {/* Unit Selection */}
           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-2">
+            <label className="block text-sm font-medium text-gray-600 mb-2">
               Select Unit Type
             </label>
             <Select value={selectedUnitUuid} onValueChange={setSelectedUnitUuid}>
-              <SelectTrigger className="bg-[#212121] border-gray-700 text-white">
+              <SelectTrigger className="bg-white border-gray-300 text-gray-900">
                 <SelectValue placeholder="Select unit type" />
               </SelectTrigger>
-              <SelectContent className="bg-[#212121] border-gray-700 text-white">
+              <SelectContent className="bg-white border-gray-300 text-gray-900">
                 {units.map((unit) => (
                   <SelectItem key={unit.unit_uuid} value={unit.unit_uuid}>
                     {unit.unit_name} {unit.is_base_unit && "(Base)"}
@@ -117,7 +119,7 @@ function UnitSelectionModal({
 
           {/* Quantity Selection */}
           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-2">
+            <label className="block text-sm font-medium text-gray-600 mb-2">
               Quantity
             </label>
             <div className="flex items-center gap-3">
@@ -126,7 +128,7 @@ function UnitSelectionModal({
                 variant="outline"
                 size="icon"
                 onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                className="border-gray-700 text-white"
+                className="border-gray-300 text-gray-700"
               >
                 <Minus className="h-4 w-4" />
               </Button>
@@ -135,14 +137,14 @@ function UnitSelectionModal({
                 min="1"
                 value={quantity}
                 onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                className="w-20 text-center bg-[#212121] border-gray-700 text-white"
+                className="w-20 text-center bg-white border-gray-300 text-gray-900"
               />
               <Button
                 type="button"
                 variant="outline"
                 size="icon"
                 onClick={() => setQuantity(quantity + 1)}
-                className="border-gray-700 text-white"
+                className="border-gray-300 text-gray-700"
               >
                 <Plus className="h-4 w-4" />
               </Button>
@@ -150,16 +152,16 @@ function UnitSelectionModal({
           </div>
 
           {/* Price Preview */}
-          <div className="bg-[#212121] rounded-xl p-4 space-y-2">
+          <div className="bg-gray-50 rounded-xl p-4 space-y-2">
             <div className="flex justify-between items-center">
-              <span className="text-gray-400">Unit Price:</span>
-              <span className="font-semibold text-white">
+              <span className="text-gray-500">Unit Price:</span>
+              <span className="font-semibold text-gray-900">
                 ₹{getUnitPrice(selectedUnit).toFixed(2)}
               </span>
             </div>
-            <div className="flex justify-between items-center pt-2 border-t border-gray-700">
-              <span className="text-gray-400">Total Price:</span>
-              <span className="text-xl font-bold text-green-500">
+            <div className="flex justify-between items-center pt-2 border-t border-gray-200">
+              <span className="text-gray-500">Total Price:</span>
+              <span className="text-xl font-bold text-green-600">
                 ₹{totalPrice}
               </span>
             </div>
@@ -171,7 +173,7 @@ function UnitSelectionModal({
               type="button"
               variant="outline"
               onClick={onClose}
-              className="flex-1 border-gray-700 text-white hover:bg-gray-800"
+              className="flex-1 border-gray-300 text-gray-700 hover:bg-gray-50"
             >
               Cancel
             </Button>
@@ -210,6 +212,18 @@ export default function ProductGrid({ products, loading, page, totalPages, onPag
   const [showUnitModal, setShowUnitModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [productUnits, setProductUnits] = useState<ProductUnit[]>([]);
+
+  // Toast notification state
+  const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: "", visible: false });
+
+  const showToast = (message: string) => {
+    setToast({ message, visible: true });
+    setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3000);
+  };
+
+  // Server-side search state
+  const [searchResults, setSearchResults] = useState<Product[] | null>(null);
+  const [searchLoading, setSearchLoading] = useState(false);
 
   // Virtual scrolling state
   const gridRef = useRef<HTMLDivElement>(null);
@@ -275,7 +289,7 @@ export default function ProductGrid({ products, loading, page, totalPages, onPag
     const units = await loadProductUnits(product.product_uuid);
     
     if (units.length === 0) {
-      alert(`No units defined for ${product.name}. Please add pack sizes first.`);
+      showToast(`No pack sizes defined for "${product.name}". Please add pack sizes first.`);
       return;
     }
     
@@ -314,23 +328,56 @@ export default function ProductGrid({ products, loading, page, totalPages, onPag
     }
   }, [products]);
 
-  // Filter products based on search term
-  const filteredProducts = useMemo(() => products.filter((product) => {
+  // Server-side search when user types (debounced)
+  useEffect(() => {
+    if (searchTerm.trim().length < 2) {
+      setSearchResults(null);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      setSearchLoading(true);
+      try {
+        const results = await searchProducts(searchTerm.trim());
+        if (!cancelled) setSearchResults(results);
+      } catch (err) {
+        if (!cancelled) {
+          console.error("Search failed:", err);
+          setSearchResults([]);
+        }
+      } finally {
+        if (!cancelled) setSearchLoading(false);
+      }
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [searchTerm]);
+
+  // Use server results when available, otherwise filter paginated products
+  const filteredProducts = useMemo(() => {
+    const source = searchResults ?? products;
     const searchLower = searchTerm.toLowerCase();
-    return (
+    return source.filter((product) => (
       product.name.toLowerCase().includes(searchLower) ||
       (product.sku && product.sku.toLowerCase().includes(searchLower)) ||
       (product.barcode && product.barcode.toLowerCase().includes(searchLower))
-    );
-  }), [products, searchTerm]);
+    ));
+  }, [products, searchTerm, searchResults]);
 
-  const sortedProducts = useMemo(() => searchTerm
-    ? filteredProducts
-    : [
-        ...filteredProducts.filter(p => recentUUIDs.includes(p.product_uuid))
-          .sort((a, b) => recentUUIDs.indexOf(a.product_uuid) - recentUUIDs.indexOf(b.product_uuid)),
-        ...filteredProducts.filter(p => !recentUUIDs.includes(p.product_uuid))
-      ], [searchTerm, filteredProducts, recentUUIDs]);
+  const sortedProducts = useMemo(() => {
+    if (searchResults) return filteredProducts;
+    return searchTerm
+      ? filteredProducts
+      : [
+          ...filteredProducts.filter(p => recentUUIDs.includes(p.product_uuid))
+            .sort((a, b) => recentUUIDs.indexOf(a.product_uuid) - recentUUIDs.indexOf(b.product_uuid)),
+          ...filteredProducts.filter(p => !recentUUIDs.includes(p.product_uuid))
+        ];
+  }, [searchTerm, filteredProducts, recentUUIDs, searchResults]);
 
   // Virtual scrolling handlers and calculations
   const handleScroll = useCallback(() => {
@@ -403,7 +450,7 @@ export default function ProductGrid({ products, loading, page, totalPages, onPag
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  if (loading) {
+  if (loading && products.length === 0) {
     return (
       <div className="flex flex-col h-full">
         <div className="p-3">
@@ -420,6 +467,18 @@ export default function ProductGrid({ products, loading, page, totalPages, onPag
 
   return (
     <div className="flex flex-col h-full">
+
+      {/* Custom Toast Notification */}
+      <div
+        className={`fixed top-5 left-1/2 -translate-x-1/2 z-[9999] transition-all duration-300 ${
+          toast.visible ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-3 pointer-events-none"
+        }`}
+      >
+        <div className="bg-red-600 text-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 text-sm font-medium">
+          <IonIcon icon={alertCircleOutline} className="text-lg shrink-0" />
+          <span>{toast.message}</span>
+        </div>
+      </div>
 
       {/* Search Bar */}
       <div className="p-3 sticky top-0 z-10 bg-[#141414]">
@@ -459,7 +518,12 @@ export default function ProductGrid({ products, loading, page, totalPages, onPag
       </div>
 
       {/* Product Grid - Virtual Scrolling */}
-      <div ref={gridRef} className="flex-1 min-h-0 overflow-y-auto scrollbar-hide" onScroll={handleScroll}>
+      <div ref={gridRef} className="flex-1 min-h-0 overflow-y-auto scrollbar-hide relative" onScroll={handleScroll}>
+        {loading && products.length > 0 && (
+          <div className="absolute inset-0 bg-black/50 z-20 flex items-start justify-center pt-12 pointer-events-none">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600" />
+          </div>
+        )}
         {sortedProducts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-gray-500">
             <div className="text-4xl mb-2">🔍</div>
@@ -579,19 +643,19 @@ export default function ProductGrid({ products, loading, page, totalPages, onPag
             })}
           </div>
         ) : null}
-      {totalPages > 1 && (
+      {!searchResults && totalPages > 1 && (
         <div className="sticky bottom-0 flex justify-center py-3 pointer-events-none">
           <div className="flex items-center pointer-events-auto gap-x-1.5">
-            <div className="rounded-lg border border-gray-700 bg-black px-2 py-1.5 flex items-center">
+            <div className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 flex items-center shadow-sm">
               <button
                 onClick={() => onPageChange(page - 1)}
                 disabled={page <= 1}
-                className="px-2 py-1 text-sm font-medium transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-gray-400 hover:text-white"
+                className="px-2 py-1 text-sm font-medium transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-gray-500 hover:text-gray-900"
               >
                 ‹ Prev
               </button>
             </div>
-            <div className="rounded-lg border border-gray-700 bg-black px-2 py-1.5 flex items-center">
+            <div className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 flex items-center shadow-sm">
               <div className="flex items-center gap-1.5">
                 {Array.from({ length: totalPages }, (_, i) => i + 1)
                   .filter(p => {
@@ -610,7 +674,7 @@ export default function ProductGrid({ products, loading, page, totalPages, onPag
                   }, [])
                   .map((item, idx) =>
                     item === 'ellipsis' ? (
-                      <span key={`e${idx}`} className="px-1.5 text-gray-600 text-sm">...</span>
+                      <span key={`e${idx}`} className="px-1.5 text-gray-400 text-sm">...</span>
                     ) : (
                       <button
                         key={item}
@@ -618,7 +682,7 @@ export default function ProductGrid({ products, loading, page, totalPages, onPag
                         className={`text-sm font-medium transition-colors ${
                           item === page
                             ? 'bg-green-600 text-white rounded px-2.5 py-1'
-                            : 'px-1.5 text-gray-400 hover:text-white'
+                            : 'px-1.5 text-gray-500 hover:text-gray-900'
                         }`}
                       >
                         {item}
@@ -627,11 +691,11 @@ export default function ProductGrid({ products, loading, page, totalPages, onPag
                   )}
               </div>
             </div>
-            <div className="rounded-lg border border-gray-700 bg-black px-2 py-1.5 flex items-center">
+            <div className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 flex items-center shadow-sm">
               <button
                 onClick={() => onPageChange(page + 1)}
                 disabled={page >= totalPages}
-                className="px-2 py-1 text-sm font-medium transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-gray-400 hover:text-white"
+                className="px-2 py-1 text-sm font-medium transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-gray-500 hover:text-gray-900"
               >
                 Next ›
               </button>

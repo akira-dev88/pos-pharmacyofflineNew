@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { format as formatDate } from "date-fns";        // renamed to avoid conflict
+import { format as formatDate } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import {
   getSales,
@@ -14,41 +14,24 @@ import { IonIcon } from "@ionic/react";
 import {
   eyeOutline,
   closeOutline,
-  cashOutline,
-  calendarOutline,
-  documentTextOutline,
-  trendingUpOutline,
-  checkmarkCircleOutline,
-  searchOutline,
-  trashOutline,
-  refreshOutline,
 } from "ionicons/icons";
 import InvoiceReceipt from "../pos/components/InvoiceReceipt";
-
-// shadcn/ui components
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
+import SimpleDatePicker from "../../components/SimpleDatePicker";
 
-// Helper to format money (previously conflicted with date-fns format)
 const formatMoney = (val: any) => {
   const num = Number(val);
   return isNaN(num) ? "0.00" : num.toFixed(2);
+};
+
+const formatCompactNumber = (num: number): string => {
+  if (num === null || num === undefined) return "0";
+  const absNum = Math.abs(num);
+  if (absNum >= 10000000) return (num / 10000000).toFixed(2) + "cr";
+  if (absNum >= 100000) return (num / 100000).toFixed(2) + "L";
+  if (absNum >= 1000) return (num / 1000).toFixed(2) + "k";
+  return num.toString();
 };
 
 export default function Sales() {
@@ -58,15 +41,42 @@ export default function Sales() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterDate, setFilterDate] = useState("");
+  const [filterDateObj, setFilterDateObj] = useState<Date | undefined>(undefined);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [filterPickPos, setFilterPickPos] = useState({ top: 0, right: 0 });
+  const filterBtnRef = useRef<HTMLButtonElement>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<Sale | null>(null);
+  const [invoiceSale, setInvoiceSale] = useState<Sale | null>(null);
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
   const { user } = useAuth();
 
   useEffect(() => {
     loadSales();
   }, []);
 
+  useEffect(() => {
+    if (!showDatePicker || !filterBtnRef.current) return;
+    const rect = filterBtnRef.current.getBoundingClientRect();
+    setFilterPickPos({ top: rect.bottom + 4, right: document.documentElement.clientWidth - rect.right });
+    const handler = (e: MouseEvent) => {
+      if (filterBtnRef.current && !filterBtnRef.current.contains(e.target as Node)) {
+        const cal = document.getElementById("filter-cal-popup");
+        if (cal && !cal.contains(e.target as Node)) {
+          setShowDatePicker(false);
+        }
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showDatePicker]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm, filterDate]);
+
   const handleDelete = async (sale: Sale) => {
-    if (!confirm(`Delete invoice ${sale.invoice_number}? Stock will be restored.`)) return;
     setDeleting(sale.sale_uuid);
     try {
       const result = await deleteSale(sale.sale_uuid);
@@ -79,6 +89,7 @@ export default function Sales() {
       alert('Failed to delete: ' + err.message);
     } finally {
       setDeleting(null);
+      setDeleteConfirm(null);
     }
   };
 
@@ -156,6 +167,7 @@ export default function Sales() {
       const rawInvoice = await getInvoice(sale.sale_uuid);
       const normalised = normaliseInvoice(rawInvoice);
       setInvoiceData(normalised);
+      setInvoiceSale(sale);
       setSales(prevSales =>
         prevSales.map(s =>
           s.sale_uuid === sale.sale_uuid
@@ -202,92 +214,164 @@ export default function Sales() {
     return matchesSearch && matchesDate;
   });
 
-  // Stat Card component
-  const StatCard = ({ label, value, delta, gradient, icon }: any) => (
-    <div className={`relative overflow-hidden rounded-2xl p-5 ${gradient} group cursor-default text-white`}>
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider opacity-80 mb-1">{label}</p>
-          <p className="text-3xl font-bold mt-0.5">{value}</p>
-          {delta && <p className="text-xs mt-1.5 opacity-80">{delta}</p>}
-        </div>
-        <div className="p-2.5 rounded-xl bg-white/15 backdrop-blur-sm">{icon}</div>
-      </div>
-      <div className="absolute -bottom-4 -right-4 w-24 h-24 rounded-full bg-white/5 group-hover:bg-white/10 transition-colors" />
-    </div>
-  );
+  const totalPages = Math.ceil(filteredSales.length / pageSize);
+  const paginatedSales = filteredSales.slice((page - 1) * pageSize, page * pageSize);
+
+  const [selectedStat, setSelectedStat] = useState<string | null>(null);
+
+  const salesTrend = sales.reduce((acc: any[], sale) => {
+    const date = sale.created_at?.slice(0, 10);
+    if (!date) return acc;
+    const existing = acc.find(d => d.date === date);
+    const total = Number(sale.grand_total || 0);
+    if (existing) {
+      existing.total += total;
+      existing.count += 1;
+      existing.avg = existing.total / existing.count;
+    } else {
+      acc.push({ date, total, count: 1, avg: total });
+    }
+    return acc;
+  }, []).sort((a: any, b: any) => a.date.localeCompare(b.date));
+
+  const Sparkline = ({ data: chartData, dataKey, width = 320, height = 100, color = "#22c55e" }: { data: any[], dataKey: string, width?: number, height?: number, color?: string }) => {
+    const [hovered, setHovered] = useState(false);
+    if (!chartData || chartData.length < 2) return null;
+    const values = chartData.map((d: any) => Number(d[dataKey]) || 0);
+    const max = Math.max(...values, 1);
+    const min = Math.min(...values, 0);
+    const range = max - min || 1;
+    const points = values.map((v: number, i: number) => ({
+      x: i / (values.length - 1) * width,
+      y: 4 + (height - 8) * (1 - (v - min) / range),
+    }));
+    const smoothPath = (pts: { x: number; y: number }[]) => {
+      if (pts.length < 2) return '';
+      let d = `M ${pts[0].x},${pts[0].y}`;
+      for (let i = 1; i < pts.length; i++) {
+        const p0 = pts[i - 1], p1 = pts[i], p_1 = pts[Math.max(0, i - 2)], p2 = pts[Math.min(pts.length - 1, i + 1)];
+        d += ` C ${p0.x + (p1.x - p_1.x) / 6},${p0.y + (p1.y - p_1.y) / 6} ${p1.x - (p2.x - p0.x) / 6},${p1.y - (p2.y - p0.y) / 6} ${p1.x},${p1.y}`;
+      }
+      return d;
+    };
+    const lineD = smoothPath(points);
+    const areaD = `${lineD} L ${width},${height} L 0,${height} Z`;
+    return (
+      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none"
+        onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+        style={{ cursor: 'pointer' }}>
+        <defs>
+          <linearGradient id={`sg-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity={hovered ? 0.55 : 0.38} />
+            <stop offset="100%" stopColor={color} stopOpacity={hovered ? 0.06 : 0.02} />
+          </linearGradient>
+        </defs>
+        <path d={areaD} fill={`url(#sg-${dataKey})`} />
+        <path d={lineD} fill="none" stroke={color} strokeWidth={hovered ? 3.5 : 2.5} strokeLinecap="round" strokeLinejoin="round" style={{ transition: 'stroke-width 0.15s' }} />
+      </svg>
+    );
+  };
+
+  const todayTotal = todaySales;
+  const avgSale = averageSale;
 
   return (
     <div className="min-h-screen bg-[#F8F9FC] p-6 space-y-5">
-      {/* Header */}
-      <div className="flex justify-between items-center flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight text-start">{t('sales.title')}</h1>
-          <p className="text-slate-500 text-sm mt-0.5">{t('sales.subtitle')}</p>
-        </div>
-        <Button onClick={loadSales} disabled={loading} variant="outline" className="gap-2">
-          <IonIcon icon={refreshOutline} className={`text-lg ${loading ? 'animate-spin' : ''}`} />
-          {t('sales.refresh')}
-        </Button>
-      </div>
-
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        <StatCard
-          label="Total Sales"
-          value={`₹${formatMoney(totalSales)}`}
-          delta="Overall revenue"
-          gradient="bg-gradient-to-br from-blue-500 to-blue-700"
-          icon={
-            <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 text-start">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-6 py-5 flex items-center gap-6 relative">
+          <button onClick={() => setSelectedStat('totalSales')} className="absolute top-2 right-2 w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M7 17L17 7M7 7h10v10" />
             </svg>
-          }
-        />
-        <StatCard
-          label="Average Sale"
-          value={`₹${formatMoney(averageSale)}`}
-          delta="Per transaction"
-          gradient="bg-gradient-to-br from-emerald-500 to-emerald-700"
-          icon={
-            <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </button>
+          <div className="flex-shrink-0">
+            <p className="text-xs text-gray-400 mb-0.5">Statistics</p>
+            <p className="text-sm font-semibold text-gray-700 mb-3">Total Sales</p>
+            <p className="text-5xl font-bold text-gray-900 leading-none mb-2">₹{formatCompactNumber(Math.round(totalSales))}</p>
+            <div className="flex items-center gap-1">
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold leading-none" style={{ backgroundColor: "#3b82f6", color: "#fff" }}>Overall Revenue</span>
+            </div>
+          </div>
+          <div className="flex-1 min-w-0">
+            <svg viewBox="0 0 160 80" preserveAspectRatio="none" className="w-full h-16">
+              <polyline fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points="0,60 20,45 35,55 45,30 60,50 75,40 90,52 110,25 130,45 160,38" />
             </svg>
-          }
-        />
-        <StatCard
-          label="Today's Sales"
-          value={`₹${formatMoney(todaySales)}`}
-          delta="Last 24 hours"
-          gradient="bg-gradient-to-br from-violet-500 to-violet-700"
-          icon={
-            <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-6 py-5 flex items-center gap-6 relative">
+          <button onClick={() => setSelectedStat('avgSale')} className="absolute top-2 right-2 w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M7 17L17 7M7 7h10v10" />
             </svg>
-          }
-        />
-        <StatCard
-          label="Transactions"
-          value={sales.length}
-          delta="Total invoices"
-          gradient="bg-gradient-to-br from-amber-500 to-amber-700"
-          icon={
-            <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </button>
+          <div className="flex-shrink-0">
+            <p className="text-xs text-gray-400 mb-0.5">Statistics</p>
+            <p className="text-sm font-semibold text-gray-700 mb-3">Average Sale</p>
+            <p className="text-5xl font-bold text-gray-900 leading-none mb-2">₹{formatCompactNumber(Math.round(averageSale))}</p>
+            <div className="flex items-center gap-1">
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold leading-none" style={{ backgroundColor: "#10b981", color: "#fff" }}>Per Transaction</span>
+            </div>
+          </div>
+          <div className="flex-1 min-w-0">
+            <svg viewBox="0 0 160 80" preserveAspectRatio="none" className="w-full h-16">
+              <polyline fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points="0,55 20,40 35,50 45,25 60,45 75,35 90,48 110,20 130,40 160,32" />
             </svg>
-          }
-        />
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-6 py-5 flex items-center gap-6 relative">
+          <button onClick={() => setSelectedStat('todaySales')} className="absolute top-2 right-2 w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M7 17L17 7M7 7h10v10" />
+            </svg>
+          </button>
+          <div className="flex-shrink-0">
+            <p className="text-xs text-gray-400 mb-0.5">Statistics</p>
+            <p className="text-sm font-semibold text-gray-700 mb-3">Today's Sales</p>
+            <p className="text-5xl font-bold text-gray-900 leading-none mb-2">₹{formatCompactNumber(Math.round(todaySales))}</p>
+            <div className="flex items-center gap-1">
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold leading-none" style={{ backgroundColor: "#8b5cf6", color: "#fff" }}>Last 24 Hours</span>
+            </div>
+          </div>
+          <div className="flex-1 min-w-0">
+            <svg viewBox="0 0 160 80" preserveAspectRatio="none" className="w-full h-16">
+              <polyline fill="none" stroke="#8b5cf6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points="0,60 20,50 35,65 45,20 60,55 75,45 90,58 110,35 130,50 160,42" />
+            </svg>
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-6 py-5 flex items-center gap-6 relative">
+          <button onClick={() => setSelectedStat('transactions')} className="absolute top-2 right-2 w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M7 17L17 7M7 7h10v10" />
+            </svg>
+          </button>
+          <div className="flex-shrink-0">
+            <p className="text-xs text-gray-400 mb-0.5">Statistics</p>
+            <p className="text-sm font-semibold text-gray-700 mb-3">Transactions</p>
+            <p className="text-5xl font-bold text-gray-900 leading-none mb-2">{formatCompactNumber(sales.length)}</p>
+            <div className="flex items-center gap-1">
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold leading-none" style={{ backgroundColor: "#f59e0b", color: "#fff" }}>Total Invoices</span>
+            </div>
+          </div>
+          <div className="flex-1 min-w-0">
+            <svg viewBox="0 0 160 80" preserveAspectRatio="none" className="w-full h-16">
+              <polyline fill="none" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points="0,50 20,35 35,45 45,20 60,40 75,30 90,42 110,15 130,35 160,28" />
+            </svg>
+          </div>
+        </div>
       </div>
 
       {/* Search & Filter Bar */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
-          <IonIcon icon={searchOutline} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg" />
+          <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
           <Input
             placeholder={t('sales.searchPlaceholder')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-11 pr-10 py-2.5 bg-white border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+            className="pl-11 pr-10 py-2.5 bg-white border-slate-200 rounded-xl focus-visible:ring-2 focus-visible:ring-green-500/20 focus-visible:border-green-400 transition-all"
           />
           {searchTerm && (
             <button
@@ -299,175 +383,286 @@ export default function Sales() {
           )}
         </div>
 
-        {/* Date filter with Popover – now aligned to end so it doesn't overflow */}
-        <div className="relative">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className="w-[180px] justify-start text-left font-normal bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
-              >
-                {filterDate ? formatDate(new Date(filterDate), "PPP") : <span>Filter by date</span>}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto border-0 bg-transparent p-0 shadow-none" align="end" sideOffset={5}>
-              <Calendar
-                mode="single"
-                selected={filterDate ? new Date(filterDate) : undefined}
-                onSelect={(date) => setFilterDate(date ? formatDate(date, "yyyy-MM-dd") : "")}
-                className="rounded-xl bg-[#141414] p-4 text-white shadow-2xl"
-                classNames={{
-                  months: "space-y-4",
-                  month: "space-y-4",
-                  month_caption: "flex items-center justify-center gap-4 pt-1",
-                  nav: "absolute inset-x-0 top-1 flex items-center justify-between px-1",
-                  button_previous: "h-8 w-8 rounded-md text-zinc-400 hover:bg-white/10 hover:text-white transition flex items-center justify-center",
-                  button_next: "h-8 w-8 rounded-md text-zinc-400 hover:bg-white/10 hover:text-white transition flex items-center justify-center",
-                  caption_label: "text-sm font-semibold text-white",
-                  month_grid: "w-full border-collapse",
-                  weekdays: "flex",
-                  weekday: "text-zinc-500 rounded-md w-9 font-normal text-[0.8rem]",
-                  week: "flex w-full mt-2",
-                  day: "h-9 w-9 p-0 font-normal text-zinc-200 rounded-md transition-colors hover:bg-white/10 hover:text-white aria-selected:opacity-100",
-                  selected: "bg-green-500 text-black font-semibold",
-                  today: "border border-white/20 bg-white/10 text-white",
-                  outside: "text-zinc-700 opacity-50",
-                  disabled: "text-zinc-700 opacity-30",
-                }}
-              />
-            </PopoverContent>
-          </Popover>
+        <div className="relative shrink-0">
+          <button
+            ref={filterBtnRef}
+            type="button"
+            onClick={() => setShowDatePicker(!showDatePicker)}
+            className="flex h-10 items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm text-slate-700 hover:border-slate-300 transition-colors focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-400"
+          >
+            <CalendarIcon className="w-4 h-4 text-slate-400" />
+            <span>{filterDate ? formatDate(new Date(filterDate), "dd MMM yyyy") : "Filter by date"}</span>
+          </button>
           {filterDate && (
             <button
-              onClick={() => setFilterDate("")}
-              className="absolute right-2 top-[55%] -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+              onClick={() => { setFilterDate(""); setFilterDateObj(undefined); }}
+              className="absolute -right-2 -top-2 w-5 h-5 bg-slate-300 hover:bg-slate-400 text-white rounded-full flex items-center justify-center transition-colors"
             >
-              <IonIcon icon={closeOutline} className="text-lg" />
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
             </button>
           )}
+          {showDatePicker && (
+            <div id="filter-cal-popup" className="fixed z-[70]" style={{ top: filterPickPos.top, right: filterPickPos.right }}>
+              <SimpleDatePicker
+                date={filterDateObj || new Date()}
+                onSelect={(d) => { setFilterDate(formatDate(d, "yyyy-MM-dd")); setFilterDateObj(d); setShowDatePicker(false); }}
+              />
+            </div>
+          )}
         </div>
+
+        <Button onClick={loadSales} disabled={loading} variant="outline" className="gap-2 shrink-0">
+          <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          {t('sales.refresh')}
+        </Button>
       </div>
 
-      {/* Sales Data Table */}
-      <Card className="border-slate-200 shadow-sm bg-white overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table className="min-w-[800px]">
-            <TableHeader>
-              <TableRow className="bg-slate-50 border-b border-slate-200">
-                <TableHead className="text-left text-slate-600 min-w-[120px]">Invoice</TableHead>
-                <TableHead className="text-left text-slate-600 min-w-[150px]">Customer</TableHead>
-                <TableHead className="text-right text-slate-600 min-w-[100px]">Amount</TableHead>
-                <TableHead className="text-left text-slate-600 min-w-[160px]">Date &amp; Time</TableHead>
-                <TableHead className="text-center text-slate-600 min-w-[90px]">Status</TableHead>
-                <TableHead className="text-center text-slate-600 min-w-[90px]">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading && sales.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-12">
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
-                      <p className="text-slate-500 text-sm">{t('sales.loadingSales')}</p>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : filteredSales.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-12 text-slate-500">
-                    {searchTerm || filterDate ? t('sales.noSearchResults') : t('sales.noSales')}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredSales.map((sale) => (
-                  <TableRow key={sale.sale_uuid} className="border-b border-slate-100 hover:bg-slate-50/80 transition-colors">
-                    {/* Invoice */}
-                    <TableCell className="text-left align-top">
-                      <div className="font-medium text-slate-800 break-words" title={sale.invoice_number || "N/A"}>
-                        {sale.invoice_number || "N/A"}
-                      </div>
-                      <div className="text-xs text-slate-400 font-mono mt-0.5 break-all">
-                        {sale.sale_uuid?.slice(0, 8)}...
-                      </div>
-                    </TableCell>
+      {/* Sales Table */}
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-gray-50 border-b border-gray-200">
+              <th className="text-center px-5 py-3 text-xs font-medium text-gray-500">Invoice</th>
+              <th className="text-center px-5 py-3 text-xs font-medium text-gray-500">Customer</th>
+              <th className="text-center px-5 py-3 text-xs font-medium text-gray-500">Amount</th>
+              <th className="text-center px-5 py-3 text-xs font-medium text-gray-500">Date</th>
+              <th className="text-center px-5 py-3 text-xs font-medium text-gray-500">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading && sales.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="text-center py-10">
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
+                    <p className="text-slate-500 text-sm">{t('sales.loadingSales')}</p>
+                  </div>
+                </td>
+              </tr>
+            ) : paginatedSales.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="text-center py-12 text-slate-500">
+                  {searchTerm || filterDate ? t('sales.noSearchResults') : t('sales.noSales')}
+                </td>
+              </tr>
+            ) : (
+              paginatedSales.map((sale) => (
+                <tr key={sale.sale_uuid} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                  <td className="px-5 py-3.5 text-center font-medium text-blue-600">
+                    <span title={sale.invoice_number || "N/A"}>
+                      {sale.invoice_number || "N/A"}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3.5 text-center text-gray-700">
+                    {sale.customer_name || t('sales.walkInCustomer')}
+                  </td>
+                  <td className="px-5 py-3.5 text-center font-semibold text-emerald-600">
+                    ₹{formatMoney(sale.grand_total)}
+                  </td>
+                  <td className="px-5 py-3.5 text-center text-gray-500">
+                    {sale.created_at ? formatDate(new Date(sale.created_at), "dd MMM yyyy") : "—"}
+                  </td>
+                  <td className="px-5 py-3.5 text-center">
+                    <button
+                      onClick={() => handleView(sale)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 transition-colors"
+                      title={t('sales.viewButton')}
+                    >
+                      <IonIcon icon={eyeOutline} className="text-sm" />
+                      View
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
 
-                    {/* Customer */}
-                    <TableCell className="text-left align-top break-words">
-                      {sale.customer_name || t('sales.walkInCustomer')}
-                    </TableCell>
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 bg-slate-50/50">
+            <p className="text-xs text-slate-500">
+              Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, filteredSales.length)} of {filteredSales.length}
+            </p>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                Prev
+              </button>
+              {(() => {
+                const pages: (number | string)[] = [];
+                const range = 2;
+                for (let i = 1; i <= totalPages; i++) {
+                  if (i === 1 || i === totalPages || (i >= page - range && i <= page + range)) {
+                    pages.push(i);
+                  } else if (pages[pages.length - 1] !== '...') {
+                    pages.push('...');
+                  }
+                }
+                return pages.map((p, idx) =>
+                  p === '...' ? (
+                    <span key={`e-${idx}`} className="px-1 text-xs text-slate-400">…</span>
+                  ) : (
+                    <button
+                      key={p}
+                      onClick={() => setPage(p as number)}
+                      className={`w-8 h-8 text-xs font-medium rounded-lg transition-colors ${
+                        p === page
+                          ? 'bg-emerald-600 text-white'
+                          : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  )
+                );
+              })()}
+              <button
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
-                    {/* Amount */}
-                    <TableCell className="text-right align-top whitespace-nowrap">
-                      <span className="font-bold text-emerald-600 text-lg">
-                        ₹{formatMoney(sale.grand_total)}
-                      </span>
-                    </TableCell>
-
-                    {/* Date & Time */}
-                    <TableCell className="text-left align-top">
-                      <div className="text-slate-600 whitespace-nowrap">
-                        {sale.created_at ? new Date(sale.created_at).toLocaleDateString() : "N/A"}
-                      </div>
-                      <div className="text-xs text-slate-400 whitespace-nowrap">
-                        {sale.created_at ? new Date(sale.created_at).toLocaleTimeString() : ""}
-                      </div>
-                    </TableCell>
-
-                    {/* Status */}
-                    <TableCell className="text-center align-top">
-                      <Badge variant="secondary" className="bg-emerald-100 p-1 text-emerald-700 hover:bg-emerald-100 border-emerald-200 whitespace-nowrap">
-                        <IonIcon icon={checkmarkCircleOutline} className="text-xs mr-1" />
-                        {t('sales.statusCompleted')}
-                      </Badge>
-                    </TableCell>
-
-                    {/* Actions */}
-                    <TableCell className="text-center align-top whitespace-nowrap">
-                      <div className="flex items-center justify-center gap-1">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleView(sale)}
-                          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                          title={t('sales.viewButton')}
-                        >
-                          <IonIcon icon={eyeOutline} className="text-lg" />
-                        </Button>
-
-                        {user?.role === 'owner' && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleDelete(sale)}
-                            disabled={deleting === sale.sale_uuid}
-                            className="text-red-500 hover:text-red-600 hover:bg-red-50 disabled:opacity-50"
-                            title="Delete sale"
-                          >
-                            {deleting === sale.sale_uuid ? (
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-500" />
-                            ) : (
-                              <IonIcon icon={trashOutline} className="text-lg" />
-                            )}
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={(e) => e.target === e.currentTarget && setDeleteConfirm(null)}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden p-6 text-center">
+            <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-red-50 flex items-center justify-center">
+              <svg className="w-7 h-7 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-bold text-slate-800 mb-2">Delete Invoice</h3>
+            <p className="text-sm text-slate-500 mb-2">
+              Are you sure you want to delete invoice <span className="font-semibold text-slate-700">{deleteConfirm.invoice_number}</span>?
+            </p>
+            <p className="text-xs text-amber-600 mb-6">Stock will be restored automatically.</p>
+            <div className="flex gap-3">
+              <Button onClick={() => setDeleteConfirm(null)} variant="outline" className="flex-1">
+                Cancel
+              </Button>
+              <Button
+                onClick={() => handleDelete(deleteConfirm)}
+                disabled={deleting === deleteConfirm.sale_uuid}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+              >
+                {deleting === deleteConfirm.sale_uuid ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                ) : (
+                  'Delete'
+                )}
+              </Button>
+            </div>
+          </div>
         </div>
-      </Card>
+      )}
 
       {/* Invoice Modal */}
       {invoiceData && (
         <InvoiceReceipt
           invoice={invoiceData}
-          onClose={() => setInvoiceData(null)}
+          onClose={() => { setInvoiceData(null); setInvoiceSale(null); }}
           autoPrint={false}
+          onDelete={() => { setDeleteConfirm(invoiceSale); setInvoiceData(null); setInvoiceSale(null); }}
         />
       )}
+
+      {selectedStat && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={() => setSelectedStat(null)}>
+          <div className="w-[400px] h-[500px] rounded-[24px] overflow-hidden pt-5 px-5 pb-3 flex flex-col" style={{ background: "#1a1d1f" }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-end mb-1">
+              <button onClick={() => setSelectedStat(null)} className="text-xs font-semibold px-3 py-1 rounded-full" style={{ background: "#dc2626", color: "#fff" }}>
+                Close
+              </button>
+            </div>
+
+            {selectedStat === 'totalSales' && (
+              <>
+                <div className="flex-1 flex flex-col justify-center text-center px-4">
+                  <p className="text-base" style={{ color: "#888888" }}>Total Sales</p>
+                  <p className="text-5xl font-bold leading-none tracking-tight text-white mt-3">
+                    ₹{Math.round(totalSales).toLocaleString('en-IN')}
+                  </p>
+                  <span className="inline-block text-sm font-semibold px-4 py-1.5 rounded-full mt-3 mx-auto" style={{ background: "#3b82f6", color: "#fff" }}>
+                    Overall Revenue
+                  </span>
+                </div>
+                <div className="relative -mx-5 -mb-3" style={{ height: 180 }}>
+                  <Sparkline data={salesTrend} dataKey="total" width={400} height={180} color="#3b82f6" />
+                </div>
+              </>
+            )}
+
+            {selectedStat === 'avgSale' && (
+              <>
+                <div className="flex-1 flex flex-col justify-center text-center px-4">
+                  <p className="text-base" style={{ color: "#888888" }}>Average Sale</p>
+                  <p className="text-5xl font-bold leading-none tracking-tight text-white mt-3">
+                    ₹{Math.round(avgSale).toLocaleString('en-IN')}
+                  </p>
+                  <span className="inline-block text-sm font-semibold px-4 py-1.5 rounded-full mt-3 mx-auto" style={{ background: "#10b981", color: "#fff" }}>
+                    Per Transaction
+                  </span>
+                </div>
+                <div className="relative -mx-5 -mb-3" style={{ height: 180 }}>
+                  <Sparkline data={salesTrend} dataKey="avg" width={400} height={180} color="#10b981" />
+                </div>
+              </>
+            )}
+
+            {selectedStat === 'todaySales' && (
+              <>
+                <div className="flex-1 flex flex-col justify-center text-center px-4">
+                  <p className="text-base" style={{ color: "#888888" }}>Today's Sales</p>
+                  <p className="text-5xl font-bold leading-none tracking-tight text-white mt-3">
+                    ₹{Math.round(todayTotal).toLocaleString('en-IN')}
+                  </p>
+                  <span className="inline-block text-sm font-semibold px-4 py-1.5 rounded-full mt-3 mx-auto" style={{ background: "#8b5cf6", color: "#fff" }}>
+                    Last 24 Hours
+                  </span>
+                </div>
+                <div className="relative -mx-5 -mb-3" style={{ height: 180 }}>
+                  <Sparkline data={salesTrend} dataKey="total" width={400} height={180} color="#8b5cf6" />
+                </div>
+              </>
+            )}
+
+            {selectedStat === 'transactions' && (
+              <>
+                <div className="flex-1 flex flex-col justify-center text-center px-4">
+                  <p className="text-base" style={{ color: "#888888" }}>Transactions</p>
+                  <p className="text-5xl font-bold leading-none tracking-tight text-white mt-3">
+                    {sales.length.toLocaleString('en-IN')}
+                  </p>
+                  <span className="inline-block text-sm font-semibold px-4 py-1.5 rounded-full mt-3 mx-auto" style={{ background: "#f59e0b", color: "#fff" }}>
+                    Total Invoices
+                  </span>
+                </div>
+                <div className="relative -mx-5 -mb-3" style={{ height: 180 }}>
+                  <Sparkline data={salesTrend} dataKey="count" width={400} height={180} color="#f59e0b" />
+                </div>
+              </>
+            )}
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

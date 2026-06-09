@@ -26,11 +26,9 @@ export async function createMedicineReturn(data: {
   refund_amount?: number;
   reason?: string;
 }) {
-  try {
-    const response = await apiPost("/medicine-returns", data);
-    return response.data || response;
-  } catch (error) {
-    console.error("Failed to create medicine return:", error);
-    return { success: false, error: "Medicine return failed" };
+  const response = await apiPost("/medicine-returns", data);
+  if (!response || response.success === false) {
+    throw new Error(response?.error || "Medicine return failed");
   }
+  return response.data || response;
 }

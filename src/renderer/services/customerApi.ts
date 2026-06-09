@@ -71,6 +71,18 @@ export async function getCustomerLedger(uuid: string) {
   return response.data || response;
 }
 
+export async function getCreditTrend(): Promise<Array<{ month: string; total: number }>> {
+  try {
+    const response = await apiGet("/customers/credit-trend");
+    const data = response?.data || response;
+    if (Array.isArray(data)) return data;
+    return [];
+  } catch (error) {
+    console.error("Credit trend API error:", error);
+    return [];
+  }
+}
+
 export async function getCustomerSummary(): Promise<any> {
   const response = await apiGet("/customers/summary");
   const data = response.data || response;

@@ -24,11 +24,27 @@ export class ReportModel {
         WHERE DATE(created_at, 'localtime') = DATE('now', 'localtime')
     `).get() as any).total;
 
+    // Today's refunds
+    const todayRefunds = (db.prepare(`
+        SELECT COALESCE(SUM(refund_amount), 0) as total 
+        FROM medicine_returns 
+        WHERE return_type = 'customer_return'
+        AND DATE(created_at, 'localtime') = DATE('now', 'localtime')
+    `).get() as any).total;
+
     // This month's sales - using DATE() with localtime
     const monthSales = (db.prepare(`
         SELECT COALESCE(SUM(grand_total), 0) as total 
         FROM sales 
         WHERE strftime('%Y-%m', created_at, 'localtime') = strftime('%Y-%m', 'now', 'localtime')
+    `).get() as any).total;
+
+    // This month's refunds
+    const monthRefunds = (db.prepare(`
+        SELECT COALESCE(SUM(refund_amount), 0) as total 
+        FROM medicine_returns 
+        WHERE return_type = 'customer_return'
+        AND strftime('%Y-%m', created_at, 'localtime') = strftime('%Y-%m', 'now', 'localtime')
     `).get() as any).total;
 
     // Alternative method using string comparison (more reliable)
@@ -45,19 +61,32 @@ export class ReportModel {
         FROM sales
     `).get() as any).total;
 
-    // Total orders
+    // Total refunds (all time)
+    const totalRefunds = (db.prepare(`
+        SELECT COALESCE(SUM(refund_amount), 0) as total 
+        FROM medicine_returns 
+        WHERE return_type = 'customer_return'
+    `).get() as any).total;
+
+    // Total orders (excluding fully refunded)
     const totalOrders = (db.prepare(`
         SELECT COUNT(*) as count 
         FROM sales
+        WHERE status != 'refunded'
     `).get() as any).count;
 
-    // Recent sales (last 5)
+    // Recent sales (last 100)
     const recentSales = db.prepare(`
-        SELECT s.*, c.name as customer_name
+        SELECT s.*, 
+               c.name as customer_name,
+               (SELECT COALESCE(SUM(refund_amount), 0) 
+                FROM medicine_returns 
+                WHERE sale_uuid = s.sale_uuid AND return_type = 'customer_return'
+               ) as refund_total
         FROM sales s
         LEFT JOIN customers c ON s.customer_uuid = c.customer_uuid
         ORDER BY s.created_at DESC
-        LIMIT 5
+        LIMIT 100
     `).all();
 
     // Low stock products (stock < 10)
@@ -100,8 +129,14 @@ export class ReportModel {
 
     return {
       today_sales: todaySales || 0,
+      today_refunds: todayRefunds || 0,
+      today_net_sales: (todaySales || 0) - (todayRefunds || 0),
       month_sales: monthSales || 0,
+      month_refunds: monthRefunds || 0,
+      month_net_sales: (monthSales || 0) - (monthRefunds || 0),
       total_sales: totalSales || 0,
+      total_refunds: totalRefunds || 0,
+      total_net_sales: (totalSales || 0) - (totalRefunds || 0),
       total_orders: totalOrders || 0,
       recent_sales: recentSales,
       low_stock: lowStock,
@@ -119,6 +154,7 @@ export class ReportModel {
       SELECT 
         p.product_uuid,
         p.name,
+        p.manufacturer,
         p.barcode,
         p.sku,
         p.price,
@@ -136,6 +172,7 @@ export class ReportModel {
     return topProducts.map((item: any) => ({
       product_uuid: item.product_uuid,
       name: item.name || 'Unknown',
+      manufacturerName: item.manufacturer,
       barcode: item.barcode,
       sku: item.sku,
       price: item.price,
@@ -156,11 +193,17 @@ export class ReportModel {
 
   // Profit estimation
   static getProfit() {
-    // Calculate total revenue from sales
+    // Calculate total revenue from sales (using grand_total = subtotal + tax)
     const revenue = (db.prepare(`
-      SELECT COALESCE(SUM(si.price * si.quantity), 0) as total
-      FROM sale_items si
-      JOIN sales s ON si.sale_uuid = s.sale_uuid
+      SELECT COALESCE(SUM(grand_total), 0) as total
+      FROM sales
+    `).get() as any).total;
+
+    // Total refund amount
+    const totalRefunds = (db.prepare(`
+      SELECT COALESCE(SUM(refund_amount), 0) as total
+      FROM medicine_returns
+      WHERE return_type = 'customer_return'
     `).get() as any).total;
 
     // Calculate total cost from purchases
@@ -171,12 +214,15 @@ export class ReportModel {
     `).get() as any).total;
 
     const revenueNum = Number(revenue) || 0;
+    const refundsNum = Number(totalRefunds) || 0;
     const costNum = Number(cost) || 0;
+    const netRevenue = revenueNum - refundsNum;
 
     return {
-      revenue: Math.round(revenueNum * 100) / 100,
+      revenue: Math.round(netRevenue * 100) / 100,
+      refunds: Math.round(refundsNum * 100) / 100,
       cost: Math.round(costNum * 100) / 100,
-      profit: Math.round((revenueNum - costNum) * 100) / 100
+      profit: Math.round((netRevenue - costNum) * 100) / 100
     };
   }
 
@@ -203,12 +249,28 @@ export class ReportModel {
       ORDER BY date ASC
     `).all(dates[0]) as Array<{ date: string; total: number }>;
 
-    // Map to all 7 days with 0 for missing days
+    // Get refund data grouped by date
+    const refundData = db.prepare(`
+      SELECT 
+        DATE(created_at) as date,
+        COALESCE(SUM(refund_amount), 0) as total
+      FROM medicine_returns
+      WHERE return_type = 'customer_return' AND created_at >= ?
+      GROUP BY DATE(created_at)
+      ORDER BY date ASC
+    `).all(dates[0]) as Array<{ date: string; total: number }>;
+
+    // Build refund map
+    const refundMap = new Map(refundData.map((d: any) => [d.date, Number(d.total)]));
+
+    // Map to all 7 days with 0 for missing days, subtracting refunds
     return dates.map(date => {
       const dayData = salesData.find((d: any) => d.date === date);
+      const gross = dayData ? Number(dayData.total) : 0;
+      const refunds = refundMap.get(date) || 0;
       return {
         date,
-        total: dayData ? Number(dayData.total) : 0
+        total: Math.round((gross - refunds) * 100) / 100
       };
     });
   }
@@ -228,16 +290,25 @@ export class ReportModel {
       dates.push(date.toISOString().split('T')[0]);
     }
 
-    // Get sales per day
+    // Get sales per day (using grand_total = subtotal + GST)
     const salesByDay = db.prepare(`
       SELECT 
-        DATE(s.created_at) as date,
-        COALESCE(SUM(si.price * si.quantity), 0) as revenue
-      FROM sales s
-      JOIN sale_items si ON s.sale_uuid = si.sale_uuid
-      WHERE s.created_at >= ?
-      GROUP BY DATE(s.created_at)
+        DATE(created_at) as date,
+        COALESCE(SUM(grand_total), 0) as revenue
+      FROM sales
+      WHERE created_at >= ?
+      GROUP BY DATE(created_at)
     `).all(startDateStr) as Array<{ date: string; revenue: number }>;
+
+    // Get refunds per day
+    const refundsByDay = db.prepare(`
+      SELECT 
+        DATE(created_at) as date,
+        COALESCE(SUM(refund_amount), 0) as total
+      FROM medicine_returns
+      WHERE return_type = 'customer_return' AND created_at >= ?
+      GROUP BY DATE(created_at)
+    `).all(startDateStr) as Array<{ date: string; total: number }>;
 
     // Get purchases per day
     const purchasesByDay = db.prepare(`
@@ -252,16 +323,20 @@ export class ReportModel {
 
     // Create maps for quick lookup
     const salesMap = new Map(salesByDay.map((d: any) => [d.date, Number(d.revenue)]));
+    const refundsMap = new Map(refundsByDay.map((d: any) => [d.date, Number(d.total)]));
     const purchasesMap = new Map(purchasesByDay.map((d: any) => [d.date, Number(d.cost)]));
 
-    // Build result for all 7 days
+    // Build result for all 7 days (net revenue = gross - refunds)
     return dates.map(date => {
-      const revenue = salesMap.get(date) || 0;
+      const grossRevenue = salesMap.get(date) || 0;
+      const refunds = refundsMap.get(date) || 0;
+      const revenue = grossRevenue - refunds;
       const cost = purchasesMap.get(date) || 0;
 
       return {
         date,
         revenue: Math.round(revenue * 100) / 100,
+        refunds: Math.round(refunds * 100) / 100,
         cost: Math.round(cost * 100) / 100,
         profit: Math.round((revenue - cost) * 100) / 100
       };
@@ -278,7 +353,7 @@ export class ReportModel {
         COUNT(*) as count,
         COALESCE(SUM(amount), 0) as total
       FROM payments
-      WHERE 1=1
+      WHERE method != 'refund'
     `;
     const params: any[] = [];
 
@@ -385,10 +460,11 @@ export class ReportModel {
       COUNT(*) as total_bills,
       COALESCE(SUM(total), 0) as subtotal,
       COALESCE(SUM(tax), 0) as total_tax,
-      COALESCE(SUM(grand_total), 0) as grand_total
+      COALESCE(SUM(grand_total), 0) as grand_total,
+      COALESCE((SELECT SUM(refund_amount) FROM medicine_returns WHERE return_type = 'customer_return' AND created_at BETWEEN ? AND ?), 0) as total_refunds
     FROM sales
     WHERE created_at BETWEEN ? AND ?
-  `).get(startDate, endDate) as any;
+  `).get(startDate, endDate, startDate, endDate) as any;
 
     // Payment breakdown
     const payments = db.prepare(`

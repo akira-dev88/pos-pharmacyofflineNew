@@ -1018,3 +1018,473 @@ Role	Description	Permissions
 owner	Shop owner/admin	Full access to all features
 manager	Store manager	Sales, reports, product management
 cashier	Counter staff	POS operations, cart checkout
+
+---
+
+## 📅 June 5, 2026 — Manufacturer field in Top Products report
+
+Added `manufacturer` field to the top products query so the manufacturer name is included in the API response.
+
+### Backend changes
+
+| File | Change |
+|------|--------|
+| `server/src/models/Report.ts` | Added `p.manufacturer` to SQL SELECT in `getTopProducts()`; mapped `manufacturerName` in the response object |
+
+### API
+
+```
+GET /api/reports/top-products
+```
+
+Response:
+```json
+[
+  {
+    "product_uuid": "uuid",
+    "name": "Product A",
+    "manufacturerName": "Micro Labs Ltd",
+    "total_qty": 150,
+    "total_revenue": 29999.99
+  }
+]
+```
+
+---
+
+---
+
+## 📅 June 6, 2026 — GST Report Date Range endpoint
+
+Added a new backend endpoint `GET /reports/gst-report-range` that accepts arbitrary `startDate` and `endDate` parameters, enabling daily, monthly, yearly, and custom range GST reports from the same API. Previously the backend only supported month-based GST reports via `GET /reports/gst-report?month=YYYY-MM`.
+
+### Backend changes
+
+| File | Change |
+|------|--------|
+| `server/src/controllers/reportController.ts` | Added `getGSTReportByRange` — new controller method that queries GST slabs, exempt items, invoices, and summary for any `startDate`/`endDate` range |
+| `server/src/routes/reports.ts` | Added `GET /reports/gst-report-range` route (authenticated, owner/manager/admin) |
+
+### API
+
+```
+GET /api/reports/gst-report-range?startDate=2026-04-01&endDate=2026-04-22
+```
+
+Response:
+```json
+{
+  "success": true,
+  "data": {
+    "shop": { "name": "My Store", "gstin": "..." },
+    "slabs": [
+      { "tax_percent": 12, "invoice_count": 1, "taxable_value": 50, "total_tax": 6 }
+    ],
+    "exempt_value": 0,
+    "invoices": [ /* ... */ ],
+    "summary": {
+      "total_invoices": 16,
+      "total_taxable": 950,
+      "total_tax": 6,
+      "grand_total": 956
+    },
+    "range": { "startDate": "2026-04-01", "endDate": "2026-04-22" }
+  }
+}
+```
+
+---
+
+## 📅 June 5, 2026 — Credit Trend Chart (Dashboard)
+
+Replaced the hardcoded sample data in the Dashboard "Credit Given" line chart with real data from `customer_ledgers`.
+
+### Backend changes
+
+| File | Change |
+|------|--------|
+| `server/src/types/index.ts` | Added `CreditTrendItem` interface (`{ month: string, total: number }`) |
+| `server/src/models/Customer.ts` | Added `getCreditTrend()` — queries `customer_ledgers` WHERE `type IN ('debit', 'sale')`, grouped by month |
+| `server/src/controllers/customerController.ts` | Added `creditTrend` handler |
+| `server/src/routes/customers.ts` | Added `GET /customers/credit-trend` route |
+
+### Frontend changes
+
+| File | Change |
+|------|--------|
+| `src/renderer/services/customerApi.ts` | Added `getCreditTrend()` API function |
+| `src/pages/admin/Dashboard.tsx` | Removed hardcoded `creditChartData` array; fetches real data on load; hover tooltip now shows `₹amount` |
+
+### API
+
+```
+GET /api/customers/credit-trend
+```
+
+Response:
+```json
+{
+  "success": true,
+  "data": [
+    { "month": "2025-06", "total": 15000 },
+    { "month": "2025-07", "total": 22000 }
+  ]
+}
+```
+
+# PRODUCT TEMPLATE MODULE
+# 📅 june 7 2026
+
+--------------PRODUCT TEMPLATE MODULE----------------------
+
+1. Create Template
+
+POST
+
+http://localhost:3000/api/product-templates
+
+Headers:
+
+Authorization: Bearer <TOKEN>
+Content-Type: application/json
+
+Body:
+
+{
+  "name": "Tablet",
+  "description": "Solid oral medicine",
+  "category_uuid": "tablet-category-uuid",
+  "icon": "tablet-portrait",
+
+  "defaults_json": {
+    "gst_percent": 12,
+    "schedule_type": "NONE",
+    "medicine_type": "Tablet",
+    "prescription_required": false
+  },
+
+  "packaging_json": {
+    "baseUnit": "Tablet",
+    "templates": [
+      {
+        "name": "Strip",
+        "contains": 15,
+        "unit": "Tablet"
+      },
+      {
+        "name": "Box",
+        "contains": 20,
+        "unit": "Strip"
+      }
+    ]
+  }
+}
+
+Expected:
+
+{
+  "success": true,
+  "data": {
+    "template_uuid": "generated-uuid",
+    "name": "Tablet"
+  }
+}
+2. List Templates
+
+GET
+
+http://localhost:3000/api/product-templates
+
+Headers:
+
+Authorization: Bearer <TOKEN>
+
+Expected:
+
+{
+  "success": true,
+  "data": [
+    {
+      "template_uuid": "...",
+      "name": "Tablet",
+      "category_uuid": "tablet-category-uuid"
+    }
+  ]
+}
+3. Get Single Template
+
+Copy the UUID from Step 1.
+
+GET
+
+http://localhost:3000/api/product-templates/<template_uuid>
+
+Example:
+
+http://localhost:3000/api/product-templates/2ab7d1f3-xxxx
+
+Expected:
+
+{
+  "success": true,
+  "data": {
+    "template_uuid": "...",
+    "name": "Tablet",
+    "defaults_json": {
+      "gst_percent": 12
+    }
+  }
+}
+4. Update Template
+
+PUT
+
+http://localhost:3000/api/product-templates/<template_uuid>
+
+Headers:
+
+Authorization: Bearer <TOKEN>
+Content-Type: application/json
+
+Body:
+
+{
+  "description": "Updated Tablet Template",
+  "defaults_json": {
+    "gst_percent": 5,
+    "schedule_type": "H"
+  }
+}
+
+Expected:
+
+{
+  "success": true,
+  "data": {
+    "description": "Updated Tablet Template"
+  }
+}
+5. Delete Template
+
+DELETE
+
+http://localhost:3000/api/product-templates/<template_uuid>
+
+Headers:
+
+Authorization: Bearer <TOKEN>
+
+Expected:
+
+{
+  "success": true,
+  "message": "Deleted successfully"
+}
+
+--------------HOW TO USE IT-----------------------
+
+
+Current Flow
+
+Today your frontend does:
+
+Hardcoded PRODUCT_TYPES
+       ↓
+User selects Tablet
+       ↓
+Product Form
+       ↓
+Unit Form
+       ↓
+Save Product
+New Flow With Templates
+Settings (Admin)
+
+Create templates once.
+
+Examples:
+
+Tablet
+Syrup
+Injection
+Device
+Ayurvedic
+
+Each template contains:
+
+{
+  "name": "Tablet",
+  "category_uuid": "tablet-category",
+
+  "defaults_json": {
+    "gst_percent": 12,
+    "schedule_type": "NONE"
+  },
+
+  "packaging_json": {
+    "baseUnit": "Tablet",
+    "templates": [
+      {
+        "name": "Strip",
+        "contains": 15,
+        "unit": "Tablet"
+      }
+    ]
+  }
+}
+
+This is setup data.
+
+Not product data.
+
+Product Creation Screen
+
+Instead of:
+
+const PRODUCT_TYPES = [...]
+
+You do:
+
+GET /product-templates
+
+Returns:
+
+[
+  {
+    "template_uuid": "1",
+    "name": "Tablet"
+  },
+  {
+    "template_uuid": "2",
+    "name": "Syrup"
+  }
+]
+User Experience
+
+User clicks:
+
++ Add Product
+
+Show:
+
+Choose Template
+
+[ Tablet ]
+[ Syrup ]
+[ Injection ]
+[ Device ]
+
+Exactly like your current ProductType cards.
+
+User selects Tablet
+
+Frontend:
+
+GET /product-templates/1
+
+Returns:
+
+{
+  "name": "Tablet",
+  "category_uuid": "tablet-category",
+
+  "defaults_json": {
+    "gst_percent": 12,
+    "schedule_type": "NONE",
+    "prescription_required": false
+  },
+
+  "packaging_json": {
+    "baseUnit": "Tablet",
+    "templates": [
+      {
+        "name": "Strip",
+        "contains": 15,
+        "unit": "Tablet"
+      }
+    ]
+  }
+}
+Prefill Product Form
+
+Instead of:
+
+gst_percent = "0";
+schedule_type = "NONE";
+
+Use:
+
+gst_percent = template.defaults_json.gst_percent;
+schedule_type = template.defaults_json.schedule_type;
+
+The user still enters:
+
+Dolo 650
+Manufacturer
+Composition
+Barcode
+Price
+
+Nothing changes.
+
+Dynamic Attributes
+
+Now use:
+
+GET /category-attributes/:category_uuid
+
+Example:
+
+GET /category-attributes/tablet-category
+
+Returns:
+
+[
+  {
+    "name": "Strength"
+  },
+  {
+    "name": "Dosage Form"
+  }
+]
+
+Render those fields automatically.
+
+Product Save
+
+Still:
+
+POST /products
+
+No change.
+
+Product Unit Step
+
+After product creation:
+
+{
+  "product_uuid": "abc123"
+}
+
+Load template packaging:
+
+{
+  "baseUnit": "Tablet",
+  "templates": [
+    {
+      "name": "Strip",
+      "contains": 15,
+      "unit": "Tablet"
+    }
+  ]
+}
+
+Prefill the Unit Form.
+
+User can modify if needed.
+
+Then:
+
+POST /product-units
+
+No change.

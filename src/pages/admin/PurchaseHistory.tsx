@@ -1,48 +1,21 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { getPurchases } from "../../renderer/services/purchaseApi";
 import { IonIcon } from "@ionic/react";
 import {
   cartOutline,
   cashOutline,
-  calendarOutline,
-  peopleOutline,
   closeOutline,
   documentTextOutline,
-  checkmarkCircleOutline,
   warningOutline,
-  timeOutline,
+  searchOutline,
 } from "ionicons/icons";
 
-// shadcn/ui components
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { ScrollArea } from "@/components/ui/scroll-area";
 
-// ── Reusable StatCard (matches other pages)
-const StatCard = ({ label, value, gradient, icon }: any) => (
-  <div className={`relative overflow-hidden rounded-2xl p-5 ${gradient} group cursor-default text-white min-w-0`}>
-    <div className="flex items-start justify-between gap-2">
-      <div className="min-w-0">
-        <p className="text-xs font-semibold uppercase tracking-wider opacity-80 mb-1 truncate">{label}</p>
-        <p className="text-2xl sm:text-3xl font-bold mt-0.5 truncate">{value}</p>
-      </div>
-      <div className="p-2.5 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center shrink-0">
-        {icon}
-      </div>
-    </div>
-    <div className="absolute -bottom-4 -right-4 w-24 h-24 rounded-full bg-white/5 group-hover:bg-white/10 transition-colors" />
-  </div>
-);
+
 
 export default function PurchaseHistory() {
   const { t } = useTranslation();
@@ -50,6 +23,9 @@ export default function PurchaseHistory() {
   const [selected, setSelected] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [page, setPage] = useState(1);
+  const perPage = 10;
 
   useEffect(() => {
     load();
@@ -78,13 +54,81 @@ export default function PurchaseHistory() {
     }
   };
 
+  const filtered = purchases.filter((p) =>
+    [p.supplier?.name, p.supplier_name, p.purchase_uuid, p.id?.toString()]
+      .some((f) => f?.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
   const totalPurchases = purchases.length;
   const totalSpent = purchases.reduce((sum, p) => sum + (Number(p.total) || 0), 0);
   const averagePurchase = totalPurchases > 0 ? totalSpent / totalPurchases : 0;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+  const safePage = Math.min(page, totalPages);
+  const start = (safePage - 1) * perPage;
+  const pageItems = filtered.slice(start, start + perPage);
 
   const formatNumber = (value: any) => {
     const num = Number(value);
     return isNaN(num) ? 0 : num;
+  };
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm]);
+
+  const [selectedStat, setSelectedStat] = useState<string | null>(null);
+
+  const trendData = useMemo(() => {
+    const gen = (peak: number) => {
+      const pts: number[] = [];
+      for (let i = 0; i < 20; i++) {
+        const base = (i / 19) * peak;
+        pts.push(Math.max(0, Math.round(base * (0.7 + ((i * 7 + 13) % 10) / 20))));
+      }
+      return pts;
+    };
+    return {
+      purchases: gen(totalPurchases),
+      spent: gen(totalSpent),
+      avg: gen(averagePurchase),
+    };
+  }, [totalPurchases, totalSpent, averagePurchase]);
+
+  const Sparkline = ({ data: chartData, width = 320, height = 100, color = "#22c55e" }: { data: number[], width?: number, height?: number, color?: string }) => {
+    const [hovered, setHovered] = useState(false);
+    if (!chartData || chartData.length < 2) return null;
+    const values = chartData;
+    const max = Math.max(...values, 1);
+    const min = Math.min(...values, 0);
+    const range = max - min || 1;
+    const points = values.map((v: number, i: number) => ({
+      x: i / (values.length - 1) * width,
+      y: 4 + (height - 8) * (1 - (v - min) / range),
+    }));
+    const smoothPath = (pts: { x: number; y: number }[]) => {
+      if (pts.length < 2) return '';
+      let d = `M ${pts[0].x},${pts[0].y}`;
+      for (let i = 1; i < pts.length; i++) {
+        const p0 = pts[i - 1], p1 = pts[i], p_1 = pts[Math.max(0, i - 2)], p2 = pts[Math.min(pts.length - 1, i + 1)];
+        d += ` C ${p0.x + (p1.x - p_1.x) / 6},${p0.y + (p1.y - p_1.y) / 6} ${p1.x - (p2.x - p0.x) / 6},${p1.y - (p2.y - p0.y) / 6} ${p1.x},${p1.y}`;
+      }
+      return d;
+    };
+    const lineD = smoothPath(points);
+    const areaD = `${lineD} L ${width},${height} L 0,${height} Z`;
+    return (
+      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none"
+        onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+        style={{ cursor: 'pointer' }}>
+        <defs>
+          <linearGradient id={`sg-${color.replace('#','')}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity={hovered ? 0.55 : 0.38} />
+            <stop offset="100%" stopColor={color} stopOpacity={hovered ? 0.06 : 0.02} />
+          </linearGradient>
+        </defs>
+        <path d={areaD} fill={`url(#sg-${color.replace('#','')})`} />
+        <path d={lineD} fill="none" stroke={color} strokeWidth={hovered ? 3.5 : 2.5} strokeLinecap="round" strokeLinejoin="round" style={{ transition: 'stroke-width 0.15s' }} />
+      </svg>
+    );
   };
 
   if (loading) {
@@ -97,18 +141,6 @@ export default function PurchaseHistory() {
 
   return (
     <div className="min-h-screen bg-[#F8F9FC] p-6 space-y-5">
-      {/* Header */}
-      <div className="flex justify-between items-center flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight text-start">{t('purchaseHistory.title')}</h1>
-          <p className="text-slate-500 text-sm mt-0.5">{t('purchaseHistory.subtitle')}</p>
-        </div>
-        <Button onClick={load} className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white gap-2">
-          <IonIcon icon={cartOutline} className="text-xl" />
-          {t('purchaseHistory.refresh')}
-        </Button>
-      </div>
-
       {/* Error Alert */}
       {error && (
         <Card className="border-red-200 bg-red-50">
@@ -126,240 +158,363 @@ export default function PurchaseHistory() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-start">
-        <StatCard
-          label={t('purchaseHistory.totalPurchases')}
-          value={totalPurchases}
-          gradient="bg-gradient-to-br from-blue-500 to-blue-700"
-          icon={<IonIcon icon={cartOutline} className="w-5 h-5 text-white" />}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-6 py-5 flex items-center gap-6 relative">
+          <button onClick={() => setSelectedStat('purchases')} className="absolute top-2 right-2 w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M7 17L17 7M7 7h10v10" />
+            </svg>
+          </button>
+          <div className="flex-shrink-0">
+            <p className="text-xs text-gray-400 mb-0.5">Statistics</p>
+            <p className="text-sm font-semibold text-gray-700 mb-3">{t('purchaseHistory.totalPurchases')}</p>
+            <p className="text-5xl font-bold text-gray-900 leading-none">{totalPurchases}</p>
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-6 py-5 flex items-center gap-6 relative">
+          <button onClick={() => setSelectedStat('spent')} className="absolute top-2 right-2 w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M7 17L17 7M7 7h10v10" />
+            </svg>
+          </button>
+          <div className="flex-shrink-0">
+            <p className="text-xs text-gray-400 mb-0.5">Statistics</p>
+            <p className="text-sm font-semibold text-gray-700 mb-3">{t('purchaseHistory.totalSpent')}</p>
+            <p className="text-5xl font-bold text-gray-900 leading-none">₹{formatNumber(totalSpent).toLocaleString()}</p>
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-6 py-5 flex items-center gap-6 relative">
+          <button onClick={() => setSelectedStat('avg')} className="absolute top-2 right-2 w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M7 17L17 7M7 7h10v10" />
+            </svg>
+          </button>
+          <div className="flex-shrink-0">
+            <p className="text-xs text-gray-400 mb-0.5">Statistics</p>
+            <p className="text-sm font-semibold text-gray-700 mb-3">{t('purchaseHistory.averagePurchase')}</p>
+            <p className="text-5xl font-bold text-gray-900 leading-none">₹{formatNumber(averagePurchase).toFixed(0)}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Search Bar */}
+      <div className="relative flex-1">
+        <IonIcon icon={searchOutline} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg" />
+        <Input
+          placeholder="Search by supplier, invoice..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-11 pr-10 py-2.5 bg-white border-slate-200 rounded-xl focus:ring-2 focus:ring-green-500/20 focus:border-green-400 transition-all"
         />
-        <StatCard
-          label={t('purchaseHistory.totalSpent')}
-          value={`₹${formatNumber(totalSpent).toLocaleString()}`}
-          gradient="bg-gradient-to-br from-emerald-500 to-emerald-700"
-          icon={<IonIcon icon={cashOutline} className="w-5 h-5 text-white" />}
-        />
-        <StatCard
-          label={t('purchaseHistory.averagePurchase')}
-          value={`₹${formatNumber(averagePurchase).toFixed(0)}`}
-          gradient="bg-gradient-to-br from-violet-500 to-violet-700"
-          icon={<IonIcon icon={documentTextOutline} className="w-5 h-5 text-white" />}
-        />
+        {searchTerm && (
+          <button
+            onClick={() => setSearchTerm("")}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+          >
+            <IonIcon icon={closeOutline} className="text-lg" />
+          </button>
+        )}
       </div>
 
       {/* Purchases Table */}
-      <Card className="border-slate-200 shadow-sm bg-white overflow-hidden">
-        <CardHeader className="bg-gradient-to-r from-slate-700 to-slate-800 rounded-t-2xl">
-          <div className="flex justify-between items-center">
-            <CardTitle className="flex items-center gap-2 text-white">
-              <IonIcon icon={cartOutline} className="text-xl" />
-              {t('purchaseHistory.purchaseOrders')}
-            </CardTitle>
-            <span className="text-gray-300 text-sm">
-              {t('purchaseHistory.recordsCount', { count: purchases.length })}
-            </span>
-          </div>
-        </CardHeader>
-        <div className="overflow-x-auto">
-          <Table>
-              <TableHeader>
-                <TableRow className="bg-slate-50 border-b border-slate-200">
-                  <TableHead className="text-slate-600 min-w-[180px]">{t('purchaseHistory.tableSupplier')}</TableHead>
-                  <TableHead className="text-slate-600 min-w-[150px]">{t('purchaseHistory.tableItems')}</TableHead>
-                  <TableHead className="text-right text-slate-600 min-w-[120px] text-center">{t('purchaseHistory.tableTotalAmount')}</TableHead>
-                  <TableHead className="text-slate-600 min-w-[160px]">{t('purchaseHistory.tableDate')}</TableHead>
-                  <TableHead className="text-slate-600 min-w-[100px] text-start">{t('purchaseHistory.tableStatus')}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {purchases.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className=" py-12 text-slate-500">
-                      <div className="flex flex-col gap-2">
-                        <IonIcon icon={cartOutline} className="text-6xl text-slate-300" />
-                        <p className="text-lg">{t('purchaseHistory.noPurchases')}</p>
-                        <p className="text-sm">{t('purchaseHistory.noPurchasesSubtext')}</p>
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <table className="w-full text-sm table-fixed">
+          <thead>
+            <tr className="bg-gray-50 border-b border-gray-200">
+              <th className="text-start px-5 py-3 text-xs font-medium text-gray-500">{t('purchaseHistory.tableSupplier')}</th>
+              <th className="text-center px-5 py-3 text-xs font-medium text-gray-500">{t('purchaseHistory.tableItems')}</th>
+              <th className="text-center px-5 py-3 text-xs font-medium text-gray-500">{t('purchaseHistory.tableTotalAmount')}</th>
+              <th className="text-center px-5 py-3 text-xs font-medium text-gray-500">{t('purchaseHistory.tableDate')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="text-center py-12 text-slate-500">
+                  <IonIcon icon={cartOutline} className="text-6xl text-slate-300 mb-2" />
+                  <p className="text-lg">{searchTerm ? `No results found for "${searchTerm}"` : t('purchaseHistory.noPurchases')}</p>
+                  <p className="text-sm">{searchTerm ? "Try a different search term" : t('purchaseHistory.noPurchasesSubtext')}</p>
+                </td>
+              </tr>
+            ) : (
+              pageItems.map((purchase) => (
+                <tr
+                  key={purchase.purchase_uuid || purchase.id}
+                  onClick={() => setSelected(purchase)}
+                  className="border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer"
+                >
+                  <td className="px-5 py-3.5">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm shrink-0">
+                        {purchase.supplier?.name?.charAt(0).toUpperCase() || 
+                         purchase.supplier_name?.charAt(0).toUpperCase() || 
+                         "W"}
                       </div>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  purchases.map((purchase) => (
-                    <TableRow
-                      key={purchase.purchase_uuid || purchase.id}
-                      onClick={() => setSelected(purchase)}
-                      className="border-b border-slate-100 hover:bg-slate-50/80 transition-colors cursor-pointer"
-                    >
-                      <TableCell>
-                        <div className="flex  gap-3">
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm">
-                            {purchase.supplier?.name?.charAt(0).toUpperCase() || 
-                             purchase.supplier_name?.charAt(0).toUpperCase() || 
-                             "W"}
-                          </div>
-                          <div>
-                            <div className="font-medium text-slate-800">
-                              {purchase.supplier?.name || purchase.supplier_name || t('purchaseHistory.walkInSupplier')}
-                            </div>
-                            {purchase.supplier?.phone && (
-                              <div className="text-xs text-slate-400">{purchase.supplier.phone}</div>
-                            )}
-                          </div>
+                      <div className="min-w-0 text-start">
+                        <div className="font-medium text-slate-800 truncate">
+                          {purchase.supplier?.name || purchase.supplier_name || t('purchaseHistory.walkInSupplier')}
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm text-start text-slate-600">
-                          {t('purchaseHistory.itemsCount', { count: purchase.items?.length || 0 })}
-                        </div>
-                        <div className="text-xs text-start text-slate-400 truncate max-w-[200px]">
-                          {purchase.items?.slice(0, 2).map((item: any) => 
-                            item.product?.name || item.name
-                          ).join(", ")}
-                          {purchase.items?.length > 2 && "..."}
-                        </div>
-                      </TableCell>
-                      <TableCell className="">
-                        <span className="font-semibold text-emerald-600">₹{formatNumber(purchase.total).toLocaleString()}</span>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1 text-sm text-slate-600">
-                          <IonIcon icon={calendarOutline} className="text-xs" />
-                          <span>{purchase.created_at ? new Date(purchase.created_at).toLocaleDateString() : 'N/A'}</span>
-                        </div>
-                        <div className="flex items-center gap-1 text-xs text-slate-400 mt-0.5">
-                          <IonIcon icon={timeOutline} className="text-xs" />
-                          <span>{purchase.created_at ? new Date(purchase.created_at).toLocaleTimeString() : 'N/A'}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-left">
-                        <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-emerald-200">
-                          <IonIcon icon={checkmarkCircleOutline} className="text-xs mr-1" />
-                          {t('purchaseHistory.statusCompleted')}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                        {purchase.supplier?.phone && (
+                          <div className="text-xs text-slate-400 truncate">{purchase.supplier.phone}</div>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-5 py-3.5 text-center">
+                    <div className="font-medium text-slate-800">
+                      {t('purchaseHistory.itemsCount', { count: purchase.items?.length || 0 })}
+                    </div>
+                    {purchase.items && purchase.items.length > 0 && (
+                      <div className="text-xs text-slate-400 truncate max-w-[160px] mx-auto mt-0.5">
+                        {purchase.items.slice(0, 2).map((item: any) => 
+                          item.product?.name || item.name
+                        ).join(", ")}
+                        {purchase.items.length > 2 && "..."}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-5 py-3.5 text-center font-semibold text-emerald-600">
+                    ₹{formatNumber(purchase.total).toLocaleString()}
+                  </td>
+                  <td className="px-5 py-3.5 text-center text-slate-500">
+                    <div>{purchase.created_at ? new Date(purchase.created_at).toLocaleDateString() : 'N/A'}</div>
+                    <div className="text-xs text-slate-400 mt-0.5">
+                      {purchase.created_at ? new Date(purchase.created_at).toLocaleTimeString() : 'N/A'}
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-1 mt-5">
+          <button
+            onClick={() => setPage(safePage - 1)}
+            disabled={safePage <= 1}
+            className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >‹</button>
+          {(() => {
+            const pages: (number | string)[] = [];
+            for (let i = 1; i <= totalPages; i++) {
+              if (i === 1 || i === totalPages || Math.abs(i - safePage) <= 1) {
+                pages.push(i);
+              } else if (Math.abs(i - safePage) === 2) {
+                if (pages[pages.length - 1] !== '…') pages.push('…');
+              }
+            }
+            return pages.map((p, i) =>
+              typeof p === 'number' ? (
+                <button
+                  key={i}
+                  onClick={() => setPage(p)}
+                  className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                    p === safePage
+                      ? 'border border-gray-300 bg-white font-medium text-gray-800'
+                      : 'text-gray-500 hover:bg-gray-100'
+                  }`}
+                >{String(p).padStart(2, '0')}</button>
+              ) : (
+                <span key={i} className="text-gray-400 text-sm px-1">…</span>
+              )
+            );
+          })()}
+          <button
+            onClick={() => setPage(safePage + 1)}
+            disabled={safePage >= totalPages}
+            className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >›</button>
         </div>
-      </Card>
+      )}
 
-      {/* Purchase Details Modal - Premium Dark Design (same as supplier modal) */}
+      {/* Purchase Details Modal */}
       {selected && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-gray-700">
-            <div className="sticky top-0 bg-gray-900/95 backdrop-blur-sm border-b border-gray-700 px-6 py-4 flex justify-between items-center">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-slate-200">
+            <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center">
               <div>
                 <div className="flex items-center gap-2">
-                  <IonIcon icon={documentTextOutline} className="text-gray-400 text-xl" />
-                  <h2 className="text-xl font-bold text-white">{t('purchaseHistory.purchaseDetails')}</h2>
+                  <h2 className="text-xl font-bold text-slate-800">{t('purchaseHistory.purchaseDetails')}</h2>
                 </div>
-                <p className="text-gray-400 text-sm mt-1">
+                <p className="text-slate-400 text-sm mt-1 text-left">
                   {t('purchaseHistory.orderNumber')} #{selected.purchase_uuid?.slice(0, 8).toUpperCase() || 'N/A'}
                 </p>
               </div>
-              <button onClick={() => setSelected(null)} className="text-gray-400 hover:text-gray-200 transition-colors">
+              <button onClick={() => setSelected(null)} className="text-slate-400 hover:text-slate-600 transition-colors">
                 <IonIcon icon={closeOutline} className="text-2xl" />
               </button>
             </div>
 
             <div className="p-6 space-y-5">
-              {/* Supplier Info */}
-              <div className="bg-gray-900/50 rounded-xl p-4 border border-gray-700">
-                <div className="flex items-center gap-2 mb-3">
-                  <IonIcon icon={peopleOutline} className="text-blue-400 text-lg" />
-                  <h3 className="font-semibold text-gray-200">{t('purchaseHistory.supplierInformation')}</h3>
-                </div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">{t('purchaseHistory.nameLabel')}:</span>
-                    <span className="font-medium text-gray-200">
-                      {selected.supplier?.name || selected.supplier_name || t('purchaseHistory.walkInSupplier')}
-                    </span>
+              <div className="flex gap-4">
+                {/* Supplier Info */}
+                <div className="flex-1 bg-slate-50 rounded-xl p-4 border border-slate-200">
+                  <div className="flex items-center gap-2 mb-3">
+                    <h3 className="font-semibold text-slate-700">{t('purchaseHistory.supplierInformation')}</h3>
                   </div>
-                  {selected.supplier?.phone && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">{t('purchaseHistory.phoneLabel')}:</span>
-                      <span className="text-gray-200">{selected.supplier.phone}</span>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-start gap-2">
+                      <span className="text-slate-500">{t('purchaseHistory.nameLabel')}:</span>
+                      <span className="font-medium text-slate-700">
+                        {selected.supplier?.name || selected.supplier_name || t('purchaseHistory.walkInSupplier')}
+                      </span>
                     </div>
-                  )}
-                  {selected.supplier?.email && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">{t('purchaseHistory.emailLabel')}:</span>
-                      <span className="text-gray-200">{selected.supplier.email}</span>
-                    </div>
-                  )}
+                    {selected.supplier?.phone && (
+                      <div className="flex justify-start gap-2">
+                        <span className="text-slate-500">{t('purchaseHistory.phoneLabel')}:</span>
+                        <span className="text-slate-700">{selected.supplier.phone}</span>
+                      </div>
+                    )}
+                    {selected.supplier?.email && (
+                      <div className="flex justify-start gap-2">
+                        <span className="text-slate-500">{t('purchaseHistory.emailLabel')}:</span>
+                        <span className="text-slate-700">{selected.supplier.email}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              {/* Purchase Info */}
-              <div className="bg-gray-900/50 rounded-xl p-4 border border-gray-700">
-                <div className="flex items-center gap-2 mb-3">
-                  <IonIcon icon={calendarOutline} className="text-blue-400 text-lg" />
-                  <h3 className="font-semibold text-gray-200">{t('purchaseHistory.purchaseInformation')}</h3>
-                </div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">{t('purchaseHistory.dateLabel')}:</span>
-                    <span className="text-gray-200">
-                      {selected.created_at ? new Date(selected.created_at).toLocaleString() : 'N/A'}
-                    </span>
+                {/* Purchase Info */}
+                <div className="flex-1 bg-slate-50 rounded-xl p-4 border border-slate-200">
+                  <div className="flex items-center gap-2 mb-3">
+                    <h3 className="font-semibold text-slate-700">{t('purchaseHistory.purchaseInformation')}</h3>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">{t('purchaseHistory.itemsLabel')}:</span>
-                    <span className="text-gray-200">{t('purchaseHistory.productsCount', { count: selected.items?.length || 0 })}</span>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-start gap-2">
+                      <span className="text-slate-500">{t('purchaseHistory.dateLabel')}:</span>
+                      <span className="text-slate-700">
+                        {selected.created_at ? new Date(selected.created_at).toLocaleDateString() : 'N/A'}
+                      </span>
+                    </div>
+                    <div className="flex justify-start gap-2">
+                      <span className="text-slate-500">{t('purchaseHistory.timeLabel')}:</span>
+                      <span className="text-slate-700">
+                        {selected.created_at ? new Date(selected.created_at).toLocaleTimeString() : 'N/A'}
+                      </span>
+                    </div>
+                    <div className="flex justify-start gap-2">
+                      <span className="text-slate-500">{t('purchaseHistory.itemsLabel')}:</span>
+                      <span className="text-slate-700">{t('purchaseHistory.productsCount', { count: selected.items?.length || 0 })}</span>
+                    </div>
                   </div>
                 </div>
               </div>
 
               {/* Items List */}
-              <div className="bg-gray-900/50 rounded-xl p-4 border border-gray-700">
+              <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
                 <div className="flex items-center gap-2 mb-3">
-                  <IonIcon icon={cartOutline} className="text-blue-400 text-lg" />
-                  <h3 className="font-semibold text-gray-200">{t('purchaseHistory.itemsPurchased')}</h3>
+                  <h3 className="font-semibold text-slate-700">{t('purchaseHistory.itemsPurchased')}</h3>
                 </div>
-                <ScrollArea className="h-[300px]">
-                  <div className="grid grid-cols-3 text-xs font-semibold text-gray-400 pb-2 mb-2 border-b border-gray-700">
-                    <span>{t('purchaseHistory.productLabel')}</span>
-                    <span className="text-center">{t('purchaseHistory.quantityLabel')}</span>
-                    <span className="text-right">{t('purchaseHistory.costPriceLabel')}</span>
-                  </div>
-                  {selected.items && selected.items.length > 0 ? (
-                    selected.items.map((item: any, i: number) => (
-                      <div key={i} className="grid grid-cols-3 text-sm py-2 border-b border-gray-700 last:border-0">
-                        <span className="text-gray-200">{item.product?.name || item.name || t('purchaseHistory.unknownProduct')}</span>
-                        <span className="text-center text-gray-400">x{item.quantity || 0}</span>
-                        <span className="text-right text-emerald-400 font-medium">₹{formatNumber(item.cost_price).toFixed(2)}</span>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center text-gray-400 py-4">{t('purchaseHistory.noItemDetails')}</div>
-                  )}
-                </ScrollArea>
+                <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                  <table className="w-full text-sm table-fixed">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200">
+                        <th className="text-center px-5 py-3 text-xs font-medium text-gray-500">{t('purchaseHistory.productLabel')}</th>
+                        <th className="text-center px-5 py-3 text-xs font-medium text-gray-500">{t('purchaseHistory.quantityLabel')}</th>
+                        <th className="text-center px-5 py-3 text-xs font-medium text-gray-500">{t('purchaseHistory.costPriceLabel')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selected.items && selected.items.length > 0 ? (
+                        selected.items.map((item: any, i: number) => (
+                          <tr key={i} className="border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
+                            <td className="px-5 py-3.5 text-slate-700 font-medium">{item.product?.name || item.name || t('purchaseHistory.unknownProduct')}</td>
+                            <td className="px-5 py-3.5 text-center text-slate-500">x{item.quantity || 0}</td>
+                            <td className="px-5 py-3.5 text-center text-emerald-600 font-semibold">₹{formatNumber(item.cost_price).toFixed(2)}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={3} className="text-center text-slate-400 py-8">{t('purchaseHistory.noItemDetails')}</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
               {/* Total */}
-              <div className="bg-gradient-to-r from-emerald-900/30 to-emerald-800/30 rounded-xl p-4 border border-emerald-800/50">
+              <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-200">
                 <div className="flex justify-between items-center">
                   <div>
-                    <p className="text-sm text-gray-300">{t('purchaseHistory.totalAmountLabel')}</p>
-                    <p className="text-xs text-gray-400">{t('purchaseHistory.includingAllItems')}</p>
+                    <p className="text-sm text-slate-600">{t('purchaseHistory.totalAmountLabel')}</p>
+                    <p className="text-xs text-slate-500">{t('purchaseHistory.includingAllItems')}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-3xl font-bold text-emerald-400">₹{formatNumber(selected.total).toFixed(2)}</p>
+                    <p className="text-3xl font-bold text-emerald-700">₹{formatNumber(selected.total).toFixed(2)}</p>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Modal Footer */}
-            <div className="sticky bottom-0 bg-gray-900/95 backdrop-blur-sm border-t border-gray-700 px-6 py-4 rounded-b-2xl">
-              <Button onClick={() => setSelected(null)} className="w-full bg-gray-700 hover:bg-gray-600 text-white">
+            <div className="sticky bottom-0 bg-white border-t border-slate-200 px-6 py-4 rounded-b-2xl">
+              <Button onClick={() => setSelected(null)} className="w-full bg-green-600 hover:bg-green-700 text-white">
                 {t('common.close')}
               </Button>
             </div>
           </div>
         </div>
       )}
+
+      {selectedStat && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={() => setSelectedStat(null)}>
+          <div className="w-[400px] h-[500px] rounded-[24px] overflow-hidden pt-5 px-5 pb-3 flex flex-col" style={{ background: "#1a1d1f" }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-end mb-1">
+              <button onClick={() => setSelectedStat(null)} className="text-xs font-semibold px-3 py-1 rounded-full" style={{ background: "#dc2626", color: "#fff" }}>
+                Close
+              </button>
+            </div>
+
+            {selectedStat === 'purchases' && (
+              <>
+                <div className="flex-1 flex flex-col justify-center text-center px-4">
+                  <p className="text-base" style={{ color: "#888888" }}>Total Purchases</p>
+                  <p className="text-5xl font-bold leading-none tracking-tight text-white mt-3">{totalPurchases.toLocaleString()}</p>
+                  <span className="inline-block text-sm font-semibold px-4 py-1.5 rounded-full mt-3 mx-auto" style={{ background: "#3b82f6", color: "#fff" }}>
+                    All Purchases
+                  </span>
+                </div>
+                <div className="relative -mx-5 -mb-3" style={{ height: 180 }}>
+                  <Sparkline data={trendData.purchases} width={400} height={180} color="#3b82f6" />
+                </div>
+              </>
+            )}
+
+            {selectedStat === 'spent' && (
+              <>
+                <div className="flex-1 flex flex-col justify-center text-center px-4">
+                  <p className="text-base" style={{ color: "#888888" }}>Total Spent</p>
+                  <p className="text-5xl font-bold leading-none tracking-tight text-white mt-3">₹{Math.round(totalSpent).toLocaleString()}</p>
+                  <span className="inline-block text-sm font-semibold px-4 py-1.5 rounded-full mt-3 mx-auto" style={{ background: "#10b981", color: "#fff" }}>
+                    Total Amount
+                  </span>
+                </div>
+                <div className="relative -mx-5 -mb-3" style={{ height: 180 }}>
+                  <Sparkline data={trendData.spent} width={400} height={180} color="#10b981" />
+                </div>
+              </>
+            )}
+
+            {selectedStat === 'avg' && (
+              <>
+                <div className="flex-1 flex flex-col justify-center text-center px-4">
+                  <p className="text-base" style={{ color: "#888888" }}>Average Purchase</p>
+                  <p className="text-5xl font-bold leading-none tracking-tight text-white mt-3">₹{Math.round(averagePurchase).toLocaleString()}</p>
+                  <span className="inline-block text-sm font-semibold px-4 py-1.5 rounded-full mt-3 mx-auto" style={{ background: "#8b5cf6", color: "#fff" }}>
+                    Per Transaction
+                  </span>
+                </div>
+                <div className="relative -mx-5 -mb-3" style={{ height: 180 }}>
+                  <Sparkline data={trendData.avg} width={400} height={180} color="#8b5cf6" />
+                </div>
+              </>
+            )}
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

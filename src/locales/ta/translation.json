@@ -430,6 +430,7 @@
     "emailLabel": "மின்னஞ்சல்",
     "purchaseInformation": "கொள்முதல் தகவல்",
     "dateLabel": "தேதி",
+    "timeLabel": "நேரம்",
     "itemsLabel": "பொருட்கள்",
     "productsCount_one": "{{count}} பொருள்",
     "productsCount_other": "{{count}} பொருட்கள்",

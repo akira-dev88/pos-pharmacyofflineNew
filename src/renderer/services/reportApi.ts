@@ -7,8 +7,14 @@ export async function getDashboardReport() {
     const data = response?.data || response;
     return {
       today_sales: data.today_sales || 0,
+      today_refunds: data.today_refunds || 0,
+      today_net_sales: data.today_net_sales ?? (data.today_sales || 0),
       month_sales: data.month_sales || 0,
+      month_refunds: data.month_refunds || 0,
+      month_net_sales: data.month_net_sales ?? (data.month_sales || 0),
       total_sales: data.total_sales || 0,
+      total_refunds: data.total_refunds || 0,
+      total_net_sales: data.total_net_sales ?? (data.total_sales || 0),
       total_orders: data.total_orders || 0,
       low_stock: data.low_stock || [],
       recent_sales: data.recent_sales || [],
@@ -19,8 +25,14 @@ export async function getDashboardReport() {
     console.error("Dashboard API error:", error);
     return {
       today_sales: 0,
+      today_refunds: 0,
+      today_net_sales: 0,
       month_sales: 0,
+      month_refunds: 0,
+      month_net_sales: 0,
       total_sales: 0,
+      total_refunds: 0,
+      total_net_sales: 0,
       total_orders: 0,
       low_stock: [],
       recent_sales: [],
@@ -60,6 +72,7 @@ export async function getProfitReport() {
     const data = response?.data || response;
     return {
       revenue: data.revenue || 0,
+      refunds: data.refunds || 0,
       cost: data.cost || 0,
       profit: data.profit || 0,
     };
@@ -69,9 +82,9 @@ export async function getProfitReport() {
   }
 }
 
-export async function getSalesTrend() {
+export async function getSalesTrend(days = 7) {
   try {
-    const response: any = await apiGet("/reports/sales-trend");
+    const response: any = await apiGet(`/reports/sales-trend?days=${days}`);
     if (response?.success && Array.isArray(response.data)) return response.data;
     if (Array.isArray(response)) return response;
     return [];
@@ -81,9 +94,9 @@ export async function getSalesTrend() {
   }
 }
 
-export async function getProfitTrend() {
+export async function getProfitTrend(days = 7) {
   try {
-    const response: any = await apiGet("/reports/profit-trend");
+    const response: any = await apiGet(`/reports/profit-trend?days=${days}`);
     if (response?.success && Array.isArray(response.data)) return response.data;
     if (Array.isArray(response)) return response;
     return [];
@@ -177,6 +190,17 @@ export async function getGSTReport(month: string) {
     return null;
   } catch (error) {
     console.error("GST report API error:", error);
+    return null;
+  }
+}
+
+export async function getGSTReportByRange(startDate: string, endDate: string) {
+  try {
+    const response: any = await apiGet(`/reports/gst-report-range?startDate=${startDate}&endDate=${endDate}`);
+    if (response?.success && response.data) return response.data;
+    return null;
+  } catch (error) {
+    console.error("GST report by range API error:", error);
     return null;
   }
 }
